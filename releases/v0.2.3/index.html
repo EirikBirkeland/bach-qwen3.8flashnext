@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bach — the organ works as light</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #05060b;
+        color: #e9edf6;
+        font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+        overflow: hidden;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+        display: block;
+      }
+      #vignette {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(ellipse at 50% 70%, rgba(0, 0, 0, 0) 38%, rgba(0, 0, 0, 0.62) 100%);
+      }
+      .pane {
+        position: fixed;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.7s ease;
+      }
+      .pane.shown {
+        opacity: 1;
+        visibility: visible;
+      }
+      #card {
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: min(560px, 86vw);
+        text-align: center;
+      }
+      #card.dim {
+        opacity: 0.35;
+      }
+      h1 {
+        font-size: clamp(42px, 9vw, 84px);
+        font-weight: 400;
+        letter-spacing: 0.22em;
+        text-indent: 0.22em;
+        margin: 0 0 0.1em;
+      }
+      .tagline {
+        margin: 0 0 2.4em;
+        color: #93a2c0;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        font-size: 11px;
+      }
+      .piece {
+        display: block;
+        width: 100%;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(178, 196, 230, 0.25);
+        color: #e9edf6;
+        padding: 16px 20px;
+        margin: 0 0 12px;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.3s, background 0.3s;
+        font-family: inherit;
+      }
+      .piece:hover {
+        border-color: rgba(255, 212, 122, 0.8);
+        background: rgba(255, 212, 122, 0.06);
+      }
+      .piece-title {
+        display: block;
+        font-size: 21px;
+      }
+      .piece-subtitle {
+        display: block;
+        color: #93a2c0;
+        font-size: 13px;
+        margin-top: 3px;
+      }
+      .note {
+        color: #c9a9a9;
+        font-size: 13px;
+        min-height: 1.4em;
+        margin-top: 18px;
+      }
+      .hint {
+        color: #5f6c85;
+        font-size: 12px;
+        margin-top: 26px;
+      }
+      .hint + .hint {
+        margin-top: 8px;
+      }
+      #hud {
+        inset: 0;
+        pointer-events: none;
+      }
+      #hud > * {
+        pointer-events: auto;
+      }
+      #nowTitle {
+        position: absolute;
+        left: 26px;
+        top: 22px;
+        font-size: 15px;
+        letter-spacing: 0.06em;
+        color: #cdd8ee;
+        text-shadow: 0 0 18px rgba(0, 0, 0, 0.9);
+      }
+      #nowTime {
+        position: absolute;
+        left: 26px;
+        top: 46px;
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        color: #7e8ca6;
+      }
+      #stops {
+        position: absolute;
+        left: 26px;
+        top: 68px;
+        font-size: 11px;
+        letter-spacing: 0.09em;
+        line-height: 1.8;
+        color: #63708c;
+        white-space: pre;
+      }
+      #voices {
+        position: absolute;
+        left: 26px;
+        bottom: 26px;
+        font-size: 12px;
+        color: #a9b6cf;
+        line-height: 1.9;
+      }
+      #lookHint {
+        position: absolute;
+        right: 26px;
+        bottom: 26px;
+        max-width: 38vw;
+        text-align: right;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        line-height: 1.8;
+        color: #5f6c85;
+      }
+      .voice {
+        display: flex;
+        align-items: center;
+      }
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        margin-right: 9px;
+        box-shadow: 0 0 10px currentColor;
+      }
+      button.plain {
+        background: none;
+        border: 1px solid rgba(178, 196, 230, 0.28);
+        color: #cdd8ee;
+        font-family: inherit;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 8px 14px;
+        cursor: pointer;
+      }
+      button.plain:hover {
+        border-color: rgba(255, 212, 122, 0.8);
+        color: #fff;
+      }
+      #controls {
+        position: absolute;
+        right: 24px;
+        top: 22px;
+        display: flex;
+        gap: 8px;
+      }
+      #seek {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 18px;
+        cursor: pointer;
+        background: linear-gradient(to top, rgba(178, 196, 230, 0.14), rgba(178, 196, 230, 0));
+      }
+      #seek:hover {
+        background: linear-gradient(to top, rgba(255, 212, 122, 0.22), rgba(255, 212, 122, 0));
+      }
+      #progress {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 2px;
+        width: 0;
+        background: rgba(255, 212, 122, 0.75);
+      }
+      #end {
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+      }
+      #endLine {
+        font-size: 20px;
+        margin: 0 0 22px;
+      }
+      #again,
+      #menu {
+        margin: 0 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div id="vignette"></div>
+
+    <div id="hud" class="pane">
+      <div id="nowTitle"></div>
+      <div id="nowTime"></div>
+      <div id="stops"></div>
+      <div id="voices"></div>
+      <div id="lookHint"></div>
+      <div id="controls">
+        <button id="pause" class="plain" type="button">Pause</button>
+        <button id="restart" class="plain" type="button">Restart</button>
+        <button id="stop" class="plain" type="button">Stop</button>
+      </div>
+      <div id="seek">
+        <div id="progress"></div>
+      </div>
+    </div>
+
+    <div id="card" class="pane">
+      <h1>BACH</h1>
+      <p class="tagline">the organ works, played as light</p>
+      <div id="pieces"></div>
+      <p class="note" id="status"></p>
+      <p class="hint">loudspeakers or headphones, please</p>
+      <p class="hint">space pauses &middot; &larr; &rarr; move &middot; click the line below to jump</p>
+    </div>
+
+    <div id="end" class="pane">
+      <p id="endLine"></p>
+      <button id="again" class="plain" type="button">Play it again</button>
+      <button id="menu" class="plain" type="button">Choose</button>
+    </div>
+
+    <script src="src/pieces.js"></script>
+    <script src="src/audio.js"></script>
+    <script src="src/visual.js"></script>
+    <script src="src/echoes.js"></script>
+    <script src="src/theme.js"></script>
+    <script src="src/look-fall.js"></script>
+    <script src="src/look-braid.js"></script>
+    <script src="src/look-vigil.js"></script>
+    <script src="src/look-subject.js"></script>
+    <script src="src/main.js"></script>
+  </body>
+</html>
