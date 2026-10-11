@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.3.3",
+    "date": "2026-10-11",
+    "released": "2026-10-11T16:21:39.661Z",
+    "summary": "BWV 645's beat now lands where the music does: the edition's pickup was hiding in the MIDI file",
+    "added": 276,
+    "removed": 63,
+    "logBytes": 4116960
+  },
+  {
     "version": "0.3.2",
     "date": "2026-10-11",
     "released": "2026-10-11T15:40:26.033Z",
