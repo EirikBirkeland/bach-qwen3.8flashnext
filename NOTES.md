@@ -392,6 +392,26 @@ the four-bar phrase (26 s) is the unit, and it is heard twice in the same notes.
 For the look: the waiting, the arrival of the gold line, and the refrain coming
 back are the whole drama of this one.
 
+## What surprised me
+
+- **Two of the four pieces are built on a literal repeat, not on development.**
+  BWV 639 plays its first four bars again, note for note in all three voices, and
+  BWV 645 brings its opening ritornello back whole in the middle. That is worth
+  more to a picture than any amount of key-change: the eye can recognise something.
+- **The ground bass is in the pedal only 13 times, though there are 21
+  statements.** So eight statements must carry the theme in a manual, or written
+  out differently. I could not check this against a score, so treat the count as
+  "the theme in the pedal", not "the variations".
+- **A bar of these files is not what I expected.** BWV 639's bar is 6.5 seconds
+  because the editor wrote the accompaniment in sixteenths at ♩=37; the number
+  of bars a printed edition would show is not the number measured here. The bar
+  grid is still self-consistent, which is all the look needs, but do not quote
+  "bar 12" to anyone holding a score.
+- The pattern finder is picky in a useful way: the fugue subject of BWV 565 came
+  out as eight entries, three of them in the pedal after long silences, which is
+  exactly the sort of thing a picture could mark and that I could not have found
+  by reading the data by eye.
+
 ---
 
 Next, in order:
