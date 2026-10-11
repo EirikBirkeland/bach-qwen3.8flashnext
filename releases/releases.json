@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.4.0",
+    "date": "2026-10-11",
+    "released": "2026-10-11T20:45:01.145Z",
+    "summary": "The organ breathes: phrases that swell, thin moments played full, and a line brought out when it comes back",
+    "added": 1057,
+    "removed": 43,
+    "logBytes": 5045584
+  },
+  {
     "version": "0.3.5",
     "date": "2026-10-11",
     "released": "2026-10-11T19:20:17.047Z",
