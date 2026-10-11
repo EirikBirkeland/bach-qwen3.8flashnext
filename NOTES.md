@@ -430,3 +430,91 @@ Next, in order:
    "which variation am I in", derive it from the theme's copies, not from
    `boundaries()`.
 4. Still not done from session 3's list: cheapening far, faint notes for BWV 582.
+
+## Session 6 — 2026-10-11 — milestone 2: BWV 639 is woven, not falling
+
+**What was waiting for me.** The last session left a whole look in the working tree —
+uncommitted, unreleased, and with no notes (the log stopped at "measure the shape").
+It was finished and 107 tests passed, so this session was: check it properly, fix
+what was wrong in it, and ship it. Released as `0.2.0`.
+
+What is in the tree now:
+
+- **Looks are pluggable.** `src/visual.js` keeps the canvas (`createScreen`: wipe,
+  veil, resize) and picks one look out of `Bach.looks`; `src/look-fall.js` is the
+  old falling picture, unchanged; `src/look-braid.js` is the new one. `src/pieces.js`
+  says who wears what, and its `hint` is the small line in the corner that says how
+  to read the picture.
+- **The woven picture (BWV 639).** Time runs sideways and one phrase — four bars,
+  25.9 s — is exactly as wide as the screen, so the whole shape of a phrase is in
+  front of you while it is played. A bar of this piece is 6.49 s, which is why
+  falling notes showed nothing: one bar was most of the height of a screen. Each
+  voice is an unbroken strand (these editions are legato), crossing a line of sound
+  a quarter of the way in; a line at every bar, a wider one every phrase, gold where
+  a phrase was already heard.
+- **`src/echoes.js`** finds the repeats from the notes alone: a phrase is
+  `barsPerPhrase` bars, its notes keyed by "place in the phrase : pitch", and a
+  later phrase counts when 7/8 of its keys were heard in an earlier one at the same
+  place and pitch (so an ornament still counts as the same phrase). For 639 it finds
+  exactly one: 0:25, 0.95 of the opening.
+- **The data files have bar lines now** (`metre`, `bars`): `tools/bars.mjs`, moved
+  out of `tools/shape.mjs`, which now reads them from the data instead of re-reading
+  the MIDI file. Only the woven picture uses them so far.
+- **`tools/look.mjs`** prints every piece's picture in numbers (busiest second,
+  quietest, burnt-out cells, goldness, what comes back).
+
+What I fixed, all of it found by checking rather than by looking:
+
+- The **measuring harness was measuring a different picture from the page**: it
+  handed the look notes with no `role`, so every line was drawn 3 px thick while the
+  page drew 5.5/4.5/3. `notesFor(data, roles)` now mirrors `toObjects` in
+  `src/audio.js`.
+- `weightOf` promised the line to follow was the stoutest and gave that to the pedal.
+  Melody 5.5, pedal 4.5, inner 3 — the same order the organ plays them in.
+- `main.js` handed `roles` to the picture, which no picture ever read. The roles
+  travel with the notes (organ.prepare attaches them), so the dead field is gone.
+- New tests. The lines sounding at 14 s in BWV 639 must each be drawn as thick as
+  their role says — matched to their boxes by pitch order — and "a piece is drawn the
+  picture it asks for" wraps `Bach.createVisual` to see what the page really asked
+  for, plus the hint on screen. I checked both fail when they should: drop the roles
+  and the thickness test says "the melody line on 72 is drawn 3 thick"; take
+  `name` out of `main.js` and the page test says "was drawn as fall, asked for braid".
+- Measured the split of `visual.js` against the old code in a throw worktree at
+  `c302ec3`: identical mean light, peak and burnt cells for all three fall pieces at
+  their busiest second (565 0.0390/0.65/0, 645 0.0341/0.50/0, 582 0.0454/1.00/6).
+  Worth recording: session 3 wrote 0.031 for 565, and that difference comes from the
+  harness of the day, not from any change to the picture.
+
+What surprised me:
+
+- **`phraseEchoes` can only see a repeat that begins where its own grid begins.** BWV
+  645's opening ritornello comes back whole — bars 5–10 again at bar 24 — and
+  `tools/look.mjs` was printing "nothing in it is played twice over" for it, which is
+  simply false. The two tellings are 19 bars apart and 19 has no divisors, so no
+  whole number of bars per phrase can put a line at both. I reworded the tool to say
+  what it actually tested, and made "the repeat finder has to slide along the piece
+  instead of tiling it" the first job of 645's look.
+- Two repeat questions, two tools: `echoes.js` asks "was this whole stretch played
+  before" (nothing in 565 at four bars; at two bars it points at 5:12 as a repeat of
+  0:38, which is the toccata's parallel chords, not music worth marking), `shape.mjs`
+  asks "is this tune back" and finds the fugue subject eight times. Do not conflate
+  them.
+- A frame of the woven picture draws 250-odd boxes at 10 s, well under the 1500
+  budget, and its light is mean 0.031-0.034 with one burnt cell in the whole piece.
+
+Next, in order:
+
+1. **BWV 645's own look.** Three voices, 3m40, and the clearest drama here: the
+   waiting, the gold chorale arriving at 0:50, its 29 s and 23 s absences, and the
+   ritornello back whole at 1:32. Start by making the repeat finder slide (a window
+   of bars moved along the piece, best match wins) instead of tiling from bar 1.
+2. BWV 582 last of all: 315 notes on screen at once, and the far faint ones may want
+   drawing more cheaply (a crowded frame is 542 boxes and 203 gradients against
+   budgets of 1500 and 600, so it is not urgent).
+3. BWV 565 wants its three worlds — chordal toccata, the bare middle where one note
+   sounds at a time, and the eight fugue entries, which `tools/shape.mjs` already
+   finds with their keys and times.
+4. Still open from milestone 1: dynamics drawn from the music instead of the flat
+   velocities (582 is all 127, 565 all 90).
+5. For myself: commit and release before a session ends. Work left in the tree with no
+   notes is a session's worth of thinking nobody can recover.

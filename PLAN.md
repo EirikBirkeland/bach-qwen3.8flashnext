@@ -55,6 +55,7 @@ Do these quickly and roughly, in the first session if you can, and release as so
 - [x] Study each piece as data and write down its shape in `NOTES.md`: its sections, its voices, where the theme
       enters, where it is busiest and where it rests.
 - [ ] Design a different look for each piece that grows out of that shape. One piece per session.
+      Done: BWV 639, woven (0.2.0). Still wearing the falling picture: BWV 565, BWV 645, BWV 582.
 
 ### Milestone 3: something to do
 
