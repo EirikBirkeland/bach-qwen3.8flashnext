@@ -8,7 +8,8 @@
 
 import fs from "node:fs";
 import vm from "node:vm";
-import { pictureScripts } from "./files.mjs";
+import assert from "node:assert";
+import { pictureScripts, gameScripts } from "./files.mjs";
 
 const COLS = 64;
 const ROWS = 40;
@@ -84,12 +85,26 @@ function warmth(air) {
 
 const DARK = [0.02, 0.024, 0.043]; // the dark of the page
 
+/** A gradient drawn with a nonsense number in it is nowhere, and nowhere is not a
+ *  thing any of these pictures means to draw. */
+function assertFiniteGradient(args) {
+  for (const one of args) {
+    assert.ok(Number.isFinite(one), "a gradient with a nonsense number in it: " + args);
+  }
+}
+
 /**
  * A screen the picture can draw on, and the grid of light it collects. Every
  * frame starts from the same dark, so what is measured is one frame, not what a
  * trail left behind.
+ *
+ * `options.play` says to wire up playing along as index.html wires it - the game
+ * over the piece's own beats, and the picture asked whether it wants to draw the
+ * pulse in its own world. Measuring the picture *and* the pulse together is how
+ * you find out what striking the beat costs in light.
  */
-export function createStage(piece) {
+export function createStage(piece, options) {
+  const play = !!(options && options.play);
   const width = 1280;
   const height = 800;
   const air = [];
@@ -102,6 +117,14 @@ export function createStage(piece) {
     fillStyle: "",
     setTransform() {},
     fillRect(x, y, w, h) {
+      // A box with a nonsense number in it is invisible rather than wrong, and a
+      // picture can lose a whole device that way without any other test noticing.
+      // A box covering the whole screen is a wipe and gets away with it.
+      if (!(x <= 0 && y <= 0 && w >= width && h >= height)) {
+        for (const one of [x, y, w, h]) {
+          assert.ok(Number.isFinite(one), "a box of light with a nonsense number in it: " + [x, y, w, h]);
+        }
+      }
       const plain = colourOf(context.fillStyle);
       const blended = context.globalCompositeOperation === "lighter";
       const isGradient = context.fillStyle && typeof context.fillStyle.at === "function";
@@ -142,9 +165,11 @@ export function createStage(piece) {
       }
     },
     createLinearGradient(...args) {
+      assertFiniteGradient(args);
       return gradient("linear", args);
     },
     createRadialGradient(...args) {
+      assertFiniteGradient(args);
       return gradient("radial", args);
     },
     beginPath() {},
@@ -166,13 +191,34 @@ export function createStage(piece) {
     addEventListener() {},
   };
   const sandbox = vm.createContext({ window, console });
-  for (const file of pictureScripts()) {
+  const scripts = pictureScripts();
+  if (play) {
+    for (const file of gameScripts()) if (scripts.indexOf(file) < 0) scripts.push(file);
+  }
+  for (const file of scripts) {
     const source = fs.readFileSync(new URL("../" + file, import.meta.url), "utf8");
     vm.runInContext(source, sandbox, { filename: file });
   }
 
   const look = window.Bach.createVisual(canvas);
   look.reset(piece.notes, piece.look);
+
+  // Playing along, wired the way the page wires it: the game judges the strikes
+  // and the picture may take the pulse off its hands. The organ is a stand-in
+  // that writes down every bell it was asked for, because nothing here can hear.
+  const rung = [];
+  let game = null;
+  if (play) {
+    assert.ok(piece.data, "playing along needs the piece's own bar lines and metre");
+    game = window.Bach.createGame(canvas, {
+      chime: function (pitch, when, weight, touch) {
+        rung.push({ pitch: pitch, weight: weight, level: touch && touch.level, decay: touch && touch.decay });
+      },
+    });
+    game.open(piece.notes, piece.data);
+    game.paint(look.pulse());
+    game.enable(true);
+  }
   return {
     air: air,
     drawn: drawn,
@@ -186,6 +232,7 @@ export function createStage(piece) {
       for (const spot of air) spot.slice(0, 3).forEach((value, k) => (spot[k] = DARK[k]));
       drawn.length = 0;
       look.frame(now);
+      if (game) game.frame(now);
       let mean = 0;
       let peak = 0;
       let burnt = 0;
@@ -204,6 +251,26 @@ export function createStage(piece) {
         warm: warm / air.length,
         cells: air.length,
       };
+    },
+    /** The player struck something at this second of the piece. */
+    hit: function (at) {
+      assert.ok(game, "this stage is not playing along");
+      return game.hit(at);
+    },
+    /** Whether the piece's own picture is drawing the pulse, or the game's ladder is. */
+    painted: function () {
+      assert.ok(game, "this stage is not playing along");
+      return game.painted();
+    },
+    /** The bells the stand-in organ was asked for. */
+    rung: rung,
+    beats: function () {
+      assert.ok(game, "this stage is not playing along");
+      return game.beats();
+    },
+    score: function () {
+      assert.ok(game, "this stage is not playing along");
+      return game.numbers();
     },
   };
 }
@@ -242,22 +309,27 @@ export function warmestFrame(piece, frames, startAt, strideSeconds) {
 }
 
 /**
- * The notes of a data file, as the picture wants them.
+ * The notes of a data file, as the picture and the game want them.
  *
  * `roles` is what src/pieces.js calls each voice - "melody", "inner", "pedal".
  * On the page the picture is handed the organ's own notes, which carry their
  * role (see toObjects in src/audio.js, done the same way here), so that a look
  * can give the line to follow a different weight from the line under it. The
- * measuring has to hand the same notes, or it measures a different picture.
+ * measuring has to hand the same notes, or it measures a different picture. The
+ * loadness comes along for the same reason: how big a bell a piece can carry is
+ * worked out from it, and a harness that hands none gets the smallest bell there
+ * is without anyone noticing.
  */
 export function notesFor(data, roles) {
+  const at = data.format.indexOf.bind(data.format);
   return data.notes
     .map((row) => ({
-      voice: row[0],
-      pitch: row[1],
-      time: row[2],
-      length: row[3],
-      role: (roles && roles[String(row[0])]) || "inner",
+      voice: row[at("voice")],
+      pitch: row[at("pitch")],
+      time: row[at("time")],
+      length: row[at("duration")],
+      velocity: row[at("velocity")],
+      role: (roles && roles[String(row[at("voice")])]) || "inner",
     }))
     .sort((a, b) => a.time - b.time);
 }

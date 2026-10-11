@@ -20,6 +20,9 @@
 //  - the rim keeps count. One mark per turn taken, gold for the turns that carried
 //    the ground and cool for the ones after it - so the rim says both how far into
 //    the piece you are and where the ground stopped.
+//  - when the player is playing along, the rim grows a tooth per beat, just inside
+//    those marks: this picture has no straight line anywhere, so the pulse is
+//    marked on the wheel instead of being laid over it in a ladder. See src/game.js.
 //  - at the hinge the ground stops coming back, and the wheel has nothing left to
 //    fold along: the fugue is a hand sweeping a dark disc with a few seconds of
 //    light on it, which is what a fugue with no ground feels like after seven
@@ -42,6 +45,9 @@ window.Bach = window.Bach || {};
   var FALL_BACK_BAR = 2.5; // only used if a piece arrives without bar lines
   var GOLD = "#ffd47a"; // the ground bass, and nothing else
   var COOL = "#bcd0f0"; // the clock face, the pitch rings, the hand, the rim
+  var MARK = "#e8f1ff"; // a beat of the piece, marked on the rim for the player to
+  // strike. It needs a colour of its own because gold is taken: on this wheel the
+  // ground is the one thing that is gold, and a beat cannot take that meaning away.
   var TOP = -0.25; // so a turn begins at the top of the screen and winds clockwise
   var TAU = Math.PI * 2;
 
@@ -70,7 +76,7 @@ window.Bach = window.Bach || {};
     var lastNow = -1;
     var time = 0;
     // Filled in at the top of every frame, so the helpers know the size of things.
-    var view = { width: 1, height: 1, cx: 0, cy: 0, inner: 1, outer: 1 };
+    var view = { width: 1, height: 1, cx: 0, cy: 0, inner: 1, outer: 1, ahead: 4, hand: 0 };
 
     screen.onResize(function () {
       lastNow = -1;
@@ -327,6 +333,89 @@ window.Bach = window.Bach || {};
       bloom(tip.x, tip.y, view.outer * 0.1, COOL, strength * 0.16);
     }
 
+    /**
+     * A tooth of the rim: a short tick pointing inwards at one bearing, longer and
+     * brighter the nearer its beat is to the hand. The rim already carries the bars
+     * of the turn and the tally of the turns, so a beat lives just inside all that,
+     * and three teeth to a bar is the metre, written on the wheel.
+     */
+    function tooth(angle, length, colour, strength) {
+      if (length <= 0 || strength <= 0.01) return;
+      for (var depth = 0; depth <= length; depth += 3) {
+        var inward = 1 - depth / (length + 3); // the far end of a tooth is its soft end
+        var here = point(view.outer - 3 - depth, angle);
+        dot(here.x, here.y, 0.6 + 0.9 * inward, colour, strength * inward);
+      }
+    }
+
+    /**
+     * The player's pulse, on the wheel's own rim.
+     *
+     * Elsewhere the game lays a ladder of falling beats over the picture. That
+     * would be the only straight line in a picture that has none: here the hand is
+     * already the line of sound and already goes once round a turn, and the beat
+     * grid folds to that same turn - eight bars, three beats to a bar - so every
+     * beat has a bearing of its own and the hand crossing that bearing *is* the
+     * beat arriving. A tooth per beat costs nothing to explain: the rim becomes a
+     * clock face with the pulse on it, and striking a beat is what lights it.
+     *
+     * The shot comes from src/game.js and is only read here: this draws the pulse,
+     * it does not judge it.
+     */
+    function pulse(shot) {
+      var gap = shot.gap > 0 ? shot.gap : 1;
+      ctx.globalCompositeOperation = "lighter";
+
+      // The rim brightens as the run grows: the wheel's version of a line that
+      // gets wider the longer a player stays with the piece.
+      if (shot.run > 0.02) ring(view.outer, 2 + 4 * shot.run, COOL, 0.015 + 0.05 * shot.run);
+
+      // The teeth: every beat the wheel has room to show. When the ground stops
+      // and the wheel unwinds there is no whole turn left to mark, and the teeth
+      // go back on the rack along with everything else ahead of the hand.
+      for (var i = shot.pointer; i < shot.beats.length; i++) {
+        var beat = shot.beats[i];
+        var away = beat.time - shot.now;
+        if (away > view.ahead) break;
+        if (beat.taken) continue; // that one is light on the rim now, not a tooth
+        var near = Math.max(0, 1 - away / (3 * gap)); // due within three beats
+        tooth(
+          angleAt(beat.time),
+          (beat.bar ? 1.5 : 1) * (3 + 9 * near), // a downbeat reaches further in
+          beat.bright ? MARK : COOL,
+          0.05 + 0.3 * near * near
+        );
+      }
+
+      // What the player struck: light laid round the bearing its beat was at, and
+      // fading. A ring rather than a glow, because the tooth is going in the same
+      // place, and two full lights on one spot are white rather than loud.
+      for (var s = 0; s < shot.strikes.length; s++) {
+        var one = shot.strikes[s];
+        var faded = Math.max(0, 1 - (shot.now - one.at) / shot.fade);
+        if (faded <= 0.01) continue;
+        if (one.when === null || one.when === undefined) {
+          // A click with no beat near it: one dull mark where the hand has got to.
+          var stray = point(view.outer + 6, view.hand);
+          dot(stray.x, stray.y, 1.6, COOL, 0.05 * faded);
+          continue;
+        }
+        var struck = angleAt(one.when);
+        var at = point(view.outer - 7, struck);
+        glow(
+          at.x,
+          at.y,
+          view.outer * (0.05 + 0.18 * faded * faded) + 10,
+          one.kind === "gold" ? MARK : COOL,
+          (one.truest ? 0.24 : 0.16) * faded
+        );
+        tooth(struck, 5 + 9 * faded * faded, MARK, 0.18 + 0.45 * faded);
+      }
+
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1;
+    }
+
     function frame(now) {
       var width = screen.width();
       var height = screen.height();
@@ -360,6 +449,7 @@ window.Bach = window.Bach || {};
         var letGo = 1 - (now - hingeTime) / UNWIND;
         ahead = AHEAD + Math.max(0, untilTurnEnd(now) - AHEAD) * letGo;
       }
+      view.ahead = ahead;
 
       if (from > to) to = from;
       while (from < notes.length && notes[from].time + notes[from].length + TAIL < now) from++;
@@ -400,6 +490,7 @@ window.Bach = window.Bach || {};
       // The clock face: a mark at every bar of the turn, and a gold one where the
       // ground begins. The hand brightens each one as it crosses it.
       var handAngle = angleAt(now);
+      view.hand = handAngle;
       for (var b = 0; b < periodBars; b++) {
         var mark = (b / periodBars + TOP) * TAU;
         var off = Math.abs(Math.sin((mark - handAngle) / 2)); // how far the hand is from here
@@ -503,7 +594,7 @@ window.Bach = window.Bach || {};
       ctx.globalAlpha = 1;
     }
 
-    return { reset: reset, frame: frame };
+    return { reset: reset, frame: frame, pulse: pulse };
   }
 
   Bach.looks.round = createRoundLook;

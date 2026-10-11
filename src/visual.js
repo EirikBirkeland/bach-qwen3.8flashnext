@@ -120,6 +120,15 @@ window.Bach = window.Bach || {};
       frame: function (now) {
         if (active) active.frame(now);
       },
+      /**
+       * The picture's own way of drawing the player's pulse, or nothing. A piece
+       * whose time goes round, or recedes to a horizon, has no more use for a
+       * straight ladder of beats than it has for falling notes: it can put the
+       * pulse in its own world, and src/game.js hands it over if this says so.
+       */
+      pulse: function () {
+        return active && typeof active.pulse === "function" ? active.pulse : null;
+      },
     };
   }
 

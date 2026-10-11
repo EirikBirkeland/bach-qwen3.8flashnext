@@ -151,6 +151,9 @@ window.Bach = window.Bach || {};
           duration: data.duration,
         });
         game.open(prepared.notes, data);
+        // Some pieces would rather show their pulse in their own world than have a
+        // ladder laid over it: the picture says so by having a way to draw it.
+        game.paint(visual.pulse());
         describeGame();
         elements.nowTitle.textContent = piece.title + " " + piece.subtitle;
         elements.stops.textContent = describeStops(prepared.stops);

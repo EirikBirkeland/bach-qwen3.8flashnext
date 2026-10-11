@@ -975,3 +975,304 @@ test("BWV 582: a frame of the wheel is cheap, and nothing on it burns out", () =
   assert.ok(most < 1500, "one frame draws " + most + " boxes: that will not keep up with the music");
   assert.strictEqual(burnt, 0, burnt + " cells of the grid burned out white somewhere in the piece");
 });
+
+// --- playing along: the wheel takes its own pulse ---------------------------
+//
+// Every other piece has the game's ladder of beats laid over its picture. The
+// wheel cannot use one: it is a picture with no straight line in it, and its hand
+// is already the line of sound going once round a turn - so its beats have
+// bearings of their own and the rim can carry them. These are the numbers for
+// "the rim ticks a tooth to a beat", and they are measured with the game wired to
+// the picture the way index.html wires them.
+
+const WHEEL_MARK = "#e8f1ff"; // src/look-round.js: a beat marked on the rim
+
+/** The difference between two bearings, in degrees, the short way round. */
+function bearingGap(one, other) {
+  const apart = Math.abs(one - other) % 360;
+  return apart > 180 ? 360 - apart : apart;
+}
+
+/** A point on the wheel: the look's own geometry, so a test can say where a
+ *  thing belongs and so prove it was drawn there. */
+function wheelPoint(angle, radius) {
+  return { x: CENTRE.x + Math.cos(angle) * radius, y: CENTRE.y + Math.sin(angle) * radius };
+}
+
+/**
+ * The wheel with a player striking its beats, kept beside the wheel on its own.
+ *
+ * `see(seconds)` frames both at the same second and hands back what playing
+ * along added. The picture draws the same marks whether or not anyone is
+ * playing, and the pulse is laid on after them, so everything past the
+ * picture's own count is the pulse and nothing else - which is the only honest
+ * way to point at a tooth when the hand and the clock face are drawn in the same
+ * colours as it is.
+ */
+function wheelPlaying() {
+  const scene = sceneOf("bwv582-passacaglia-c-minor");
+  const picture = createStage(scene);
+  const stage = createStage(scene, { play: true });
+  const ground = groundOf(picture, scene);
+  const turn = ground.barsPerTurn * (scene.data.bars[1] - scene.data.bars[0]);
+
+  return {
+    scene: scene,
+    ground: ground,
+    turn: turn,
+    painted: () => stage.painted(),
+    beats: () => [...stage.beats()],
+    score: () => stage.score(),
+    hit: (at) => stage.hit(at),
+    /** The bearing a second of the piece falls on, counted as polar() counts it. */
+    bearing: (seconds) => {
+      const angle = wheelAt(scene, ground.anchor, ground.barsPerTurn, 60, seconds).angle;
+      return (angle * 180) / Math.PI + 90;
+    },
+    /** The look's own geometry for a second of the piece: bearing and angle. */
+    place: (seconds) => wheelAt(scene, ground.anchor, ground.barsPerTurn, 60, seconds),
+    see: function (seconds) {
+      picture.frame(seconds);
+      const count = picture.drawn.length;
+      const seen = stage.frame(seconds);
+      return { frame: seen, added: stage.drawn.slice(count), hand: this.bearing(seconds) };
+    },
+  };
+}
+
+/** Marks of the pulse just inside the rim, where its teeth live. */
+function onTheRim(boxes) {
+  return boxes.filter((box) => {
+    const where = polar(box);
+    return where.radius > WHEEL_OUTER - 24 && where.radius <= WHEEL_OUTER && box.w <= 6;
+  });
+}
+
+test("only a picture that has a way to draw the pulse is given it", async () => {
+  // src/main.js asks the picture whether it wants the player's pulse. Three of
+  // these worlds are happy with the game's ladder; the wheel is not, because a
+  // wheel of time has its own place to put a beat.
+  const seen = [];
+  for (const slug of [
+    "bwv565-toccata-and-fugue-d-minor",
+    "bwv639-ich-ruf-zu-dir",
+    "bwv645-wachet-auf",
+    "bwv582-passacaglia-c-minor",
+  ]) {
+    seen.push([slug, playground(slug).painted()]);
+  }
+  assert.deepStrictEqual(seen, [
+    ["bwv565-toccata-and-fugue-d-minor", false],
+    ["bwv639-ich-ruf-zu-dir", false],
+    ["bwv645-wachet-auf", false],
+    ["bwv582-passacaglia-c-minor", true],
+  ]);
+});
+
+/** A stage wired for playing along, over one piece as the page hands it over. */
+function playground(slug) {
+  return createStage(sceneOf(slug), { play: true });
+}
+
+test("BWV 582: playing along is taken by the wheel itself, and lays no ladder over it", () => {
+  const play = wheelPlaying();
+  assert.strictEqual(play.painted(), true, "the wheel did not take the pulse off the game");
+  const seen = play.see(120);
+  assert.ok(seen.added.length > 40, "playing along drew only " + seen.added.length + " marks");
+
+  // The ladder is a pile of wide thin bars. None of what the wheel adds is one.
+  const beams = seen.added.filter((box) => box.w > 60 && box.h <= 3);
+  assert.strictEqual(beams.length, 0, "a wide thin bar of the ladder was drawn over the wheel");
+
+  // And what it does draw is a ring of teeth just inside the rim.
+  const teeth = onTheRim(seen.added);
+  assert.ok(teeth.length > 40, "only " + teeth.length + " marks were laid on the rim");
+  const bearings = new Set(teeth.map((box) => Math.round(polar(box).degrees / 3)));
+  assert.ok(bearings.size > 15, "the teeth cover only " + bearings.size + " bearings: that is not a pulse");
+});
+
+test("BWV 582: the rim grows a tooth at every beat left in the turn, and none between", () => {
+  const play = wheelPlaying();
+  const at = 120;
+  const seen = play.see(at);
+  const teeth = onTheRim(seen.added);
+  const turnEnd = play.ground.tune.heard.map((one) => one.time).filter((one) => one > at)[0];
+  const coming = play.beats().filter((beat) => beat.time >= at && beat.time < turnEnd - 0.05);
+  assert.ok(coming.length > 12, "only " + coming.length + " beats are left in this turn to mark");
+
+  for (const beat of coming) {
+    const bearing = play.bearing(beat.time);
+    const marks = teeth.filter((box) => bearingGap(polar(box).degrees, bearing) < 1.5);
+    assert.ok(marks.length >= 2, "nothing was drawn at the bearing of the beat at " + beat.time + " s");
+  }
+
+  // Halfway between two beats there is nothing to strike, and nothing drawn.
+  const between = (play.bearing(coming[3].time) + play.bearing(coming[4].time)) / 2;
+  const stray = teeth.filter((box) => bearingGap(polar(box).degrees, between) < 1.5);
+  assert.strictEqual(stray.length, 0, "there is a mark halfway between two beats, which is nobody's beat");
+});
+
+test("BWV 582: a beat the player strikes lights the rim where it was, and a let-go one does not", () => {
+  const play = wheelPlaying();
+  const at = 100;
+  const caught = play.beats().find((one) => one.time > at + 1);
+  const letGo = play.beats().find((one) => one.time > caught.time + 4);
+
+  // The caught one: framed while it is still to come, then struck, then just after.
+  play.see(caught.time - 0.4);
+  play.hit(caught.time);
+  const struck = play.see(caught.time + 0.2);
+  const where = wheelPoint(play.place(caught.time).angle, WHEEL_OUTER - 7);
+  const glow = (added) =>
+    added.filter(
+      (box) => box.colour === "(gradient)" && Math.hypot(box.x + box.w / 2 - where.x, box.y + box.h / 2 - where.y) < 120
+    );
+  assert.ok(glow(struck.added).length > 0, "the beat was struck and nothing lit where its tooth stands");
+  assert.strictEqual(glow(play.see(caught.time - 0.4).added).length, 0, "something lit before the beat was struck");
+
+  // A beat let go: the same rim, the same second along, and no light.
+  const gone = play.see(letGo.time + 0.2);
+  const atItsRim = (added) =>
+    added.filter((box) => box.colour === "(gradient)" && bearingGap(polar(box).degrees, play.bearing(letGo.time)) < 6);
+  assert.strictEqual(atItsRim(gone.added).length, 0, "a beat nobody struck lit the rim anyway");
+
+  // A click with no beat near it: a dull mark at the hand, and no glow.
+  const far = play.beats().find((one) => one.time > letGo.time + 5);
+  play.hit(far.time + 0.5);
+  const missed = play.see(far.time + 0.55);
+  assert.strictEqual(
+    missed.added.filter((box) => box.colour === "(gradient)").length,
+    0,
+    "a click that caught nothing rang a glow anyway"
+  );
+  assert.strictEqual(missed.added.filter((box) => box.w > 4).length, 0, "a missed click drew something bigger than a mark");
+});
+
+test("BWV 582: the beat is not gold, because the ground is", () => {
+  const play = wheelPlaying();
+  const gap = play.beats()[0].gap;
+  const worth = play.beats().find((beat) => beat.bright && beat.time > 100 && beat.time < 200);
+  assert.ok(worth, "a telling of the ground should be a beat worth more");
+  const plain = play.beats().find((beat) => !beat.bright && beat.time > worth.time + 4 * gap);
+  assert.ok(plain, "there should be an ordinary beat to compare it with");
+
+  // A beat the music is marking is drawn in the pulse's own colour, and never gold.
+  const marksAt = (seconds, added) =>
+    added.filter((box) => box.w <= 6 && bearingGap(polar(box).degrees, play.bearing(seconds)) < 1.5);
+  const marking = marksAt(worth.time, play.see(worth.time - 0.05).added);
+  assert.ok(marking.length > 1, "nothing was drawn for the beat at " + worth.time + " s");
+  assert.ok(
+    marking.some((box) => box.colour === WHEEL_MARK),
+    "a beat the music is marking is not picked out: " + marking.map((box) => box.colour).join(", ")
+  );
+  // An ordinary one, the same distance ahead, is not.
+  const ordinary = marksAt(plain.time, play.see(plain.time - 0.05).added);
+  assert.ok(ordinary.length > 1, "nothing was drawn for the beat at " + plain.time + " s");
+  assert.strictEqual(
+    ordinary.filter((box) => box.colour === WHEEL_MARK).length,
+    0,
+    "an ordinary beat was picked out as though the music were marking it"
+  );
+
+  // ... not even a beat the player strikes, however much the music was marking it.
+  // (It has to be a beat further along than anywhere framed so far: a beat the
+  // hand has passed is nobody's to strike again.)
+  const goldBeat = play.beats().find((one) => one.bright && one.time > 300 && one.time < 400);
+  assert.ok(goldBeat, "there should be another telling of the ground to strike");
+  play.see(goldBeat.time - 0.2);
+  play.hit(goldBeat.time);
+  const struck = play.see(goldBeat.time + 0.1);
+  assert.ok(play.score().caught > 0, "the strike did not count");
+  const isGold = (box) => String(box.colour).indexOf(WHEEL_GOLD) >= 0 || String(box.fill).indexOf(WHEEL_GOLD) >= 0;
+  assert.strictEqual(
+    struck.added.filter(isGold).length,
+    0,
+    "a struck beat lit gold, and gold belongs to the ground alone"
+  );
+
+  // And nothing else playing along draws, anywhere, is gold either.
+  for (const at of [66, 120, 240, goldBeat.time - 0.05]) {    const seen = play.see(at);
+    assert.strictEqual(
+      seen.added.filter(isGold).length,
+      0,
+      "something gold was drawn by playing along at " + at + " s"
+    );
+  }
+});
+
+test("BWV 582: when the wheel unwinds for the fugue, the teeth go back on the rack", () => {
+  const play = wheelPlaying();
+  const hinge = play.ground.tune.heard[play.ground.tune.heard.length - 1].until;
+  const passacaglia = play.see(200);
+  const fugue = play.see(hinge + 60);
+  const spread = (added) => {
+    const degrees = onTheRim(added).map((box) => polar(box).degrees).sort((one, other) => one - other);
+    if (degrees.length < 2) return 0;
+    let widest = 360 - (degrees[degrees.length - 1] - degrees[0]);
+    for (let i = 1; i < degrees.length; i++) widest = Math.max(widest, degrees[i] - degrees[i - 1]);
+    return 360 - widest;
+  };
+  assert.ok(spread(passacaglia.added) > 250, "a turn of the passacaglia marks only " + spread(passacaglia.added).toFixed(0) + " degrees of rim");
+  assert.ok(spread(fugue.added) < 120, "the fugue still has " + spread(fugue.added).toFixed(0) + " degrees of teeth on the rim");
+});
+
+test("BWV 582: the pulse on the rim is cheap to draw, and burns nothing out", () => {
+  const scene = sceneOf("bwv582-passacaglia-c-minor");
+  const stage = createStage(scene, { play: true });
+  const beats = [...stage.beats()];
+  let at = 0;
+  let index = 0;
+  let most = 0;
+  let burnt = 0;
+  let rung = 0;
+  for (at = 1; at < scene.data.duration; at += 2) {
+    while (index < beats.length && beats[index].time < at) {
+      if (at - beats[index].time < 0.3) stage.hit(beats[index].time); // there for a beat now and then
+      index++;
+    }
+    const seen = stage.frame(at);
+    if (stage.drawn.length > most) most = stage.drawn.length;
+    burnt += seen.burnt;
+    assert.ok(seen.mean < 0.06, "the wheel is washed out at " + at + " s with the pulse on: mean light " + seen.mean.toFixed(3));
+  }
+  rung = stage.rung.length;
+  assert.ok(most > 200, "one frame draws only " + most + " marks with the pulse on");
+  assert.ok(most < 1500, "one frame draws " + most + " boxes with the pulse on: that will not keep up");
+  assert.strictEqual(burnt, 0, burnt + " cells burned out white with the pulse on");
+  assert.ok(rung > 5, "the player struck " + rung + " bells in " + Math.round(at) + " s: the harness is not striking");
+});
+
+test("BWV 582: a run brightens the rim, and letting a beat go takes it back", () => {
+  const play = wheelPlaying();
+  // The wheel's own version of the ladder's line getting wider: the rim itself
+  // takes up a ring of light while the player stays with the piece.
+  const ring = (added) =>
+    added.filter(
+      (box) =>
+        box.colour === "(gradient)" &&
+        Math.hypot(box.x + box.w / 2 - CENTRE.x, box.y + box.h / 2 - CENTRE.y) < 2 &&
+        String(box.fill).indexOf(WHEEL_COOL) >= 0
+    );
+  const from = play.beats().find((one) => one.time > 200);
+  const four = play.beats().slice(play.beats().indexOf(from), play.beats().indexOf(from) + 4);
+  assert.strictEqual(four.length, 4, "the harness wanted four beats in a row and found " + four.length);
+
+  play.see(from.time - 0.5);
+  assert.strictEqual(ring(play.see(from.time - 0.05).added).length, 0, "the rim was bright before anything was struck");
+
+  for (const beat of four) {
+    play.hit(beat.time);
+    play.see(beat.time + 0.05);
+  }
+  assert.strictEqual(play.score().chain, 4, "the four beats did not make a run");
+  assert.ok(ring(play.see(four[3].time + 0.1).added).length > 0, "four beats in a row and the rim did not brighten");
+
+  // Let one go, and it is back to plain. The frames have to come at less than half
+  // a second apart, because a bigger stride is a jump somewhere else, not a let-go.
+  const next = play.beats().find((one) => one.time > four[3].time + 0.2);
+  play.see(next.time - 0.2);
+  play.see(next.time + 0.1);
+  play.see(next.time + 0.4);
+  assert.strictEqual(play.score().chain, 0, "letting the beat go did not end the run");
+  assert.strictEqual(ring(play.see(next.time + 0.45).added).length, 0, "the rim kept its ring after the run ended");
+});

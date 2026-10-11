@@ -352,3 +352,55 @@ test("switching to play along starts the count afresh", () => {
   assert.strictEqual(game.numbers().caught, 0, "coming back starts again");
   assert.strictEqual(game.numbers().chain, 0);
 });
+
+test("a piece's own picture can take the pulse off the game, and give it back", () => {
+  const { game, canvas } = smallGame();
+  const asked = [];
+  game.paint((shot) => {
+    asked.push({
+      now: shot.now,
+      beats: shot.beats.length,
+      gap: shot.gap,
+      ahead: shot.ahead,
+      run: shot.run,
+      strikes: shot.strikes.length,
+    });
+  });
+  assert.strictEqual(game.painted(), true, "the game does not say it handed the pulse over");
+  game.hit(1);
+  canvas.drawn.rects.length = 0;
+  game.frame(1.2);
+  assert.strictEqual(canvas.drawn.rects.length, 0, "the ladder was drawn as well as the piece's own pulse");
+  assert.strictEqual(asked.length, 1, "the picture was not asked for this frame");
+  assert.strictEqual(asked[0].beats, 12, "the picture was not handed the piece's beats");
+  assert.strictEqual(asked[0].gap, 1, "nor how long they are");
+  assert.ok(asked[0].ahead > 1, "nor how far ahead they are worth showing");
+  assert.strictEqual(asked[0].strikes, 1, "nor what the player struck");
+  assert.ok(Math.abs(asked[0].run - 1 / 16) < 1e-9, "a run of one is a sixteenth of the way to a long one");
+
+  game.paint(null);
+  assert.strictEqual(game.painted(), false, "the ladder did not come back");
+  canvas.drawn.rects.length = 0;
+  game.frame(1.4);
+  assert.ok(canvas.drawn.rects.length > 0, "with nothing to paint the pulse with, nothing was drawn");
+});
+
+test("a strike says which beat it caught, not only when it landed", () => {
+  const { game } = smallGame();
+  let shot = null;
+  game.paint((one) => {
+    shot = one;
+  });
+  game.hit(2.05); // the beat at 2, struck a whisker late
+  game.frame(2.1);
+  let strike = shot.strikes[shot.strikes.length - 1];
+  assert.strictEqual(strike.when, 2, "a picture that wants to light the beat needs to know which one it was");
+  assert.strictEqual(strike.kind, "cool");
+  assert.strictEqual(strike.truest, true);
+
+  game.hit(2.6); // nowhere near a beat: it is a click and nothing more
+  game.frame(2.65);
+  strike = shot.strikes[shot.strikes.length - 1];
+  assert.strictEqual(strike.kind, "stray");
+  assert.strictEqual(strike.when, null, "a click that caught no beat has no beat to point at");
+});

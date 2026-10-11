@@ -12,6 +12,9 @@ import { pageScripts, lookScripts } from "./files.mjs";
 
 const root = new URL("..", import.meta.url); // the project folder
 
+/** The stand-in window the page is opened in, and the canvas it holds. */
+const WINDOW = { width: 1280, height: 800 };
+
 function gradient(colours) {
   return {
     addColorStop(at, colour) {
@@ -27,22 +30,36 @@ function gradient(colours) {
 
 function fakeCanvas(colours) {
   const drawn = { fillRects: 0, gradients: 0, rects: [] };
+  // A box or a glow with a nonsense number in it is invisible rather than wrong,
+  // and a page can lose a whole device that way without anything else noticing -
+  // which is how a bug in the game's drawing once sailed through every test.
+  // A box covering the whole canvas is a wipe and gets away with it.
+  const sensible = (what, args) => {
+    for (const one of args) {
+      assert.ok(Number.isFinite(one), what + " with a nonsense number in it: " + args);
+    }
+  };
   const context = {
     globalAlpha: 1,
     globalCompositeOperation: "source-over",
     fillStyle: "",
     setTransform() {},
     fillRect(x, y, w, h) {
+      if (!(x <= 0 && y <= 0 && w >= WINDOW.width && h >= WINDOW.height)) {
+        sensible("a box of light", [x, y, w, h]);
+      }
       drawn.fillRects++;
       // The colour is kept with the box: a test can tell a wipe of the whole
       // screen from one small bar of light.
       drawn.rects.push([x, y, w, h, context.fillStyle]);
     },
-    createLinearGradient() {
+    createLinearGradient(...args) {
+      sensible("a wash of light", args);
       drawn.gradients++;
       return gradient(colours);
     },
-    createRadialGradient() {
+    createRadialGradient(...args) {
+      sensible("a glow", args);
       drawn.gradients++;
       return gradient(colours);
     },
@@ -288,8 +305,8 @@ function makePage() {
 
   const window = {
     devicePixelRatio: 2,
-    innerWidth: 1280,
-    innerHeight: 800,
+    innerWidth: WINDOW.width,
+    innerHeight: WINDOW.height,
     listeners: {},
     addEventListener(kind, handler) {
       window.listeners[kind] = (window.listeners[kind] || []).concat(handler);
@@ -1383,6 +1400,35 @@ test("playing along draws its ladder on the picture, and just watching draws non
   for (const bar of bars) {
     assert.ok(Math.abs(bar[0] + bar[2] / 2 - page.window.innerWidth / 2) < 2, "the ladder is not in the middle: " + bar[0]);
   }
+});
+
+test("the Passacaglia's wheel takes the pulse itself, and the ladder stays away", async () => {
+  // The wheel of BWV 582 marks its beats on its own rim, so the game's ladder of
+  // falling bars must not be laid over it as well. This is the wiring in main.js:
+  // the picture is asked, and it says yes for this piece only.
+  const page = openPage();
+  const listed = [...page.window.Bach.pieces];
+  page.elements.pieces.children[listed.findIndex((one) => one.slug === "bwv582-passacaglia-c-minor")].click();
+  await settled();
+  const data = page.window.BachData["bwv582-passacaglia-c-minor"];
+  page.elements.seek.click({ clientX: (120 / data.duration) * page.window.innerWidth });
+  page.nextFrame(1 / 60);
+
+  const before = page.canvas.drawn.fillRects;
+  page.nextFrame(1 / 60);
+  const watching = page.canvas.drawn.fillRects - before;
+
+  page.elements.play.click();
+  const since = page.canvas.drawn.rects.length;
+  const marks = page.canvas.drawn.fillRects;
+  page.nextFrame(1 / 60);
+  const playing = page.canvas.drawn.fillRects - marks;
+  assert.ok(playing > 0, "playing along drew nothing on the wheel");
+
+  const frame = page.canvas.drawn.rects.slice(since);
+  const beams = frame.filter((box) => box[2] > 60 && box[3] <= 2);
+  assert.strictEqual(beams.length, 0, "the ladder was laid over the wheel: " + beams.length + " wide flat bars");
+  assert.ok(watching > 0, "the wheel drew nothing to compare against");
 });
 
 test("a player who is there for every beat catches every beat", async () => {

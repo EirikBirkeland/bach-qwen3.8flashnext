@@ -4,7 +4,7 @@
 set -u
 cd "$(dirname "$0")/.."
 mkdir -p /tmp/mut
-for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js; do
+for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js; do
   cp "$f" "/tmp/mut/$(basename "$f")"
 done
 
@@ -59,8 +59,25 @@ run "touch: a bell may hang as long as anything" src/touch.js 's/var decay = Mat
 run "game: the strike does not carry the piece's bell" src/game.js 's/organ\.chime\(pick\.pitch, null, weight, bell\);/organ.chime(pick.pitch, null, weight);/'
 run "theme: the same question is asked again" src/theme.js 's/    if \(asked \&\& asked\.notes === notes \&\& asked\.gap === gap\) return answer;\n//'
 
+# Playing along, when a piece's own world draws the pulse: src/visual.js asks the
+# look whether it wants to, src/main.js hands it over, src/game.js judges and
+# hands the shot, and the wheel of BWV 582 draws a tooth per beat on its own rim.
+run "game: the picture is never given the pulse" src/game.js 's/      if \(painter\) painter\(shot\);\n      else draw\(shot\);/      draw(shot);/'
+run "game: the shot does not say which beat was struck" src/game.js 's/lit\.push\(\{ at: now, when: pick\.time, /lit.push({ at: now, when: null, /'
+run "game: a run never grows the light" src/game.js 's/run: Math\.min\(1, chain \/ RUN\)/run: 0/'
+run "game: a strike keeps burning after you travel back" src/game.js 's/        if \(back\) lit = \[\];\n//'
+run "visual: the look is never asked whether it draws the pulse" src/visual.js 's/        return active && typeof active\.pulse === "function" \? active\.pulse : null;/        return null;/'
+run "main: the picture is never asked to take the pulse" src/main.js 's/        game\.paint\(visual\.pulse\(\)\);\n//'
+run "wheel: it keeps the game's ladder after all" src/look-round.js 's/return \{ reset: reset, frame: frame, pulse: pulse \};/return { reset: reset, frame: frame };/'
+run "wheel: no teeth at all" src/look-round.js 's/0\.05 \+ 0\.3 \* near \* near/0.001/'
+run "wheel: teeth drawn past what the wheel shows" src/look-round.js 's/        if \(away > view\.ahead\) break;\n//'
+run "wheel: a beat the music is marking is no different" src/look-round.js 's/          beat\.bright \? MARK : COOL,/          COOL,/'
+run "wheel: a struck beat is not lit" src/look-round.js 's/        if \(faded <= 0\.01\) continue;/        if (faded > 0) continue;/'
+run "wheel: a struck beat is lit gold, which is the ground's colour" src/look-round.js 's/          one\.kind === "gold" \? MARK : COOL,/          GOLD,/'
+run "wheel: the rim does not brighten for a run" src/look-round.js 's/      if \(shot\.run > 0\.02\) ring\(view\.outer, 2 \+ 4 \* shot\.run, COOL, 0\.015 \+ 0\.05 \* shot\.run\);//'
+
 echo "--- restoring ---"
-for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js; do
+for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js; do
   cp "/tmp/mut/$(basename "$f")" "$f"
 done
 node --test 2>&1 | grep -E "^ℹ (tests|pass|fail)"

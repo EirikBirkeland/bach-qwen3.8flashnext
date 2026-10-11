@@ -84,7 +84,7 @@ window.Bach = window.Bach || {};
       look: {
         name: "round",
         phrase: 8,
-        hint: "the wheel turns once to the ground bass · gold is the ground · the rim counts the turns",
+        hint: "the wheel turns once to the ground bass · gold is the ground · the rim marks the beat",
       },
       voices: {
         1: { name: "Right hand", colour: "#79e2ff", role: "melody" },
