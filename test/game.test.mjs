@@ -12,6 +12,7 @@ import assert from "node:assert";
 import fs from "node:fs";
 import vm from "node:vm";
 import { gameScripts } from "./files.mjs";
+import { loadPieces, rolesFor } from "./render.mjs";
 
 const root = new URL("..", import.meta.url);
 
@@ -27,9 +28,11 @@ function dataOf(slug) {
   return JSON.parse(fs.readFileSync(new URL("data/" + slug + ".json", root), "utf8"));
 }
 
-/** The notes of a data file, as the page hands them to the game. */
+/** The notes of a data file, as the page hands them to the game - with the line
+ *  each one belongs to, because the size of a bell is worked out from that. */
 function notesOf(slug) {
   const data = dataOf(slug);
+  const roles = rolesFor(loadPieces().find((piece) => piece.slug === slug));
   const at = data.format.indexOf.bind(data.format);
   return data.notes
     .map((row) => ({
@@ -37,6 +40,8 @@ function notesOf(slug) {
       pitch: row[at("pitch")],
       time: row[at("time")],
       length: row[at("duration")],
+      velocity: row[at("velocity")],
+      role: roles[String(row[at("voice")])] || "inner",
     }))
     .sort((a, b) => a.time - b.time || a.pitch - b.pitch);
 }
@@ -82,15 +87,24 @@ function fakeCanvas() {
   };
 }
 
-/** The organ, as far as the game meets it: it is told what note to ring. */
+/** The organ, as far as the game meets it: it is told what note to ring, and how
+ *  big a bell the piece asks for. */
 function fakeOrgan() {
   const rung = [];
   return {
     rung: rung,
-    chime(pitch, when, weight) {
+    chime(pitch, when, weight, touch) {
       assert.ok(pitch >= 12 && pitch <= 108, "a bell was asked for an impossible note: " + pitch);
       assert.ok(weight > 0 && weight <= 1.5 + 0.001, "a bell was struck too hard: " + weight);
-      rung.push({ pitch: pitch, weight: weight });
+      assert.ok(
+        Number.isFinite(touch.level) && touch.level > 0 && touch.level < 0.2,
+        "the game handed the bell a size that is none: " + JSON.stringify(touch)
+      );
+      assert.ok(
+        Number.isFinite(touch.decay) && touch.decay > 0.05 && touch.decay < 4,
+        "the game handed the bell a length that is none: " + JSON.stringify(touch)
+      );
+      rung.push({ pitch: pitch, weight: weight, touch: touch });
     },
   };
 }
@@ -208,6 +222,43 @@ test("a beat that the music is marking is gold, and rings for more", () => {
   assert.strictEqual(struck.bright, "tune");
   assert.strictEqual(struck.kind, "true");
   assert.ok(organ.rung[organ.rung.length - 1].weight > 1, "a gold beat rings louder than an ordinary one");
+});
+
+/** A game over a real piece of music, switched on and ready to be asked about it. */
+function over(slug) {
+  const organ = fakeOrgan();
+  const game = Bach.createGame(fakeCanvas(), organ);
+  game.open(notesOf(slug), dataOf(slug));
+  game.enable(true);
+  return { game: game, organ: organ };
+}
+
+test("each piece decides how big its own bell is, and the game hands that over", () => {
+  const chorale = over("bwv639-ich-ruf-zu-dir"); // three voices going on every beat
+  const toccata = over("bwv565-toccata-and-fugue-d-minor"); // ... and often exactly one
+  const passacaglia = over("bwv582-passacaglia-c-minor"); // ... and the fastest beat here
+
+  assert.ok(
+    chorale.game.touch().level > toccata.game.touch().level,
+    "a bell over a full chorale has to be bigger than one over a bare line: " +
+      chorale.game.touch().level.toFixed(3) +
+      " against " +
+      toccata.game.touch().level.toFixed(3)
+  );
+  assert.ok(
+    chorale.game.touch().decay > passacaglia.game.touch().decay,
+    "a bell in a slow piece carries and one in a fast piece is gone: " +
+      chorale.game.touch().decay.toFixed(2) +
+      " against " +
+      passacaglia.game.touch().decay.toFixed(2)
+  );
+
+  chorale.game.hit(plain(chorale.game.beats())[0].time);
+  assert.strictEqual(
+    chorale.organ.rung[chorale.organ.rung.length - 1].touch,
+    chorale.game.touch(),
+    "the strike did not carry the piece's own bell with it"
+  );
 });
 
 test("the ladder is drawn where the beats are", () => {

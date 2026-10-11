@@ -8,7 +8,10 @@
 // What a catch does: a bell rings, and its note is the lowest note *sounding* at
 // that moment, two octaves up. So whatever the player strikes is a note of the
 // harmony that is actually being played - the taps shimmer over the organ and
-// pick out the chords, which is the whole reason for doing it.
+// pick out the chords, which is the whole reason for doing it. How big that bell
+// is, and how long it hangs, belongs to the piece rather than to the game:
+// src/touch.js measures both out of the music and the game hands them over with
+// every strike.
 //
 // What is worth more: a beat the music itself is marking - the tune coming back,
 // a line taken up again after ten seconds gone, a chord of five struck together.
@@ -57,6 +60,7 @@ window.Bach = window.Bach || {};
     var ctx = canvas.getContext("2d");
     var beats = [];
     var gap = 1; // how long a beat usually is, in this piece
+    var bell = null; // how big a bell this piece asks for: src/touch.js says
     var speed = LADDER / AHEAD; // pixels a second of music takes down the ladder
     var look = LADDER / speed; // seconds of music the ladder shows
 
@@ -79,6 +83,7 @@ window.Bach = window.Bach || {};
       gap = Bach.beatGap(beats);
       speed = LADDER / (AHEAD * gap);
       look = AHEAD * gap;
+      bell = Bach.touch(notes, beats, gap); // how big a bell this piece can carry
       markTheLandmarks(Bach.landmarks(notes, { bars: data.bars }));
       pitchEveryBeat(notes);
       close();
@@ -194,7 +199,7 @@ window.Bach = window.Bach || {};
       var struckTrue = Math.abs(off) <= TRUE;
       if (struckTrue) truest++;
       var weight = (pick.bright ? BRIGHT : 1) * (struckTrue ? TRUEST : 0.85);
-      organ.chime(pick.pitch, null, weight);
+      organ.chime(pick.pitch, null, weight, bell);
       lit.push({ at: now, kind: pick.bright ? "gold" : "cool", truest: struckTrue });
       return { kind: struckTrue ? "true" : "near", bright: pick.bright || null, off: off };
     }
@@ -344,6 +349,10 @@ window.Bach = window.Bach || {};
       },
       pace: function () {
         return { speed: speed, look: look, gap: gap };
+      },
+      // How big a bell this piece gets: src/touch.js works it out of the music.
+      touch: function () {
+        return bell;
       },
       bell: bellPitch,
     };

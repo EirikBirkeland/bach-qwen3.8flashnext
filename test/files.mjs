@@ -32,5 +32,12 @@ export function pictureScripts() {
 /** What playing along needs: the beat grid, the finders it pays out on, and the
  *  game itself. The organ is handed in, so audio.js comes with it. */
 export function gameScripts() {
-  return ["src/audio.js", "src/theme.js", "src/landmarks.js", "src/pulse.js", "src/game.js"];
+  return [
+    "src/audio.js",
+    "src/theme.js",
+    "src/landmarks.js",
+    "src/pulse.js",
+    "src/touch.js",
+    "src/game.js",
+  ];
 }

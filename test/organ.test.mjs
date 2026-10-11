@@ -8,7 +8,7 @@
 import test from "node:test";
 import assert from "node:assert";
 import {
-  loadOrgan,
+  loadPage,
   loadPieces,
   loadData,
   rolesFor,
@@ -30,8 +30,8 @@ import {
   soundingAt,
 } from "./render.mjs";
 
-const organ = loadOrgan();
-const spec = organ.organSpec;
+const page = loadPage();
+const spec = page.organSpec;
 const pieces = loadPieces();
 const RATE = 44100;
 
@@ -41,7 +41,7 @@ function prepared(piece) {
   return {
     data: data,
     notes: preparedNotes(data, roles),
-    ready: organ.createOrgan().prepare(data, roles),
+    ready: page.createOrgan().prepare(data, roles),
   };
 }
 
@@ -65,7 +65,17 @@ const loud = pieces.map((piece) => {
     // hundredth and it takes a quarter of the doing.
     sampleRate: 16000,
   });
-  return { piece: piece, context: context, heaviest: heaviest, samples: samples, throughout: throughout };
+  // How big a bell this piece asks for when the player strikes along.
+  const beats = page.beats(context.data);
+  const touch = page.touch(context.notes, beats, page.beatGap(beats));
+  return {
+    piece: piece,
+    context: context,
+    heaviest: heaviest,
+    samples: samples,
+    throughout: throughout,
+    touch: touch,
+  };
 });
 
 test("the loudest chord of every piece stays under full scale", () => {
@@ -142,7 +152,7 @@ test("a bell struck on the loudest moment of a piece still fits", () => {
   const tremulant = 1 + 0.045 + 0.03;
   const limiter = Math.pow(10, -3 / 20);
   for (const one of loud) {
-    const bell = renderChime(spec, 60, { weight: spec.chime.heaviest });
+    const bell = renderChime(spec, 60, { weight: spec.chime.heaviest, touch: one.touch });
     assert.ok(peak(bell) > 0.05, "a bell on its own is inaudible: " + peak(bell).toFixed(3));
     const struck = peak(together(one.samples, bell));
     assert.ok(
@@ -166,13 +176,22 @@ test("a bell struck on the loudest moment of a piece still fits", () => {
 
 test("a bell is a struck thing, not a held one", () => {
   // It has to be gone again: a bell that rang on for five seconds would smear the
-  // whole piece into noise, whatever its level.
-  const bell = renderChime(spec, 60, { weight: 1 });
-  const first = peak(bell.slice(0, Math.round(0.25 * 44100)));
-  const after = peak(bell.slice(Math.round((spec.chime.decay - 0.05) * 44100)));
-  assert.ok(first > 0, "nothing was struck");
-  assert.ok(after < first * 0.01, "the bell was still ringing at " + after.toFixed(4) + " against " + first.toFixed(3));
-  assert.ok(spec.chime.decay < 2, "a bell that rings for " + spec.chime.decay + " s is a cymbal");
+  // whole piece into noise, whatever its level. Every piece is asked with its own
+  // bell, since src/touch.js gives each one a length of its own.
+  for (const one of loud) {
+    const bell = renderChime(spec, 60, { weight: 1, touch: one.touch });
+    const first = peak(bell.slice(0, Math.round(0.25 * 44100)));
+    const after = peak(bell.slice(Math.round((one.touch.decay - 0.05) * 44100)));
+    assert.ok(first > 0, "nothing was struck");
+    assert.ok(
+      after < first * 0.01,
+      one.piece.slug + ": its bell was still ringing at " + after.toFixed(4) + " against " + first.toFixed(3)
+    );
+    assert.ok(
+      one.touch.decay < 2.2,
+      one.piece.slug + ": a bell that rings for " + one.touch.decay + " s is a cymbal"
+    );
+  }
 });
 
 test("a chord is louder than one note, which is what dynamics mean", () => {

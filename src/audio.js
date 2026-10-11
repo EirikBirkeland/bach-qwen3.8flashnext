@@ -36,14 +36,23 @@ window.Bach = window.Bach || {};
   // belongs to is part of the registration, and the pedals breathe harder.
   var BREATH_SECONDS = 0.16;
 
+  // The smallest chord a piece is played as if. A piece that only ever has two
+  // notes going is not played as if it were a tutti: its own loudest moment is
+  // measured as at least this many notes, so a thin piece is not blown out of the
+  // speakers just because nothing thick ever happens in it.
+  var MIN_CHORD = 3;
+
   // The bell the player strikes when playing along. It is struck, not held, so it
-  // has an envelope of its own, and it is deliberately small beside the pipes:
-  // the heaviest chord of a piece is allowed to reach `ceiling`, and a bell or
-  // two landing on top of it must not push that over full scale. So the whole
-  // bell is under a tenth of full scale however hard it was struck, and what it
-  // sounds through is the same room the pipes do.
+  // has an envelope of its own, and it is deliberately small beside the pipes: the
+  // heaviest chord of a piece is allowed to reach `ceiling`, and a bell landing on
+  // top of it must not push that over full scale. What it sounds through is the
+  // same room the pipes do.
+  //
+  // What is here is the plain bell. How big a bell a particular piece asks for is
+  // src/touch.js's business: it hands a level and a length with every strike, and
+  // `bellLevel` and `bellDecay` below are where one is preferred over these.
   var CHIME = {
-    level: 0.07, // the whole bell, before the master volume
+    level: 0.07, // the whole bell, before the master volume and the two strikes
     heaviest: 1.5, // the most a struck-true, on a moment when the music moved, may make it
     attack: 0.006, // a struck thing is there at once
     decay: 1.2, // ... and gone to nothing about a second and a bit later
@@ -228,6 +237,21 @@ window.Bach = window.Bach || {};
       real.push(0);
     }
     return ctx.createPeriodicWave(real, imag);
+  }
+
+  /**
+   * How loud a bell is in a piece, and how long it hangs there. `touch` comes from
+   * src/touch.js and says both; a bell handed no touch is the plain one above.
+   */
+  function bellLevel(touch) {
+    return touch && typeof touch.level === "number" && touch.level > 0 ? touch.level : CHIME.level;
+  }
+
+  function bellDecay(touch) {
+    var hangs = touch && typeof touch.decay === "number" ? touch.decay : CHIME.decay;
+    // A bell shorter than its own attack, or near enough, would be a click and not
+    // a strike, so such a touch is left to ring the plain length.
+    return hangs > CHIME.attack + 0.04 ? hangs : CHIME.decay;
   }
 
   /**
@@ -541,18 +565,21 @@ window.Bach = window.Bach || {};
     /**
      * Strike the bell: one note, at once, ringing away. `weight` is how hard it
      * was struck, from the game: 1 for a beat caught, more for one that the music
-     * itself was marking. It goes past the tremulant - a bell is not a pipe - but
-     * through the same lowpass and the same room, so it sits in the same building
-     * as the organ. With no time given it rings now, which is what the player means.
+     * itself was marking. `touch` is the piece's own sizing of its bell - how loud,
+     * and how long it hangs - which src/touch.js works out of the music. It goes
+     * past the tremulant - a bell is not a pipe - but through the same lowpass and
+     * the same room, so it sits in the same building as the organ. With no time
+     * given it rings now, which is what the player means.
      */
-    function chime(pitch, when, weight) {
+    function chime(pitch, when, weight, touch) {
       if (!ctx) return;
       var at = typeof when === "number" ? when : ctx.currentTime;
-      var level = CHIME.level * Math.min(CHIME.heaviest, Math.max(0.2, weight || 1));
+      var level = bellLevel(touch) * Math.min(CHIME.heaviest, Math.max(0.2, weight || 1));
+      var hangs = bellDecay(touch);
       var gain = ctx.createGain();
       gain.gain.setValueAtTime(0.0001, at);
       gain.gain.linearRampToValueAtTime(level, at + CHIME.attack);
-      gain.gain.exponentialRampToValueAtTime(0.0001, at + CHIME.decay);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + hangs);
 
       // Two strikes a few cents apart, so the ring moves instead of humming.
       var pipes = [];
@@ -563,12 +590,12 @@ window.Bach = window.Bach || {};
         oscillator.detune.value = i === 0 ? -3 : 3;
         oscillator.connect(gain);
         oscillator.start(at);
-        oscillator.stop(at + CHIME.decay + 0.02);
+        oscillator.stop(at + hangs + 0.02);
         pipes.push(oscillator);
       }
 
       gain.connect(tone);
-      sounding.push({ gain: gain, pipes: pipes, endsAt: at + CHIME.decay + 0.03 });
+      sounding.push({ gain: gain, pipes: pipes, endsAt: at + hangs + 0.03 });
     }
 
     function pump() {
@@ -650,8 +677,8 @@ window.Bach = window.Bach || {};
           registration: REGISTRATION,
           stops: stopsDrawn(notes),
           // A piece with only a couple of notes at a time is not played as if it
-          // were a tutti, so the weight is never taken under three.
-          gain: CEILING / Math.max(3, heaviest),
+          // were a tutti, so the weight is never taken under MIN_CHORD.
+          gain: CEILING / Math.max(MIN_CHORD, heaviest),
           duration: data.duration,
         };
       },
@@ -708,10 +735,13 @@ window.Bach = window.Bach || {};
     registration: REGISTRATION,
     stopGroups: STOP_GROUPS,
     ceiling: CEILING,
+    minChord: MIN_CHORD,
     volume: VOLUME,
     envelope: ENVELOPE,
     breathSeconds: BREATH_SECONDS,
     chime: CHIME,
+    bellLevel: bellLevel,
+    bellDecay: bellDecay,
     stopsFor: stopsFor,
     pipesFor: pipesFor,
     struck: struck,

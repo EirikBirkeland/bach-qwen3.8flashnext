@@ -11,6 +11,7 @@
 
 import fs from "node:fs";
 import vm from "node:vm";
+import { gameScripts } from "./files.mjs";
 
 const root = new URL("..", import.meta.url);
 
@@ -32,6 +33,19 @@ export function loadPieces() {
 
 export function loadData(slug) {
   return JSON.parse(fs.readFileSync(new URL("data/" + slug + ".json", root), "utf8"));
+}
+
+/**
+ * Everything the page needs to play along - the organ, the beat grid, the touch of
+ * a piece, the game - loaded in a bare window, so a tool or a test can ask the
+ * page's own code the same questions a browser asks it.
+ */
+export function loadPage() {
+  const sandbox = vm.createContext({ window: {} });
+  for (const file of gameScripts()) {
+    vm.runInContext(fs.readFileSync(new URL(file, root), "utf8"), sandbox, { filename: file });
+  }
+  return sandbox.window.Bach;
 }
 
 export function hz(pitch) {
@@ -220,6 +234,45 @@ export function rms(samples) {
   return counted ? Math.sqrt(sum / counted) : 0;
 }
 
+/**
+ * How loud the piece actually is at the moments a player would be striking.
+ * The whole piece is rendered once, a chunk at a time, and each moment keeps the
+ * loudest sample within `half` seconds either side of it. `moments` in seconds,
+ * in any order; hands back one peak per moment, in the order they were given.
+ */
+export function peaksAt(notes, moments, options) {
+  const spec = options.spec;
+  const rate = options.sampleRate || 16000;
+  const chunk = options.chunk || 20;
+  const half = options.half === undefined ? 0.12 : options.half;
+  const out = moments.map(() => 0);
+  for (let start = 0; start < options.seconds; start += chunk) {
+    const shift = start - half;
+    const stop = start + chunk + half;
+    const here = moments
+      .map((at, index) => ({ at: at, index: index }))
+      .filter((one) => one.at >= start - half && one.at < start + chunk + half);
+    if (here.length === 0) continue;
+    const sounding = notes
+      .filter((note) => note.time < stop && note.time + note.length + 0.3 > shift)
+      .map((note) => ({ ...note, time: note.time - shift }));
+    const samples = render(sounding, {
+      spec: spec,
+      gain: options.gain,
+      seconds: chunk + 2 * half,
+      sampleRate: rate,
+    });
+    for (const one of here) {
+      const from = Math.max(0, Math.round((one.at - half - shift) * rate));
+      const to = Math.min(samples.length, Math.round((one.at + half - shift) * rate));
+      let top = 0;
+      for (let i = from; i < to; i++) top = Math.max(top, Math.abs(samples[i]));
+      out[one.index] = top;
+    }
+  }
+  return out;
+}
+
 /** How much of the sound lies at a given frequency, by Goertzel's filter. */
 export function energyAt(samples, freq, rate) {
   const k = (2 * Math.PI * freq) / rate;
@@ -361,14 +414,19 @@ export function rolesFor(piece) {
  * bell's own mix, its own envelope, and the two strikes a few cents apart that
  * make the ring move. Like `render`, this lines the strikes up in phase with the
  * pipes, which a real bell never is - so what comes out is louder than the truth.
+ * `touch`, when it is given, is the piece's own sizing of its bell (src/touch.js):
+ * how loud it is there, and how long it hangs. The engine's own rules are used
+ * rather than a copy of them, so a measurement cannot drift from the sound.
  */
 export function renderChime(spec, pitch, options) {
   const settings = options || {};
   const rate = settings.sampleRate || 44100;
   const at = settings.at || 0;
-  const level = spec.chime.level * Math.min(spec.chime.heaviest, settings.weight || 1);
+  const touch = settings.touch || null;
+  const level = spec.bellLevel(touch) * Math.min(spec.chime.heaviest, settings.weight || 1);
+  const hangs = spec.bellDecay(touch);
   const wave = waveFor(spec.chime.mix);
-  const out = new Float64Array(Math.round((at + spec.chime.decay + 0.05) * rate));
+  const out = new Float64Array(Math.round((at + hangs + 0.05) * rate));
   const from = Math.round(at * rate);
   for (const cents of [-3, 3]) {
     const freq = hz(pitch) * Math.pow(2, cents / 1200);
@@ -376,8 +434,7 @@ export function renderChime(spec, pitch, options) {
       const t = i / rate - at;
       let share;
       if (t < spec.chime.attack) share = t / spec.chime.attack;
-      else
-        share = Math.pow(0.0001, (t - spec.chime.attack) / (spec.chime.decay - spec.chime.attack));
+      else share = Math.pow(0.0001, (t - spec.chime.attack) / (hangs - spec.chime.attack));
       if (share <= 0) continue;
       let phase = (freq * t) % 1;
       if (phase < 0) phase += 1;

@@ -71,8 +71,11 @@ Do these quickly and roughly, in the first session if you can, and release as so
   - [ ] The ladder is laid *over* the picture, not part of it. Each piece's world could take its pulse in
         its own way - the wheel ticking one tooth of the rim to a beat, the long view planting a lamp on the
         road, the braid breathing with it. Only do it where it is better, piece by piece.
-  - [ ] The bell is one struck sound for all four pieces. A piece as different in touch as BWV 639 from
-        BWV 582 might want it heavier or lighter; decide by the numbers, as everything else here.
+  - [x] The bell is no longer one struck sound for all four pieces. `src/touch.js` sizes each piece's bell
+        from the piece: how loud, from how full the music is where the bells land, and how long it hangs,
+        from the piece's own beat. `node tools/touch.mjs` prints the measuring of it - the spread of
+        "bell beside its own music" across the four went from 3.1 to 1.7, and every bell now fills about
+        three fifths of a beat instead of a third of it in BWV 639 and nine tenths in BWV 582.
 
 #### The design: strike the beat
 

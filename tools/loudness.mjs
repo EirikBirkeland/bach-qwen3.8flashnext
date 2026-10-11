@@ -15,11 +15,13 @@
 //             once the room and the tremulant are counted
 //   rms       the widest chord, averaged: peak over rms is how spiky it is
 //   pipes     how many oscillators the busiest moment opens
-//   chord+bell  that widest chord and the heaviest bell playing along, together
+//   bell      the bell this piece asks for when the player strikes along: how loud
+//             it is, and how long it hangs (src/touch.js, measured per piece)
+//   chord+bell  that widest chord and the heaviest bell of the piece, together
 //   bell alone  what one of those bells reaches on its own
 
 import {
-  loadOrgan,
+  loadPage,
   loadPieces,
   loadData,
   rolesFor,
@@ -38,8 +40,8 @@ import {
   bandShares,
 } from "../test/render.mjs";
 
-const organ = loadOrgan();
-const spec = organ.organSpec;
+const page = loadPage();
+const spec = page.organSpec;
 const pieces = loadPieces();
 const wanted = process.argv[2];
 const rows = [];
@@ -49,13 +51,27 @@ const limiter = Math.pow(10, -3 / 20); // where the page's limiter starts to squ
 console.log("ceiling " + spec.ceiling + " of full scale, master volume " + spec.volume);
 console.log("the limiter starts at " + limiter.toFixed(3) + "; full scale is 1.000\n");
 
-const columns = ["piece", "loudest at", "widest", "weight", "gain", "bound", "peak + room", "rms", "crest", "pipes", "chord+bell", "bell alone"];
+const columns = [
+  "piece",
+  "loudest at",
+  "widest",
+  "weight",
+  "gain",
+  "bound",
+  "peak + room",
+  "rms",
+  "crest",
+  "pipes",
+  "bell",
+  "chord+bell",
+  "bell alone",
+];
 
 for (const piece of pieces) {
   if (wanted && piece.slug.indexOf(wanted) < 0) continue;
   const data = loadData(piece.slug);
   const notes = preparedNotes(data, rolesFor(piece));
-  const prepared = organ.createOrgan().prepare(data, rolesFor(piece));
+  const prepared = page.createOrgan().prepare(data, rolesFor(piece));
   const heaviest = heaviestMoment(notes, spec);
 
   const seconds = 1.2;
@@ -79,9 +95,12 @@ for (const piece of pieces) {
   const pipes = heaviest.notes.reduce((sum, note) => sum + pipesOf(note, spec).length, 0);
   const room = loudest * (1 + 0.34 * 0.85) * (1 + 0.045 + 0.03); // the convolver, then the tremulant
 
-  // Playing along rings a bell over the music: the heaviest one, struck on top of
-  // the loudest chord, with both of its strikes in phase with the pipes.
-  const bell = renderChime(spec, 60, { weight: spec.chime.heaviest });
+  // Playing along rings a bell over the music: the heaviest one that this piece's
+  // own touch allows, struck on top of the loudest chord, with both of its
+  // strikes in phase with the pipes.
+  const beats = page.beats(data);
+  const touch = page.touch(notes, beats, page.beatGap(beats));
+  const bell = renderChime(spec, 60, { weight: spec.chime.heaviest, touch: touch });
   const withBell = peak(together(samples, bell));
 
   rows.push([
@@ -95,6 +114,7 @@ for (const piece of pieces) {
     average.toFixed(3),
     (loudest / Math.max(average, 1e-9)).toFixed(1),
     String(pipes),
+    touch.level.toFixed(3) + " · " + touch.decay.toFixed(2) + "s",
     withBell.toFixed(3),
     peak(bell).toFixed(3),
   ]);
@@ -112,7 +132,7 @@ for (const piece of pieces) {
   if (wanted && piece.slug.indexOf(wanted) < 0) continue;
   const data = loadData(piece.slug);
   const notes = preparedNotes(data, rolesFor(piece));
-  const prepared = organ.createOrgan().prepare(data, rolesFor(piece));
+  const prepared = page.createOrgan().prepare(data, rolesFor(piece));
   const heaviest = heaviestMoment(notes, spec);
   const bands = bandShares(partialsOfChord(heaviest.notes, spec, prepared.gain));
   console.log(

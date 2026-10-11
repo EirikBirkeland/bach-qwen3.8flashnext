@@ -1195,6 +1195,90 @@ test("clicking the picture on a beat rings a bell and starts a run", async () =>
   assert.match(page.elements.score.textContent, /^1 in a row/, "the run was not counted on screen");
 });
 
+test("a bell that is handed a sizing which is not one falls back on the plain bell", () => {
+  const page = openPage();
+  const organ = page.window.Bach.createOrgan();
+  organ.open();
+
+  organ.chime(60, 1, 1, null);
+  const plain = page.audio.gainNodes[page.audio.gainNodes.length - 1].gain.events;
+  organ.chime(60, 1, 1, { level: "loud", decay: 0.0001 });
+  const nonsense = page.audio.gainNodes[page.audio.gainNodes.length - 1].gain.events;
+
+  assert.strictEqual(
+    nonsense.filter((one) => one.kind === "linear").pop().value,
+    plain.filter((one) => one.kind === "linear").pop().value,
+    "a level that is not a number was taken as one"
+  );
+  assert.strictEqual(
+    nonsense.filter((one) => one.kind === "exponential").pop().at,
+    plain.filter((one) => one.kind === "exponential").pop().at,
+    "a bell shorter than its own attack was rung that short"
+  );
+});
+
+/** What the page's own rule says a piece's bell should be. */
+function bellOf(page, slug) {
+  const piece = [...page.window.Bach.pieces].find((one) => one.slug === slug);
+  const data = page.window.BachData[slug];
+  const roles = {};
+  for (const voice in piece.voices) roles[voice] = piece.voices[voice].role;
+  const notes = page.window.Bach.createOrgan().prepare(data, roles).notes;
+  const beats = page.window.Bach.beats(data);
+  return page.window.Bach.touch(notes, beats, page.window.Bach.beatGap(beats));
+}
+
+/** The bell the last strike built: how loud the engine scheduled it, and for how long. */
+function lastBell(page) {
+  const gain = page.audio.gainNodes[page.audio.gainNodes.length - 1];
+  const events = gain.gain.events;
+  const up = events.filter((one) => one.kind === "linear").pop();
+  const away = events.filter((one) => one.kind === "exponential").pop();
+  const struck = page.audio.startTimes[page.audio.startTimes.length - 1];
+  return { level: up.value, decay: away.at - struck };
+}
+
+test("the bell that rings is the piece's own, not a plain one", async () => {
+  // src/touch.js sizes a bell per piece; this checks the sizing actually reaches the
+  // engine - a bell built from the defaults would look exactly the same everywhere.
+  const chorale = openPage();
+  chorale.elements.pieces.children[1].click(); // BWV 639
+  await settled();
+  chorale.elements.play.click();
+  const first = chorale.window.Bach.beats(chorale.window.BachData[SHORT])[4];
+  runTo(chorale, first.time);
+  chorale.tap(chorale.canvas);
+
+  const wanted = bellOf(chorale, SHORT);
+  const rung = lastBell(chorale);
+  assert.ok(
+    Math.abs(rung.decay - wanted.decay) < 1e-6,
+    "the bell did not hang the piece's own length: " + rung.decay.toFixed(2) + " against " + wanted.decay.toFixed(2)
+  );
+  // How loud is the piece's level times how hard the beat was struck, and the game
+  // only ever strikes between 0.85 (caught, ordinary) and 1.5 (true, and marked).
+  assert.ok(
+    rung.level >= wanted.level * 0.85 - 1e-9 && rung.level <= wanted.level * 1.5 + 1e-9,
+    "the bell was not the piece's size: " + rung.level.toFixed(4) + " against " + wanted.level.toFixed(4)
+  );
+
+  const toccata = openPage();
+  toccata.elements.pieces.children[0].click(); // BWV 565
+  await settled();
+  toccata.elements.play.click();
+  const other = toccata.window.Bach.beats(toccata.window.BachData["bwv565-toccata-and-fugue-d-minor"])[4];
+  runTo(toccata, other.time);
+  toccata.tap(toccata.canvas);
+
+  assert.ok(
+    rung.level / lastBell(toccata).level > 1.3,
+    "the same strike rang the same size in two pieces that need different ones: " +
+      rung.level.toFixed(4) +
+      " against " +
+      lastBell(toccata).level.toFixed(4)
+  );
+});
+
 test("Enter strikes too, and nothing else is disturbed", async () => {
   const page = openPage();
   page.elements.pieces.children[1].click();

@@ -4,7 +4,7 @@
 set -u
 cd "$(dirname "$0")/.."
 mkdir -p /tmp/mut
-for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js; do
+for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js; do
   cp "$f" "/tmp/mut/$(basename "$f")"
 done
 
@@ -47,10 +47,20 @@ run "main: the ladder is never drawn" src/main.js 's/    game\.frame\(organ\.tim
 run "main: the end of the piece says nothing about the run" src/main.js 's/elements\.endLine\.textContent = score === \"\" \? said : said \+ \" \" \+ score;/elements.endLine.textContent = said;/'
 run "audio: the bell is never started" src/audio.js 's/        oscillator\.start\(at\);\n//'
 run "audio: the bell is wired to nothing" src/audio.js 's/      gain\.connect\(tone\);\n//'
+run "audio: the bell ignores the piece's own size" src/audio.js 's/var level = bellLevel\(touch\) \* Math\.min/var level = CHIME.level * Math.min/'
+run "audio: the bell ignores the piece's own length" src/audio.js 's/var hangs = bellDecay\(touch\);/var hangs = CHIME.decay;/'
+run "audio: a sizing that is none is taken at face value" src/audio.js 's/    return hangs > CHIME\.attack \+ 0\.04 \? hangs : CHIME\.decay;/    return hangs;/'
+run "touch: every piece gets the same sized bell" src/touch.js 's/var level = FULL \* Math\.sqrt\(full\);/var level = FULL;/'
+run "touch: every piece gets the same length of bell" src/touch.js 's/var decay = Math\.min\(LONGEST, Math\.max\(SHORTEST, RING \* beat\)\);/var decay = 1.2;/'
+run "touch: a line let go exactly on a beat still counts" src/touch.js 's/if \(note\.time \+ note\.length <= at\) continue;/if (note.time + note.length < at) continue;/'
+run "touch: a piece of one line at a time is credited with a tutti" src/touch.js 's/var loudest = Math\.max\(spec\.minChord, spec\.heaviestChord\(notes, spec\.registration\)\);/var loudest = Math.max(1, spec.heaviestChord(notes, spec.registration));/'
+run "touch: the smallest bell is not a floor" src/touch.js 's/    if \(!\(level >= SMALLEST\)\) level = SMALLEST;\n//'
+run "touch: a bell may hang as long as anything" src/touch.js 's/var decay = Math\.min\(LONGEST, Math\.max\(SHORTEST, RING \* beat\)\);/var decay = Math.max(SHORTEST, RING * beat);/'
+run "game: the strike does not carry the piece's bell" src/game.js 's/organ\.chime\(pick\.pitch, null, weight, bell\);/organ.chime(pick.pitch, null, weight);/'
 run "theme: the same question is asked again" src/theme.js 's/    if \(asked \&\& asked\.notes === notes \&\& asked\.gap === gap\) return answer;\n//'
 
 echo "--- restoring ---"
-for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js; do
+for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js; do
   cp "/tmp/mut/$(basename "$f")" "$f"
 done
 node --test 2>&1 | grep -E "^ℹ (tests|pass|fail)"

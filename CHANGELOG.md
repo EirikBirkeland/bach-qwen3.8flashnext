@@ -1,5 +1,32 @@
 # Releases
 
+## 0.3.1 — 2026-10-11
+
+The bell you strike when you play along is now the piece's own, instead of one
+bell for all four pieces.
+
+- **Measured first.** Struck over the beats themselves, the one fixed bell sat
+  anywhere between a third of the music and nine tenths of it: hardly heard under
+  BWV 639's chorale, and as loud as the tune over a single note of BWV 565's fugue.
+  `node tools/touch.mjs` prints the whole of that, piece by piece.
+- **Each piece sizes its bell** from two things that are already in it: how full the
+  music is where the bells land - so the slow chorale's bell is nearly twice the
+  size of the toccata's - and how long a beat is, so BWV 639's bell hangs 1.95 s,
+  right across its bar, while BWV 582's is gone within a second and leaves the
+  fugue clear. The spread between the four went from 3.1 to 1.7: they now sit within
+  about 3.5 dB of each other, where they were 10 dB apart.
+- **No two bells are audible at once**, in any piece. What an ear keeps hearing of a
+  bell is about half its decay, and a decay is 1.2 beats, so a run of taps stays a
+  run of taps instead of turning into a wash.
+- **Nothing got louder than the room allows**: each piece's widest chord with the
+  heaviest bell of its own size on top still stays under where the limiter starts
+  (0.35 to 0.47 against 0.708), so the bigger bell on the slow chorale costs nothing.
+- New in the code: `src/touch.js`, the rule; `organ.chime(pitch, when, how hard,
+  touch)`, so the bell takes its size with it; and `tools/touch.mjs`, which measures
+  one fixed bell against one per piece and shows why the tidier rule - a bell always
+  at the same share of its music - was refused. 219 tests pass, and `tools/mutate.sh`
+  has eleven new things it can break to prove they are watching.
+
 ## 0.3.0 — 2026-10-11
 
 There is something to do now: play along with the pulse of the piece. Just
