@@ -19,6 +19,7 @@ function file(tracks) {
 }
 
 const TEMPO_120 = [0xff, 0x51, 0x03, 0x07, 0xa1, 0x20]; // 500000 us a quarter
+const TIME_SIGNATURE_3_4 = [0xff, 0x58, 0x04, 3, 2, 24, 8]; // 3/4, as LilyPond writes it
 const TEMPO_150 = [0xff, 0x51, 0x03, 0x06, 0x1a, 0x80]; // 400000 us a quarter
 const END = [0xff, 0x2f, 0x00];
 
@@ -84,6 +85,21 @@ test("a note still held when its track ends is not dropped", () => {
   assert.strictEqual(song.notes.length, 1);
   assert.strictEqual(song.notes[0].duration, 0.5);
   assert.strictEqual(song.duration, 0.5);
+});
+
+test("the metre in the file says how long a bar is", () => {
+  // 3/4 written the way LilyPond writes it: the denominator is a power, so 2
+  // means quarter notes. At 120 bpm a quarter lasts 0.5 s, so a bar is 1.5 s.
+  const conductor = [[0, ...TIME_SIGNATURE_3_4], [0, ...TEMPO_120], [0, ...END]];
+  const second = [[0, ...TIME_SIGNATURE_3_4], [0, 0x90, 60, 100], [48, 0x80, 60, 0], [0, ...END]];
+  const song = readMidiFile(file([conductor, second]));
+
+  assert.strictEqual(song.timeSignatures.length, 1, "the same metre twice is not two changes of metre");
+  const mark = song.timeSignatures[0];
+  assert.deepStrictEqual([mark.beats, mark.beat, mark.tick, mark.seconds], [3, 4, 0, 0]);
+  assert.strictEqual(mark.barTicks, 3 * 96);
+  assert.strictEqual(song.toSeconds(3 * 96), 1.5);
+  assert.strictEqual(song.toSeconds(6 * 96), 3);
 });
 
 test("the conductor track carries no notes", () => {

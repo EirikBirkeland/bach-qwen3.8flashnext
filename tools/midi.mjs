@@ -53,11 +53,13 @@ function round(value) {
  *
  *   ticksPerQuarter  division of the file
  *   tempoChanges     [{ tick, seconds, bpm }]
+ *   timeSignatures   [{ tick, seconds, beats, beat, barTicks }]
  *   tracks           [{ index, name, channel, notes, endSeconds }]
  *   notes            one flat list, sorted by start time, each with
  *                    track, channel, pitch, time, duration, velocity
  *   duration         when the last note ends, in seconds
  *   pitchRange       the lowest and highest note in the file
+ *   toSeconds(tick)  any tick of the file, in seconds, following the tempo map
  */
 export function readMidiFile(bytes) {
   if (bytes.length < 14 || str(bytes, 0, 4) !== "MThd") {
@@ -114,6 +116,34 @@ export function readMidiFile(bytes) {
       previous = change;
     }
     return seconds + ((tick - previous.tick) / ticksPerQuarter) * (previous.microsecondsPerQuarter / 1e6);
+  }
+
+  // The metre: the same signature is usually written once per track, so repeats
+  // of what is already in force are dropped just like repeated tempo marks are.
+  const meterSeen = [];
+  for (const track of rawTracks) {
+    for (const event of track.events) {
+      if (event.type === "timeSignature") meterSeen.push(event);
+    }
+  }
+  meterSeen.sort((a, b) => a.tick - b.tick);
+  const timeSignatures = [];
+  for (const mark of meterSeen) {
+    const beats = mark.numerator;
+    // LilyPond writes the denominator as a power: 2 means quarter notes, 3 means
+    // eighths. Checked against the music: BWV 582 is written 3,2 and its ground
+    // bass is eight bars of three quarter notes, which only fits this reading.
+    const beat = Math.pow(2, mark.denominator);
+    const barTicks = Math.round((beats * ticksPerQuarter * 4) / beat);
+    const last = timeSignatures[timeSignatures.length - 1];
+    if (last && last.tick === mark.tick && last.beats === beats && last.beat === beat) continue;
+    timeSignatures.push({
+      tick: mark.tick,
+      seconds: round(tickToSeconds(mark.tick)),
+      beats,
+      beat,
+      barTicks,
+    });
   }
 
   const notes = [];
@@ -185,6 +215,8 @@ export function readMidiFile(bytes) {
 
   return {
     ticksPerQuarter,
+    toSeconds: tickToSeconds,
+    timeSignatures,
     tempoChanges: tempoChanges.map((change) => ({
       tick: change.tick,
       seconds: round(tickToSeconds(change.tick)),
@@ -237,6 +269,13 @@ function readTrackEvents(bytes, start, end) {
       } else if (type === 0x03) {
         const text = readText(bytes, dataStart, dataStart + length.value);
         if (text) name = text;
+      } else if (type === 0x58) {
+        events.push({
+          tick,
+          type: "timeSignature",
+          numerator: bytes[dataStart],
+          denominator: bytes[dataStart + 1],
+        });
       } else if (type === 0x2f) {
         events.push({ tick, type: "endOfTrack" });
         pos = end;

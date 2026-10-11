@@ -240,3 +240,173 @@ Next, in order:
    says what is on screen at a moment, and the picture tests print their numbers.
    315 notes at once may want the far, faint ones drawn more cheaply.
 3. Then milestone 2, one piece per session: 565 or 582 first.
+
+## Session 5 — 2026-10-11 — milestone 2, first item: the shape of all four pieces
+
+What I did:
+
+- **`tools/midi.mjs` now reads the time signature** (meta 0x58) and hands back
+  `timeSignatures` (`beats`, `beat`, `barTicks`) and `toSeconds(tick)`. LilyPond
+  writes the denominator as a power, not as a number: BWV 582 arrives as `3,2`,
+  and the only reading that makes the ground bass eight bars is 2 → quarter
+  notes. Checked, not assumed: 3/4 at ♩=72 gives 2.5 s a bar, the ground bass
+  statements land 20 s apart, and 21 statements × 8 bars = 168 bars = 420 s,
+  which is exactly where the file's two "slip" tempo marks sit (6:59, 7:00).
+- **New `tools/shape.mjs`** — the shape of a piece in numbers, for a person
+  deciding what it should look like. Nothing in the page reads it. It prints:
+  the metre and bar count; a bar-by-bar profile (notes starting, notes sounding,
+  mean register, which voices) as sparklines; *sections* cut where the mix of the
+  music changes; silences (nothing at all sounding) and each voice's own rests;
+  the thinnest and fullest bars; and **figures that come back** — melodies found
+  by matching the steps between notes, so a copy at another pitch counts.
+  Flags: `--bars` for the whole table, `--json` for the same numbers as data.
+  Run `node tools/shape.mjs` for all four.
+- **New `test/shape.test.mjs`** (17 tests, 93 in all). Hand-built melodies for the
+  pattern finder, hand-worked bars for the bar table, and the claims below about
+  the four pieces. `test/midi.test.mjs` gained a time-signature test.
+- Wrote the four shapes at the bottom of these notes. That is milestone 2's first
+  box ticked. **No release**: nothing on screen or in the ears changed.
+
+Decisions worth keeping:
+
+- **How a "theme" is found.** Match steps between successive notes, not pitches:
+  then a fugue answer on the dominant and a ground bass an octave down are the
+  same tune. A copy must be at least **two bars after** the last one counted, or
+  it is a sequence (the same bar again at another pitch) and not the theme coming
+  back — without that rule a run of parallel sixths in BWV 565 out-voted the
+  ground bass. And once the most-frequent length is known, the *longest* figure
+  that comes back nearly as often (≥ ¾ of the copies) is taken instead, because a
+  theme comes back whole: that is what turned the ground bass's 8-note head into
+  the 15-note theme it is.
+- **A bar with no music after it is not counted.** Several of these editions end
+  exactly on a bar line, and that last line was being reported as an empty bar.
+- **These editions write everything legato.** In BWV 639 not one of the three
+  voices has a rest of even one beat in two minutes; the chorale melodies are
+  tied across every phrase mark in the score. So phrase ends cannot be read from
+  rests — only the chorale in BWV 645 actually stops for breath. The look will
+  have to find phrases in the melody and the bar grid, not in silences.
+- **Session 4 left no notes.** Reconstructed from the commit: ranks of pipes per
+  note, `tools/loudness.mjs`, the stops line in the corner, released as 0.1.2.
+
+A bug I made and fixed: my first `stepIndex` cut its window one step too long (an
+offset past the comma), so every "figure" was reported with a phantom extra note
+and one voice's figure could not be found in another. `whereHeard` returned 0 for
+a figure that `returningFigures` had just found — that contradiction is what gave
+it away. The first test below pins it.
+
+---
+
+# The shape of the pieces
+
+From `node tools/shape.mjs`. Pitch names are the file's; bar numbers start at 1.
+
+## BWV 565 — Toccata and Fugue in D minor
+
+9:32, 3651 notes, 4/4 at ♩=60 → **4 s a bar, 143 bars**, and one tempo mark: the
+file plays the whole piece at one speed. RH 1905 [C#3–C6], LH 1417 [C#2–F5],
+pedal 329 [C2–B3].
+
+- **Bars 1–30 (0:00–1:56) are the Toccata**: 24–44 notes a bar, chords up to 9
+  sounding (the widest moment of the piece, 0:39), fullest at bars 22–30.
+- **The Fugue begins at about 1:58.** A figure of 32 notes is heard **eight
+  times**, and the order is convincing: LH A4 1:58, RH D5 2:06, RH A5 2:34, pedal
+  D3 3:24, pedal G3 5:42, LH D4 6:08, LH A4 6:58, pedal A3 7:14 — tonic and
+  dominant alternately, one voice at a time at first.
+- The pedal is silent for two ages: **1:58–3:24 (86 s)** and **3:47–5:42 (115 s)**,
+  again 6:25–7:14 (49 s). A picture that shows the pedal line must show it waiting.
+- **The middle is bare**: bars 58–84 (3:48–5:32) run on 1–1.8 voices, and bars
+  74–84 (4:52–5:35, eleven bars) have exactly **one note sounding at a time**.
+- Bars 85–129 (5:36–8:32): three voices steady, ~27 notes a bar. The end, bars
+  130–143, is chords again (6.5 sounding at 8:36) and lands low, about F2.
+- Seven moments when nothing at all sounds, all of them in the first 30 seconds,
+  longest 2 s at 0:17.
+
+For the look: three worlds — the chordal toccata, the bare middle, the fugue —
+and the fugue is really its eight entries, which can be marked as they arrive.
+
+## BWV 582 — Passacaglia and Fugue in C minor
+
+12:17, 9546 notes, **3/4 at ♩=72 → 2.5 s a bar, 293 bars**. Ten tempo marks,
+nine of them in the last two minutes (and two at 6:59–7:00, which mark the hinge
+between the two halves). RH 4358 [G3–C7], "octave above" 1609 [G4–C7], LH 2723
+[C2–C6], pedal 856 [C1–C3].
+
+- **The ground bass: 15 notes**, found in the pedal **13 times** — 0:18, 0:38,
+  0:58, 1:18, 1:58, 2:18, 2:38, 3:18, 4:19, 5:38, 5:58, 6:18, 6:38 — statements
+  **eight bars (20 s) apart**; where the gap is wider the theme is in a manual,
+  not the pedal.
+- **Bars 1–8: one voice, one note at a time** — the theme alone. Full texture
+  from bar 9.
+- **Bars 1–168 = 21 statements × 8 bars = the Passacaglia**, 0:00–7:00. Its last
+  bar (168, 6:57) is the fullest of the whole piece: 12 notes sounding and 83
+  notes starting. Then the tempo slips twice and **the Fugue takes off about
+  7:01 (bar ~170)**.
+- The fugue runs 34–39 notes a bar with 6–7.5 sounding at once, five minutes on
+  end — as thick as the loudest variations, but without a break. At its worst the
+  screen holds 315 notes at a time (measured in session 3).
+- Almost no silence: **one** moment in 12 minutes when nothing sounds (0.83 s at
+  11:53). But individual lines rest a lot — LH 61 rests, pedal 32 (60 s at 4:19,
+  58 s at 8:12), the octave line 31 (silent 9:20–10:12).
+
+For the look: the passacaglia has an obvious 20-second pulse to build on and the
+variations can be counted; after 7:00 the ground is gone and it has to be a
+different world entirely.
+
+## BWV 639 — Ich ruf zu dir, Herr Jesu Christ (F minor)
+
+1:59, 553 notes, **4/4 at ♩=37 → 6.49 s a bar, 18 bars** (a slow bar: the
+chorale moves in quarters and the two accompanying lines run in sixteenths, so a
+bar holds 16 of their notes). Chorale 125 [Eb4–F5], LH 287 [Eb3–C5], pedal 141
+[D2–C4].
+
+- **Bars 1–4 come back exactly at 0:25 (bar 5)** — chorale, left hand and pedal
+  all together at the same pitch: the two Stollen of the chorale's bar form. The
+  left hand's opening figure returns a third time at 1:16 (bar 12).
+- **Nothing is ever silent** and no voice ever rests a beat or more, anywhere.
+- Three voices at the most, always; 24–48 notes a bar (fullest bars 6 and 2).
+  Sections: bars 1–9 sit about Eb4, bars 10–18 about Bb3 — the piece sinks.
+- The ending slows: ♩ 35 at 1:53, 30 at 1:55, 10 at 1:56.
+
+For the look: only three lines, so the gold chorale has nothing to hide behind;
+the four-bar phrase (26 s) is the unit, and it is heard twice in the same notes.
+
+## BWV 645 — Wachet auf, ruft uns die Stimme (E flat major)
+
+3:40, 863 notes, **4/4 at ♩=60 → 4 s a bar, 56 bars**, one tempo mark. RH 504
+[G3–F5], chorale 74 [Eb3–G4], pedal 285 [C2–C4].
+
+- **The chorale makes people wait for it: its first note is at 0:50 (bar 13).**
+  It then breathes 2–5 s at a time (1:00, 1:14, 1:26, …) and leaves altogether
+  for **29 s (1:34–2:03)** and **23 s (2:30–2:53)**. Its last note is at 3:24.
+- **The opening ritornello returns unchanged**: the right hand's 85-note figure
+  and the pedal's 43-note one, heard at 0:16 (bars 5–10), come back at 1:32
+  (bars 24–29) while the chorale is resting. The right hand's little 9-note
+  figure appears 8 times over the piece (0:18 … 3:08): that figure *is* the
+  refrain.
+- Two voices without the chorale, three with it; widest chord 4 (bar 20, 1:16);
+  at most 22 notes starting in a bar — the thinnest piece here.
+- The sections are just that alternation: bars 1–11 alone, 12–23 with the
+  chorale, 24–29 alone, 30–38 with, 39–44 alone, 45–51 with, 52–56 alone.
+- Two moments of total silence only, 0.5 s each (0:07, 0:15).
+
+For the look: the waiting, the arrival of the gold line, and the refrain coming
+back are the whole drama of this one.
+
+---
+
+Next, in order:
+
+1. Milestone 2, second item: **a look per piece, one piece per session.** BWV 639
+   first (three lines, two minutes, easy to judge) or BWV 645 (the clearest
+   drama: wait, arrival, refrain). BWV 582 last: it is 12 minutes and 315 notes
+   at once.
+2. If a look wants the bar grid (a pulse on each bar, a phrase every four bars),
+   the page needs bar lines: add a `bars` array in `tools/midi2json.mjs`, which
+   means re-running the converter — `test/data.test.mjs` compares the data files
+   byte for byte, so regenerate before committing. The `.js` wrappers the page
+   loads are generated from the same JSON, so they follow along.
+3. The section cut is a candidate list, not truth: for BWV 582 it does not stop at
+   every variation (a variation is not much of a change of mix). If a look needs
+   "which variation am I in", derive it from the theme's copies, not from
+   `boundaries()`.
+4. Still not done from session 3's list: cheapening far, faint notes for BWV 582.
