@@ -1726,18 +1726,18 @@ What I did:
   the dot's own box covers and `shining(x, y)` asks one.
 - **Half was not enough; the tooth steps aside.** Measured at the cell that tipped (43,31 at
   606.28 s): the picture alone has it at 0.767 - a note core 0.456, a hand dot 0.197, the
-  hand's tip bloom 0.117, the note's own ring 0.079 - and a struck tooth dot at *half* of
-  0.40 alpha of near-white still pushed it to 0.901. So a tooth dot is not laid at all
-  where the music is shining: a tick on a note's own flare is white on white anyway, and
-  the beat is still told by the ring of light round it and the part of the tooth standing
-  on ground of its own. Counted over the whole piece at a sixth of a second, only 426 of
-  127,457 rim marks are dropped - 0.3%. The teeth a player aims at are
-  untouched, because the record is written by notes that have been *struck*, and a coming
-  beat's tooth stands ahead of them.
+  hand's tip bloom 0.117, the note's own ring 0.079 - and a struck tooth dot laid there,
+  even for half (0.20 alpha of near-white where it had been 0.40) still pushed it to 0.901.
+  So a tooth dot is not laid at all where the music is shining: a tick on a note's own
+  flare is white on white anyway, and the beat is still told by the ring of light round it
+  and the part of the tooth standing on ground of its own. Counted over the whole piece at a
+  sixth of a second, only 426 of 127,457 rim marks are dropped - 0.3%. The teeth a player
+  aims at are untouched, because the record is written by notes that have been *struck*, and
+  a coming beat's tooth stands ahead of them.
 - **The grid went from two seconds to a sixth** in the committed test, and I checked the
   whole Passacaglia at a sixtieth by hand: the coarse walk found the two frames session 15
-  named (225.8 s, 245.83 s); the fine walk found a third nobody had seen (606.28 s), and it
-  is still there after the first fix - which is how I learnt that halving was the wrong
+  named (225.83 s and 245.83 s); the fine walk found a third nobody had seen (606.28 s), and it
+  was still there after the first fix - which is how I learnt that halving was the wrong
   verb. Both grids are clean now: at a sixth, 0 tipped cells, worst mean light 0.0388 against
   0.0374 with nobody playing, heaviest frame 730 marks; at a sixtieth, 44,212 frames walked
   in 85 s, 0 tipped, worst mean 0.0404 against 0.0380, and the wheel's own picture never
