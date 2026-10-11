@@ -13,7 +13,7 @@ window.Bach = window.Bach || {};
   var state = "idle"; // idle, loading, playing, paused, done
 
   var elements = {};
-  ["card", "stage", "hud", "end", "pieces", "nowTitle", "nowTime", "voices", "pause", "restart", "stop", "again", "menu", "seek", "progress", "status", "endLine"].forEach(
+  ["card", "stage", "hud", "end", "pieces", "nowTitle", "nowTime", "stops", "voices", "pause", "restart", "stop", "again", "menu", "seek", "progress", "status", "endLine"].forEach(
     function (id) {
       elements[id] = document.getElementById(id);
     }
@@ -83,6 +83,32 @@ window.Bach = window.Bach || {};
     return colours;
   }
 
+  /**
+   * Which line is which, so the organ knows what to draw for each: the line to
+   * follow gets the melody stops, the pedal line gets the big pipes.
+   */
+  function rolesFor(piece) {
+    var roles = {};
+    for (var index in piece.voices) {
+      if (Object.prototype.hasOwnProperty.call(piece.voices, index)) {
+        roles[index] = piece.voices[index].role || "inner";
+      }
+    }
+    return roles;
+  }
+
+  /**
+   * What the organ is playing with, in the words a player would use: one line
+   * for the ranks drawn on the manuals, one for the ones on the pedals.
+   */
+  function describeStops(groups) {
+    return groups
+      .map(function (group) {
+        return group.line + ": " + group.stops.join(", ");
+      })
+      .join("\n");
+  }
+
   function fillVoices(piece, data) {
     var colours = coloursFor(piece);
     elements.voices.innerHTML = "";
@@ -109,7 +135,7 @@ window.Bach = window.Bach || {};
     organ.open();
     loadData(piece)
       .then(function (data) {
-        prepared = organ.prepare(data);
+        prepared = organ.prepare(data, rolesFor(piece));
         pieceDuration = data.duration;
         if (!visual) visual = Bach.createVisual(elements.stage);
         visual.reset(prepared.notes, {
@@ -118,6 +144,7 @@ window.Bach = window.Bach || {};
           colours: coloursFor(piece),
         });
         elements.nowTitle.textContent = piece.title + " " + piece.subtitle;
+        elements.stops.textContent = describeStops(prepared.stops);
         fillVoices(piece, data);
         elements.status.textContent = "";
         elements.card.classList.remove("dim");
@@ -197,6 +224,7 @@ window.Bach = window.Bach || {};
   function backToMenu() {
     cancelAnimationFrame(timer);
     if (organ.isPlaying()) organ.stop();
+    elements.stops.textContent = "";
     state = "idle";
     show("card");
   }

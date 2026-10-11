@@ -1,7 +1,8 @@
 // The organ. Sound is built here out of nothing but the browser's Web Audio:
-// one or two oscillators per note, a stop-mix of harmonics, a little room, and
-// a tremulant. Notes are handed over a moment before they are due, so the
-// browser's own audio clock keeps the timing.
+// every note speaks through several pipes at once - a rank of the instrument -
+// drawn the way an organist draws stops, with the breath of the pipe as the key
+// opens, a little room, and a tremulant. Notes are handed over a moment before
+// they are due, so the browser's own audio clock keeps the timing.
 //
 // Depends on nothing but window; see index.html for the load order.
 
@@ -16,8 +17,95 @@ window.Bach = window.Bach || {};
   // How loud the whole organ is, before the limiter that guards the speakers.
   var VOLUME = 0.8;
 
+  // How high the loudest chord of a piece is allowed to peak, in parts of full
+  // scale. It is a worst-case figure: every pipe of every note of the chord
+  // reaching its top in the same instant. Detuning, the breath, and the room
+  // seen after it make the real peak lower than this.
+  var CEILING = 0.7;
+
+  // How a pipe speaks: it takes a moment to come up, settles back a little,
+  // holds while the key is down, and stops when the key is let go.
+  var ENVELOPE = {
+    attack: 0.025, // seconds to full voice
+    jitter: 0.02, // no key opens at exactly the same moment
+    sagTo: 0.86, // the pipe settles to this share of its level
+    release: 0.09, // the wind takes that long to die away
+  };
+
+  // How long the breath of a pipe lasts; how loud it is beside the note it
+  // belongs to is part of the registration, and the pedals breathe harder.
+  var BREATH_SECONDS = 0.16;
+
+  // The harmonic content of the pipes, as far as the ear can tell them apart.
+  // A large open flue puts most of its sound in the unison and the octave above
+  // and loses the rest little by little; a stopped pipe is poor in the even
+  // harmonics; a big pedal pipe is nearly all fundamental; a small pipe is
+  // nearly a flute. Each set is normalised by the browser to peak at 1.
+  var MIXES = {
+    principal: [1, 0.5, 0.32, 0.2, 0.1, 0.06, 0.04, 0.03],
+    stopped: [1, 0.12, 0.35, 0.06, 0.14, 0.03, 0.06, 0.02],
+    celeste: [1, 0.34, 0.2, 0.1, 0.05, 0.02],
+    octave: [1, 0.55, 0.4, 0.22, 0.12, 0.07, 0.04, 0.03],
+    small: [1, 0.28, 0.14, 0.06, 0.02],
+    wood: [1, 0.22, 0.1, 0.05, 0.02, 0.01],
+  };
+
+  // The ranks the instrument is built from. `cents` is how far apart two pipes
+  // of the same rank are scaled, which is what keeps a chord from sounding like
+  // one large synthesiser.
+  var RANKS = {
+    principal: { name: "Principal 8′", mix: "principal", cents: 4 },
+    gedackt: { name: "Gedackt 8′", mix: "stopped", cents: 3 },
+    celeste: { name: "Voix céleste 8′", mix: "celeste", cents: 3 },
+    octava: { name: "Octava 4′", mix: "octave", cents: 4 },
+    nassat: { name: "Nassat 2⅔′", mix: "small", cents: 3 },
+    subbass: { name: "Subbass 16′", mix: "wood", cents: 2 },
+    octavbass: { name: "Octavbass 8′", mix: "octave", cents: 3 },
+    mixtur: { name: "Mixtur 4′", mix: "octave", cents: 7 },
+  };
+
+  // Which stops are drawn for each kind of line. A note adds up its own pipes,
+  // so the line to follow (gold on screen) speaks about half as loud again as
+  // an inner voice, and the pedals carry the bottom of the instrument.
+  // `ratio` is the pipe's pitch beside the key: 2 is the octave above.
+  // `from` breaks a rank out below that note, the way a mixture does, because a
+  // mutation pipe under a low fundamental only thickens the mud.
+  var REGISTRATION = {
+    melody: {
+      breath: 0.06,
+      stops: [
+        { rank: "principal", ratio: 1, level: 0.3 },
+        { rank: "gedackt", ratio: 1, level: 0.13 },
+        { rank: "celeste", ratio: 1, level: 0.11, detune: 7, from: 50 },
+        { rank: "octava", ratio: 2, level: 0.13 },
+        { rank: "nassat", ratio: 3, level: 0.05, from: 55 },
+      ],
+    },
+    inner: {
+      breath: 0.05,
+      stops: [
+        { rank: "principal", ratio: 1, level: 0.27 },
+        { rank: "gedackt", ratio: 1, level: 0.11 },
+        { rank: "celeste", ratio: 1, level: 0.09, detune: 7, from: 53 },
+        { rank: "octava", ratio: 2, level: 0.09 },
+      ],
+    },
+    pedal: {
+      breath: 0.1,
+      stops: [
+        { rank: "subbass", ratio: 1, level: 0.36 },
+        { rank: "octavbass", ratio: 2, level: 0.15 },
+        { rank: "mixtur", ratio: 4, level: 0.04 },
+      ],
+    },
+  };
+
+  var WAVE_VARIANTS = 4;
+
   // Notes are converted once from the data rows into objects, in time order.
-  function toObjects(data) {
+  // `roles` says which voice is which (see src/pieces.js); a voice nobody named
+  // is an inner voice.
+  function toObjects(data, roles) {
     var format = data.format;
     var iVoice = format.indexOf("voice");
     var iPitch = format.indexOf("pitch");
@@ -32,6 +120,7 @@ window.Bach = window.Bach || {};
           time: row[iTime],
           length: row[iLength],
           velocity: row[iVelocity],
+          role: (roles && roles[String(row[iVoice])]) || "inner",
         };
       })
       .sort(function (a, b) {
@@ -39,13 +128,29 @@ window.Bach = window.Bach || {};
       });
   }
 
-  // The most notes sounding at once anywhere in the piece. This sets how loud a
-  // single pipe may be, so a full chord never clips.
-  function busiestMoment(notes) {
+  // The most notes sounding at once anywhere in the piece.
+  function widestChord(notes) {
+    return Math.max(
+      1,
+      Math.round(
+        sweep(notes, function () {
+          return 1;
+        })
+      )
+    );
+  }
+
+  /**
+   * Walks the piece once, adding something for every note that starts and taking
+   * it away again when that note ends, and keeps the highest running total it
+   * met. `weightOf` says what a note is worth.
+   */
+  function sweep(notes, weightOf) {
     var marks = [];
     for (var i = 0; i < notes.length; i++) {
-      marks.push([notes[i].time, 1]);
-      marks.push([onTheGrid(notes[i].time + notes[i].length), -1]);
+      var weight = weightOf(notes[i]);
+      marks.push([notes[i].time, weight]);
+      marks.push([onTheGrid(notes[i].time + notes[i].length), -weight]);
     }
     marks.sort(function (a, b) {
       return a[0] - b[0] || a[1] - b[1];
@@ -56,7 +161,7 @@ window.Bach = window.Bach || {};
       now += marks[j][1];
       if (now > peak) peak = now;
     }
-    return Math.max(1, peak);
+    return peak;
   }
 
   // Note times come in rounded to four decimals, but adding a length can give a
@@ -72,22 +177,136 @@ window.Bach = window.Bach || {};
     return 440 * Math.pow(2, (pitch - 69) / 12);
   }
 
-  // A stop: the mix of harmonics one pipe speaks with. Slight random differences
-  // between the mixes keep the sound from feeling like one big synthesiser.
-  function makeWaves(ctx, count) {
-    var waves = [];
-    for (var w = 0; w < count; w++) {
-      var real = [0];
-      var imag = [0];
-      for (var harmonic = 1; harmonic <= 8; harmonic++) {
-        var voice = [1, 0.62, 0.36, 0.22, 0.12, 0.07, 0.04, 0.02][harmonic - 1];
-        var jitter = 0.8 + Math.random() * 0.4;
-        imag.push(voice * jitter);
-        real.push(0);
+  /**
+   * One set of waves per rank, several voices each: the same stop, but no two
+   * pipes of it sounding exactly alike.
+   */
+  function buildVoices(ctx) {
+    var built = {};
+    for (var name in RANKS) {
+      if (!Object.prototype.hasOwnProperty.call(RANKS, name)) continue;
+      var mix = MIXES[RANKS[name].mix];
+      var waves = [];
+      for (var v = 0; v < WAVE_VARIANTS; v++) {
+        var real = [0];
+        var imag = [0];
+        for (var harmonic = 1; harmonic <= mix.length; harmonic++) {
+          imag.push(mix[harmonic - 1] * (0.85 + Math.random() * 0.3));
+          real.push(0);
+        }
+        waves.push(ctx.createPeriodicWave(real, imag));
       }
-      waves.push(ctx.createPeriodicWave(real, imag));
+      built[name] = waves;
     }
-    return waves;
+    return built;
+  }
+
+  /**
+   * The stops drawn for a line of the music.
+   */
+  function stopsFor(registration, role) {
+    return registration[role] || registration.inner;
+  }
+
+  /**
+   * The pipes that actually speak for one note: the stops drawn for its line,
+   * less any that break out below it.
+   */
+  function pipesFor(stops, pitch) {
+    var speaking = [];
+    for (var i = 0; i < stops.length; i++) {
+      if (stops[i].from === undefined || pitch >= stops[i].from) speaking.push(stops[i]);
+    }
+    return speaking;
+  }
+
+  // These files carry no dynamics at all - every key was struck the same - so
+  // velocity only nudges the level.
+  function struck(velocity) {
+    return 0.85 + 0.3 * velocity;
+  }
+
+  /**
+   * What one note adds to the loudest moment: all the pipes that speak for it,
+   * their breath, and how hard the key came down. Summed over a chord this is
+   * how high that chord can peak, since every wave is normalised to 1.
+   */
+  function noteWeight(note, registration) {
+    var drawn = stopsFor(registration, note.role);
+    var stops = pipesFor(drawn.stops, note.pitch);
+    var total = drawn.breath;
+    for (var i = 0; i < stops.length; i++) total += stops[i].level;
+    return total * struck(note.velocity);
+  }
+
+  /**
+   * The heaviest chord of a piece: the sum of the pipes sounding at once,
+   * at the moment where there are most of them. This is what sets how loud one
+   * pipe may be, so that nothing in the piece can distort.
+   */
+  function heaviestChord(notes, registration) {
+    return sweep(notes, function (note) {
+      return noteWeight(note, registration);
+    });
+  }
+
+  /**
+   * The breath of a pipe as the key opens: wind against the lip for a moment
+   * before the note stands up. Its shape is baked into one short buffer, so a
+   * note needs no more than a source and a level to breathe.
+   */
+  function makeBreath(ctx) {
+    var length = Math.floor(ctx.sampleRate * BREATH_SECONDS);
+    var buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    var samples = buffer.getChannelData(0);
+    var smooth = 0;
+    for (var i = 0; i < length; i++) {
+      var second = i / ctx.sampleRate;
+      // Roughly one octave of hiss, quickly dying: a pipe speaks, it does not hiss.
+      smooth = smooth * 0.5 + (Math.random() * 2 - 1) * 0.5;
+      var shape = Math.min(1, second / 0.004) * Math.exp(-second / 0.028);
+      samples[i] = smooth * shape;
+    }
+    return buffer;
+  }
+
+  // The two groups of stops a player would name: what is drawn on the manuals,
+  // and what on the pedals.
+  var STOP_GROUPS = [
+    { line: "Manuals", roles: ["melody", "inner"] },
+    { line: "Pedals", roles: ["pedal"] },
+  ];
+
+  /**
+   * The stops this piece will actually sound, in those two groups: everything
+   * drawn for a line the piece has, less any rank broken out above the whole
+   * piece, since no note there is high enough to call it. So the page can say
+   * what the organ is doing.
+   */
+  function stopsDrawn(notes) {
+    var highest = 0;
+    var lines = {};
+    for (var i = 0; i < notes.length; i++) {
+      if (notes[i].pitch > highest) highest = notes[i].pitch;
+      lines[notes[i].role] = true;
+    }
+    var groups = [];
+    for (var g = 0; g < STOP_GROUPS.length; g++) {
+      var group = STOP_GROUPS[g];
+      var drawn = [];
+      for (var r = 0; r < group.roles.length; r++) {
+        var role = group.roles[r];
+        if (!lines[role]) continue;
+        var stops = stopsFor(REGISTRATION, role).stops;
+        for (var s = 0; s < stops.length; s++) {
+          if (stops[s].from !== undefined && highest < stops[s].from) continue;
+          var name = RANKS[stops[s].rank].name;
+          if (drawn.indexOf(name) < 0) drawn.push(name);
+        }
+      }
+      if (drawn.length > 0) groups.push({ line: group.line, stops: drawn });
+    }
+    return groups;
   }
 
   // A short impulse response of a stone room: noise that dies away, a few early
@@ -112,19 +331,22 @@ window.Bach = window.Bach || {};
     var ctx = null;
     var master = null;
     var tremulant = null;
-    var waves = [];
+    var voices = {}; // the waves of each rank, made once
+    var wind = null; // the breath of a pipe, as a short buffer
+    var windFilter = null; // ... and the one band it is heard through
     var room = null;
     var playing = null; // the piece currently sounding, or null
     var startedAt = 0; // ctx time when playback began
     var offset = 0; // seconds into the piece when playback began
     var next = 0; // index of the next note to hand over
-    var sounding = []; // pipes currently running, so they can be shut off
+    var sounding = []; // everything running, so it can be shut off
 
     function build() {
       if (ctx) return;
       var Context = window.AudioContext || window.webkitAudioContext;
       ctx = new Context();
-      waves = makeWaves(ctx, 4);
+      voices = buildVoices(ctx);
+      wind = makeBreath(ctx);
 
       master = ctx.createGain();
       master.gain.value = VOLUME;
@@ -148,13 +370,13 @@ window.Bach = window.Bach || {};
       // The tremulant: a slow breath that moves the whole stop in and out.
       tremulant = ctx.createGain();
       tremulant.gain.value = 0.95;
-      var breath = ctx.createOscillator();
-      breath.frequency.value = 5.2;
+      var waver = ctx.createOscillator();
+      waver.frequency.value = 5.2;
       var breathDepth = ctx.createGain();
       breathDepth.gain.value = 0.045;
-      breath.connect(breathDepth);
+      waver.connect(breathDepth);
       breathDepth.connect(tremulant.gain);
-      breath.start();
+      waver.start();
 
       var slowAir = ctx.createOscillator();
       slowAir.frequency.value = 0.19;
@@ -173,7 +395,15 @@ window.Bach = window.Bach || {};
       room = ctx.createConvolver();
       room.buffer = makeRoom(ctx, 2.2);
 
+      // All the pipes breathe through the one band: the wind of a wind chest is
+      // one sound, not one per pipe.
+      windFilter = ctx.createBiquadFilter();
+      windFilter.type = "bandpass";
+      windFilter.frequency.value = 1600;
+      windFilter.Q.value = 0.7;
+
       tremulant.connect(tone);
+      windFilter.connect(tremulant);
       tone.connect(dry);
       tone.connect(send);
       send.connect(room);
@@ -185,70 +415,95 @@ window.Bach = window.Bach || {};
     }
 
     /**
-     * How loud one note may be, so that the thickest chord in the piece still
-     * fits. A note peaks at its level times about 1.3 (its second pipe), and a
-     * wave is normalised to 1, so nine notes at 0.056 peak near 0.7 - and the
-     * master volume puts that under the limiter, which only catches the odd
-     * chord whose pipes line up in phase.
+     * The shape of one pipe's voice: come up, settle back a little, hold while
+     * the key is down, shut off after it. Every time handed back is later than
+     * the one before it, whatever the length of the note.
      */
-    function noteLevel() {
-      return 0.5 / Math.max(4, playing.busiest);
-    }
-
-    function pipe(pitch, when, length, level, wave) {
-      var freq = frequency(pitch);
-      var gain = ctx.createGain();
-
-      var attack = 0.02 + Math.random() * 0.03;
-      var release = 0.1;
-      // Speak, settle a little, hold, then shut off. Every point is later than
-      // the one before it, whatever the length of the note.
-      var sagEnd = when + attack + Math.min(0.35, Math.max(0.05, length * 0.4));
+    function envelope(when, length) {
+      var attack = ENVELOPE.attack + Math.random() * ENVELOPE.jitter;
+      var attackEnd = when + attack;
+      // The settle takes two fifths of the note, never under a twentieth of a
+      // second nor over a third of one.
+      var sagEnd = attackEnd + Math.min(0.35, Math.max(0.05, length * 0.4));
       var gateEnd = Math.max(sagEnd, when + length);
-      var releaseEnd = gateEnd + release;
-      gain.gain.setValueAtTime(0.0001, when);
-      gain.gain.linearRampToValueAtTime(level, when + attack);
-      gain.gain.linearRampToValueAtTime(level * 0.78, sagEnd);
-      gain.gain.setValueAtTime(level * 0.78, gateEnd);
-      gain.gain.exponentialRampToValueAtTime(0.0001, releaseEnd);
-
-      var end = releaseEnd + 0.02;
-      var pipes = [];
-
-      var main = ctx.createOscillator();
-      main.setPeriodicWave(wave);
-      main.frequency.value = freq;
-      main.detune.value = (Math.random() * 2 - 1) * 4;
-      main.connect(gain);
-      pipes.push(main);
-
-      // A second, softer pipe a hair flat: the air around the note.
-      var shadow = ctx.createOscillator();
-      shadow.setPeriodicWave(waves[0]);
-      shadow.frequency.value = freq;
-      shadow.detune.value = -5 + (Math.random() * 2 - 1) * 3;
-      var shadowLevel = ctx.createGain();
-      shadowLevel.gain.value = 0.32;
-      shadow.connect(shadowLevel);
-      shadowLevel.connect(gain);
-      pipes.push(shadow);
-
-      for (var i = 0; i < pipes.length; i++) {
-        pipes[i].start(when);
-        pipes[i].stop(end);
-      }
-      gain.connect(tremulant);
-      sounding.push({ gain: gain, pipes: pipes, endsAt: end });
+      var releaseEnd = gateEnd + ENVELOPE.release;
+      return {
+        attackEnd: attackEnd,
+        sagEnd: sagEnd,
+        gateEnd: gateEnd,
+        releaseEnd: releaseEnd,
+        end: releaseEnd + 0.02,
+      };
     }
 
     /**
-     * Hand one note to the pipes. `left` can be shorter than the note in the data,
-     * for a note that was still held when playback was picked up again.
+     * One pipe of one rank, speaking for `length` seconds. `level` is its share
+     * of the note and is never gone beyond, which is what makes the loudest
+     * moment of a piece predictable; the pipes are never louder than the plan
+     * says, only ever a little quieter.
+     */
+    function pipe(freq, when, length, level, wave, cents) {
+      var gain = ctx.createGain();
+      var shape = envelope(when, length);
+      var sustain = level * (0.9 + Math.random() * 0.1) * ENVELOPE.sagTo;
+      gain.gain.setValueAtTime(0.0001, when);
+      gain.gain.linearRampToValueAtTime(level, shape.attackEnd);
+      gain.gain.linearRampToValueAtTime(sustain, shape.sagEnd);
+      gain.gain.setValueAtTime(sustain, shape.gateEnd);
+      gain.gain.exponentialRampToValueAtTime(0.0001, shape.releaseEnd);
+
+      var oscillator = ctx.createOscillator();
+      oscillator.setPeriodicWave(wave);
+      oscillator.frequency.value = freq;
+      oscillator.detune.value = cents;
+      oscillator.connect(gain);
+      oscillator.start(when);
+      oscillator.stop(shape.end);
+
+      gain.connect(tremulant);
+      sounding.push({ gain: gain, pipes: [oscillator], endsAt: shape.end });
+    }
+
+    /**
+     * The breath of one key: wind against the lip, then nothing. It is started
+     * with the note and needs no envelope of its own, the shape is in the buffer.
+     */
+    function breath(when, level) {
+      var gain = ctx.createGain();
+      gain.gain.value = level;
+      var source = ctx.createBufferSource();
+      source.buffer = wind;
+      source.playbackRate.value = 0.85 + Math.random() * 0.5;
+      source.connect(gain);
+      gain.connect(windFilter);
+      source.start(when);
+      source.stop(when + BREATH_SECONDS);
+      sounding.push({ gain: gain, air: source, endsAt: when + BREATH_SECONDS + 0.02 });
+    }
+
+    /**
+     * Hand one note to the instrument: every stop drawn for its line gets a
+     * pipe, and the key breathes as it opens. `left` can be shorter than the
+     * note in the data, for a note that was still held when playback was picked
+     * up again.
      */
     function speak(note, index, when, left) {
-      var level = noteLevel() * (0.85 + 0.3 * note.velocity);
-      var wave = waves[(note.pitch + index) % waves.length];
-      pipe(note.pitch, when, left, level, wave);
+      var drawn = stopsFor(playing.registration, note.role);
+      var base = playing.gain * struck(note.velocity);
+      var stops = pipesFor(drawn.stops, note.pitch);
+      for (var i = 0; i < stops.length; i++) {
+        var stop = stops[i];
+        var rank = RANKS[stop.rank];
+        pipe(
+          frequency(note.pitch) * stop.ratio,
+          when,
+          left,
+          base * stop.level,
+          voices[stop.rank][(index + i) % voices[stop.rank].length],
+          (stop.detune || 0) + (Math.random() * 2 - 1) * rank.cents
+        );
+      }
+      breath(when, base * drawn.breath);
     }
 
     function pump() {
@@ -278,18 +533,29 @@ window.Bach = window.Bach || {};
       return Math.max(0, ctx.currentTime - startedAt + offset);
     }
 
-    /** Quiet every pipe running, and keep the place in the piece we got to. */
+    /** Quiet every pipe and every breath running, and keep the place in the piece
+     *  we got to. */
     function quiet() {
       if (!ctx) return;
       var now = ctx.currentTime;
       for (var i = 0; i < sounding.length; i++) {
+        var item = sounding[i];
         try {
-          sounding[i].gain.gain.cancelScheduledValues(now);
-          sounding[i].gain.gain.setValueAtTime(Math.max(0.0001, sounding[i].gain.gain.value), now);
-          sounding[i].gain.gain.linearRampToValueAtTime(0.0001, now + 0.07);
-          for (var p = 0; p < sounding[i].pipes.length; p++) sounding[i].pipes[p].stop(now + 0.09);
+          if (item.air) {
+            item.air.stop(now + 0.09);
+          } else {
+            item.gain.gain.cancelScheduledValues(now);
+            item.gain.gain.setValueAtTime(Math.max(0.0001, item.gain.gain.value), now);
+            item.gain.gain.linearRampToValueAtTime(0.0001, now + 0.07);
+            for (var p = 0; p < item.pipes.length; p++) item.pipes[p].stop(now + 0.09);
+          }
         } catch (e) {
           /* a pipe already stopped is fine */
+        }
+        try {
+          item.gain.disconnect();
+        } catch (e) {
+          /* already gone */
         }
       }
       sounding = [];
@@ -305,11 +571,22 @@ window.Bach = window.Bach || {};
         return ctx;
       },
 
-      prepare: function (data) {
-        var notes = toObjects(data);
+      /**
+       * Read a piece of note data over: put the notes in order, work out which
+       * stops each line draws (`roles`), and how loud one pipe may be so that the
+       * heaviest chord in the whole piece still fits.
+       */
+      prepare: function (data, roles) {
+        var notes = toObjects(data, roles);
+        var heaviest = heaviestChord(notes, REGISTRATION);
         return {
           notes: notes,
-          busiest: busiestMoment(notes),
+          busiest: widestChord(notes),
+          registration: REGISTRATION,
+          stops: stopsDrawn(notes),
+          // A piece with only a couple of notes at a time is not played as if it
+          // were a tutti, so the weight is never taken under three.
+          gain: CEILING / Math.max(3, heaviest),
           duration: data.duration,
         };
       },
@@ -354,4 +631,25 @@ window.Bach = window.Bach || {};
   }
 
   Bach.createOrgan = createOrgan;
+  // What the instrument is built from, for the tools and the tests that measure
+  // it: the ranks, what is drawn for each line, how loud it is all allowed to be,
+  // and the rules that go with them, so that a measurement uses the engine's own
+  // numbers and not a copy of them. Changing these changes the sound; the numbers
+  // are checked in test/organ.test.mjs.
+  Bach.organSpec = {
+    ranks: RANKS,
+    mixes: MIXES,
+    registration: REGISTRATION,
+    stopGroups: STOP_GROUPS,
+    ceiling: CEILING,
+    volume: VOLUME,
+    envelope: ENVELOPE,
+    breathSeconds: BREATH_SECONDS,
+    stopsFor: stopsFor,
+    pipesFor: pipesFor,
+    struck: struck,
+    noteWeight: noteWeight,
+    heaviestChord: heaviestChord,
+    stopsDrawn: stopsDrawn,
+  };
 })(window.Bach);

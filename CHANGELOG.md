@@ -1,5 +1,32 @@
 # Releases
 
+## 0.1.2 — 2026-10-11
+
+The organ has ranks now. A note is no longer one pipe, and the corner of the
+screen says what is playing.
+
+- **Every note speaks through several pipes**: four or five on the manuals,
+  three on the pedals — an open Principal, a stopped Gedackt, a Voix céleste
+  tuned a shade sharp so the two beat slowly against each other, an Octava an
+  octave up, and a Nassat a twelfth up to lead the line you are meant to follow.
+  The line to follow (gold on screen) is drawn a third louder again than an
+  inner voice, so a chorale melody comes through on its own; the pedals get the
+  big pipes. Upper ranks break out below a low note, the way a mixture does, so
+  the bottom stays clear instead of turning to mud.
+- **Pipes speak, they don't switch on.** Every key lets in a moment of wind
+  against the lip as it opens, no two keys open at quite the same instant, and
+  each pipe settles back a little after its attack, so a held chord breathes
+  instead of standing still.
+- **Loudness is measured now, not guessed.** A new tool (`node
+  tools/loudness.mjs`) rebuilds the instrument in plain numbers and renders every
+  piece through it: the loudest chord of every piece peaks around 0.4 of full
+  scale where the levels allow 0.56, and the limiter only starts working at
+  0.71 — so nothing distorts, and a soft verse stays softer than a tutti. A thin
+  piece like BWV 639, three notes at a time, is played at its own level instead
+  of being turned down as though it were a tutti.
+- While a piece plays, the corner under its title lists what the organ is drawn
+  with — manuals and pedals separately.
+
 ## 0.1.1 — 2026-10-11
 
 The notes are really drawn now, and you can hold the music, start it again, or

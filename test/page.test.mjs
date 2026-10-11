@@ -64,6 +64,7 @@ function fakeCanvas(colours) {
 
 function fakeParam(events) {
   const param = {
+    events: events,
     value: 0,
     cancelScheduledValues() {
       return param;
@@ -121,11 +122,11 @@ function fakeAudio(audio) {
       context.state = "running";
     },
     createBuffer(channels, length) {
-      audio.bufferLength = length;
       const data = [];
       for (let i = 0; i < channels; i++) data.push(new Float32Array(length));
-      audio.bufferData = data;
-      return { getChannelData: (i) => data[i], length };
+      const buffer = { getChannelData: (i) => data[i], length, data };
+      audio.buffers.push(buffer);
+      return buffer;
     },
     createPeriodicWave(real, imag) {
       assert.ok(imag.length > 3, "a stop with that few harmonics is a beep");
@@ -166,6 +167,30 @@ function fakeAudio(audio) {
       });
       audio.pipes.push(osc);
       return osc;
+    },
+    createBufferSource() {
+      // The breath of a pipe: a short clip of wind, started and stopped.
+      audio.sources += 1;
+      const source = node({
+        buffer: null,
+        playbackRate: { value: 1 },
+        start(at) {
+          const when = at === undefined ? context.currentTime : at;
+          assert.ok(typeof when === "number" && when >= 0, "a breath was told to start before now");
+          source.startAt = when;
+          source.sounding = true;
+          audio.breaths += 1;
+          audio.sourceTimes.push(when);
+        },
+        stop(at) {
+          const when = at === undefined ? context.currentTime : at;
+          assert.ok(typeof when === "number" && when >= 0, "a breath was told to stop at a strange time");
+          source.stopAt = when;
+          audio.stoppedBreaths += 1;
+        },
+      });
+      audio.air.push(source);
+      return source;
     },
     createBiquadFilter() {
       return node({ type: "", frequency: fakeParam([]), Q: { value: 0 } });
@@ -243,13 +268,17 @@ function makePage() {
     stopped: 0,
     startTimes: [],
     pipes: [],
+    sources: 0,
+    breaths: 0,
+    stoppedBreaths: 0,
+    sourceTimes: [],
+    air: [],
     gains: 0,
     gainNodes: [],
     waves: 0,
     params: [],
     convolver: null,
-    bufferLength: 0,
-    bufferData: null,
+    buffers: [],
   };
   const elements = {};
   const frames = [];
@@ -385,7 +414,7 @@ test("the page lists the pieces and starts the organ on a click", async () => {
   assert.strictEqual(page.audio.context.state, "running", "the audio was not opened");
   assert.ok(page.audio.waves > 1, "the organ built one single stop for everything");
   assert.ok(page.audio.convolver && page.audio.convolver.buffer, "there is no room to sound in");
-  assert.ok(page.audio.bufferLength > 44100, "the room is shorter than a second");
+  assert.ok(page.audio.convolver.buffer.length > 44100, "the room is shorter than a second");
   assert.strictEqual(page.elements.hud.classList.contains("shown"), true, "the player did not appear");
 
   for (let frame = 0; frame < 90; frame++) page.nextFrame(1 / 60);
@@ -405,7 +434,14 @@ test("the page lists the pieces and starts the organ on a click", async () => {
     page.audio.gainNodes.some((gain) => gain.connections.indexOf(page.audio.convolver) >= 0),
     "nothing is ever sent to the room"
   );
-  assert.ok(page.audio.bufferData[0].some((sample) => sample !== 0), "the room is silent: its impulse is all zeros");
+  const room = page.audio.convolver.buffer.data[0];
+  assert.ok(room.some((sample) => sample !== 0), "the room is silent: its impulse is all zeros");
+  const wind = page.audio.buffers.find((buffer) => buffer !== page.audio.convolver.buffer);
+  assert.ok(wind, "the pipes were given no breath at all");
+  const windTop = Math.max.apply(null, Array.from(wind.data[0], Math.abs));
+  assert.ok(windTop > 0.05, "the breath of a pipe is a whisper: it peaks at " + windTop.toFixed(3));
+  assert.ok(windTop <= 1, "the breath of a pipe peaks at " + windTop.toFixed(3) + ", which is as loud as full scale");
+  assert.ok(wind.length < 44100 * 0.5, "the breath of a pipe is a long way over a tenth of a second");
 });
 
 test("every piece on the list plays, and names its voices", async () => {
@@ -465,6 +501,12 @@ test("every note that is due gets a pipe, and the envelopes are in order", async
   assert.ok(page.audio.started > 40, "four seconds of music is more than " + page.audio.started + " pipes");
 
   for (const events of page.audio.params) {
+    for (let i = 0; i < events.length; i++) {
+      assert.ok(
+        Math.abs(events[i].value) <= 1,
+        "something was given a level of " + events[i].value + ", which is louder than full scale"
+      );
+    }
     for (let i = 1; i < events.length; i++) {
       assert.ok(
         events[i].at >= events[i - 1].at - 1e-9,
@@ -623,20 +665,25 @@ test("pause rests the music and resume picks it up where it left off", async () 
 test("a note still held when the music comes back is taken up again", () => {
   const page = openPage();
   const organ = page.window.Bach.createOrgan();
+  const spec = page.window.Bach.organSpec;
+  const tail = spec.envelope.release + 0.02; // the pipe dies away after the key is let go
   organ.open();
-  const prepared = organ.prepare({
-    format: ["voice", "pitch", "time", "duration", "velocity"],
-    duration: 12,
-    notes: [
-      [1, 48, 0, 4, 0.7], // held right through the pick-up point
-      [2, 60, 3, 1, 0.7], // sounds across it too
-      [3, 72, 6, 1, 0.7], // still to come
-    ],
-  });
+  const prepared = organ.prepare(
+    {
+      format: ["voice", "pitch", "time", "duration", "velocity"],
+      duration: 12,
+      notes: [
+        [1, 48, 0, 4, 0.7], // held right through the pick-up point
+        [2, 60, 3, 1, 0.7], // sounds across it too
+        [3, 72, 6, 1, 0.7], // still to come
+      ],
+    },
+    { 1: "inner", 2: "inner", 3: "inner" }
+  );
 
   organ.play(prepared, 0);
   organ.pump();
-  assert.strictEqual(page.audio.started, 4, "only the two notes within reach should be handed over");
+  assert.strictEqual(page.audio.breaths, 1, "only the note that is due should have spoken");
 
   page.audio.context.currentTime = 3.5;
   const restedAt = organ.stop();
@@ -647,11 +694,16 @@ test("a note still held when the music comes back is taken up again", () => {
   const resumedAt = page.audio.context.currentTime;
   organ.play(prepared, restedAt);
   const takenUp = page.audio.pipes.slice(before);
-  assert.strictEqual(takenUp.length, 4, "the two notes still held were not both taken up again");
+  assert.strictEqual(page.audio.breaths - 1, 2, "the two notes still held were not both taken up again");
+  assert.ok(takenUp.length >= 4, "two notes taken up spoke through only " + takenUp.length + " pipes");
   for (const osc of takenUp) {
     const sounding = osc.stopAt - osc.startAt;
-    // What was left of the note (4 - 3.44) plus its release and the safety gap.
-    assert.ok(Math.abs(sounding - (4 - restedAt) - 0.12) < 0.001, "the held note was given " + sounding + " s");
+    // Both held notes let go at four seconds, so what they were given is what
+    // was left of them plus their release and the safety gap.
+    assert.ok(
+      Math.abs(sounding - (4 - restedAt) - tail) < 0.001,
+      "a held note was given " + sounding + " s, wanted " + (4 - restedAt + tail)
+    );
   }
 
   page.audio.context.currentTime = 6;
@@ -661,6 +713,136 @@ test("a note still held when the music comes back is taken up again", () => {
     page.audio.startTimes.some((at) => at >= wanted - 0.002 && at <= wanted + 0.01),
     "the note still to come did not arrive at its own second"
   );
+});
+
+test("every note speaks through several pipes and breathes once", async () => {
+  const page = openPage();
+  page.elements.pieces.children[0].click();
+  await settled();
+  page.playFrames(240, 1 / 60); // four seconds
+
+  assert.ok(page.audio.breaths > 10, "only " + page.audio.breaths + " keys breathed in four seconds");
+  assert.strictEqual(
+    page.audio.stoppedBreaths,
+    page.audio.breaths,
+    "a breath was started and never stopped: the wind would run for ever"
+  );
+  assert.ok(
+    page.audio.oscillators >= page.audio.breaths * 2,
+    "only " + page.audio.oscillators + " pipes for " + page.audio.breaths + " notes: a note is one beep, not a rank"
+  );
+  // The breath is short: it is the speaking of the pipe, not a second note.
+  for (const source of page.audio.air) {
+    assert.ok(source.stopAt - source.startAt < 0.25, "one key breathed for " + (source.stopAt - source.startAt) + " s");
+    assert.ok(source.buffer, "a breath was started with no wind in it");
+  }
+});
+
+test("a note speaks through the ranks drawn for its line, and in tune", () => {
+  const page = openPage();
+  const organ = page.window.Bach.createOrgan();
+  const spec = page.window.Bach.organSpec;
+  organ.open();
+
+  function pipesForOneNote(pitch, role) {
+    const before = page.audio.pipes.length;
+    const prepared = organ.prepare(
+      {
+        format: ["voice", "pitch", "time", "duration", "velocity"],
+        duration: 5,
+        notes: [[1, pitch, 0, 0.5, 0.7]],
+      },
+      { 1: role }
+    );
+    organ.play(prepared, 0);
+    organ.pump();
+    return page.audio.pipes.slice(before);
+  }
+
+  function hz(pitch) {
+    return 440 * Math.pow(2, (pitch - 69) / 12);
+  }
+
+  function drawn(role, pitch) {
+    return spec.registration[role].stops.filter((stop) => stop.from === undefined || pitch >= stop.from);
+  }
+
+  function inTune(pipes, role, pitch) {
+    const wanted = drawn(role, pitch).map((stop) => hz(pitch) * stop.ratio);
+    assert.strictEqual(pipes.length, wanted.length, role + " at " + pitch + " got " + pipes.length + " pipes, wanted " + wanted.length);
+    for (const f of wanted) {
+      assert.ok(
+        pipes.some((osc) => Math.abs(osc.frequency.value - f) / f < 0.001),
+        "nothing sounded at " + f.toFixed(1) + " Hz, which a drawn rank plays"
+      );
+    }
+    for (const osc of pipes) {
+      assert.ok(
+        wanted.some((f) => Math.abs(osc.frequency.value - f) / f < 0.001),
+        "a pipe sounded at " + osc.frequency.value.toFixed(1) + " Hz, which no drawn rank plays"
+      );
+    }
+  }
+
+  // A melody note high enough for every stop: the whole registration speaks.
+  const high = pipesForOneNote(67, "melody"); // G4
+  inTune(high, "melody", 67);
+
+  // The octave rank is really an octave above, and the twelfth really a twelfth.
+  assert.ok(
+    high.some((osc) => Math.abs(osc.frequency.value - 2 * hz(67)) < 1),
+    "the octave rank did not sound an octave above the key"
+  );
+
+  // The celeste is tuned a little sharp beside the principal: that is the whole
+  // reason it is there, the two pipes beating slowly against each other.
+  const unison = high.filter((osc) => Math.abs(osc.frequency.value - hz(67)) < 1);
+  assert.ok(unison.length >= 2, "only one pipe at the unison: nothing to beat against");
+  assert.ok(
+    unison.some((osc) => osc.detune.value > 3),
+    "no pipe at the unison was tuned sharp: " + unison.map((osc) => osc.detune.value.toFixed(1)).join(", ")
+  );
+  assert.ok(
+    unison.some((osc) => Math.abs(osc.detune.value) < 4),
+    "every pipe at the unison was out of tune with the key"
+  );
+
+  // A low note loses the ranks that break out below it, as a mixture does.
+  const low = pipesForOneNote(45, "melody"); // A2, under every break
+  inTune(low, "melody", 45);
+  assert.ok(low.length < high.length, "a low melody note drew as many pipes as a high one");
+
+  // And a pedal note is on the pedals, not on the manuals.
+  const pedal = pipesForOneNote(36, "pedal"); // C2
+  inTune(pedal, "pedal", 36);
+  const pedalNames = drawn("pedal", 36).map((stop) => spec.ranks[stop.rank].name).join(" ");
+  assert.match(pedalNames, /Subbass/, "the pedals drew no big pipes");
+  assert.doesNotMatch(pedalNames, /Voix/, "the pedals drew a celeste");
+});
+
+test("the player says which stops are drawn", async () => {
+  const page = openPage();
+  const pieces = [...page.window.Bach.pieces];
+  for (const piece of pieces) {
+    page.elements.pieces.children[pieces.indexOf(piece)].click();
+    await settled();
+    page.playFrames(2, 1 / 60);
+    const shown = page.elements.stops.textContent;
+    const lines = shown.split("\n");
+    assert.strictEqual(
+      lines.length,
+      2,
+      piece.slug + " should say one line for the manuals and one for the pedals: " + shown
+    );
+    assert.match(lines[0], /^Manuals: [A-Z]/, piece.slug + " does not say what is on the manuals: " + shown);
+    assert.match(lines[1], /^Pedals: [A-Z]/, piece.slug + " does not say what is on the pedals: " + shown);
+    assert.match(shown, /8′/, piece.slug + " has no 8 foot stop: " + shown);
+    for (const line of lines) {
+      assert.ok(line.length < 90, "a line of stops is too long to sit in the corner: " + line);
+    }
+    page.elements.stop.click();
+    assert.strictEqual(page.elements.stops.textContent, "", "the stops stayed on the screen after the piece");
+  }
 });
 
 test("clicking the line below moves into the piece", async () => {
