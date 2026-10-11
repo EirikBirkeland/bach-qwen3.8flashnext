@@ -1,5 +1,26 @@
 # Releases
 
+## 0.4.1 — 2026-10-11
+
+One pixel of the Passacaglia stopped burning out white when you strike a beat.
+
+- **The wheel of BWV 582 had a record of where it had already laid light, and its beat
+  teeth were not consulting it.** A tooth is three pixels of light just inside the rim,
+  which is exactly where this keyboard arrangement strikes its top notes, and a whole light
+  laid on a spot that is already shining is one burnt-out pixel. Two frames in twelve
+  minutes did that (225.8 s and 245.8 s). A tooth now steps aside where the music is
+  already shining there - a tick on a note's own flare is white on white anyway - and the
+  beat is still told by the ring of light round it and the part of the tooth standing on
+  ground of its own. Nothing anywhere in the piece goes over now.
+- **The record covers the ground a light falls on, not just its middle.** Two marks four
+  pixels apart are one light to the eye; the old record compared middles, so a tooth three
+  pixels outside a note's core was taken for standing in the dark.
+- **The measuring went from one second to a sixth of one.** The frames where a struck beat
+  and a struck note land together last hundredths of a second, and a coarse grid walks
+  straight past them - this burn sat under a twice-a-second check for three sessions. The
+  Passacaglia is now walked beat by beat with every beat struck, and none of the four
+  pieces' pictures goes over white on the player's account.
+
 ## 0.4.0 — 2026-10-11
 
 The organ breathes now. Every piece is shaped phrase by phrase, thin moments are played

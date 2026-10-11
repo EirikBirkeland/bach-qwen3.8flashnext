@@ -168,10 +168,15 @@ Built in this order:
         Session 11 left this out on purpose, because a bell grows exactly where the chord is widest, which is
         where the headroom is already spoken for. Measured again since the shaping went in: the four pieces
         sit within 1.7 to 1 of their own music, which is as good as a per-piece rule gets.
-  - [ ] The wheel of BWV 582 tips one cell of the picture white twice in the piece (225.8 s and 245.8 s,
-        measured a sixtieth of a second apart, found in session 15): its beat tooth is laid where a note's
-        own core is shining, and `pulse` never consults the record of where the light has already been laid.
-        Small, and the grid the tests measure on should go from one second to a sixth while it is done.
+  - [x] The wheel's beat tooth steps aside now (`0.4.1`). The wheel already kept a record of where it
+        had laid light, for two voices striking one pitch; the pulse's teeth never asked it, and one of them
+        standing on a note core did tip a cell over white. A tooth now asks - and where the music is already
+        shining there it is not laid at all, since even for half a tick on a note's own flare is white on
+        white and over full scale. The record covers the ground a light falls on rather than its middle alone,
+        which is what it took: the tooth stands three pixels outside the note it lands on. The grid the
+        picture is measured on went from one second to a sixth, and the Passacaglia is walked beat by beat
+        with every beat struck - the frames where a struck beat and a struck note land together last
+        hundredths of a second, and a coarse grid walks straight past them.
 
 ### After that
 

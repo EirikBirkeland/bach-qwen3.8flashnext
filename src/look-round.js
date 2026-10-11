@@ -50,6 +50,7 @@ window.Bach = window.Bach || {};
   // ground is the one thing that is gold, and a beat cannot take that meaning away.
   var TOP = -0.25; // so a turn begins at the top of the screen and winds clockwise
   var TAU = Math.PI * 2;
+  var CELL = 4; // how coarse the wheel's record of where it has lit is, in pixels
 
   function createRoundLook(canvas) {
     var screen = Bach.createScreen(canvas);
@@ -75,6 +76,14 @@ window.Bach = window.Bach || {};
     var to = 0;
     var lastNow = -1;
     var time = 0;
+    // Where light has already been laid down this frame. Two voices striking the
+    // same pitch at the same moment - which this arrangement does often - land on
+    // one spot of the wheel, and two full lights on one spot are white rather than
+    // loud, so the second one is drawn for less. The player's beat teeth are drawn
+    // after the notes and go through the same record, and step aside altogether: a
+    // tooth stands just inside the rim, which is exactly where the manuals' top
+    // notes are struck.
+    var spots = {};
     // Filled in at the top of every frame, so the helpers know the size of things.
     var view = { width: 1, height: 1, cx: 0, cy: 0, inner: 1, outer: 1, ahead: 4, hand: 0 };
 
@@ -265,6 +274,25 @@ window.Bach = window.Bach || {};
       return { x: view.cx + Math.cos(angle) * radius, y: view.cy + Math.sin(angle) * radius };
     }
 
+    /**
+     * Whether a mark laid light over this place already this frame. A mark writes
+     * down the whole of the ground its light covers, so a mark 4 px away from a
+     * note's middle still finds it: their lights do fall on one another.
+     */
+    function shining(x, y) {
+      return spots[Math.floor(x / CELL) + ":" + Math.floor(y / CELL)] === true;
+    }
+
+    /** Write down that light of this size covers its ground, for whatever comes after. */
+    function laid(x, y, size) {
+      var reach = Math.max(CELL / 2, size);
+      for (var col = Math.floor((x - reach) / CELL); col <= Math.floor((x + reach) / CELL); col++) {
+        for (var row = Math.floor((y - reach) / CELL); row <= Math.floor((y + reach) / CELL); row++) {
+          spots[col + ":" + row] = true;
+        }
+      }
+    }
+
     /** A square of light, and nothing else: a note, a mark on the rim. */
     function dot(x, y, size, colour, strength) {
       if (size <= 0 || strength <= 0.01) return;
@@ -344,6 +372,12 @@ window.Bach = window.Bach || {};
       for (var depth = 0; depth <= length; depth += 3) {
         var inward = 1 - depth / (length + 3); // the far end of a tooth is its soft end
         var here = point(view.outer - 3 - depth, angle);
+        // Where the music is already shining, the tooth steps aside. A tick of
+        // light laid on a note's own flare is white on white - the player sees
+        // nothing and the spot goes over full scale, even at half. The beat is
+        // still told: the ring of light round it, and the part of the tooth that
+        // stands on ground of its own.
+        if (shining(here.x, here.y)) continue;
         dot(here.x, here.y, 0.6 + 0.9 * inward, colour, strength * inward);
       }
     }
@@ -519,11 +553,8 @@ window.Bach = window.Bach || {};
         );
       }
 
-      // Where lights have already been laid down this frame. Two voices striking
-      // the same pitch at the same moment - which this arrangement does often -
-      // land on one spot of the wheel, and two full lights on one spot is white
-      // rather than loud, so the second one is drawn for less.
-      var spots = {};
+      // Fresh every frame: what is shining now is what a mark has to share with.
+      spots = {};
 
       // The notes of the turn being played, and the last few seconds of light.
       for (var n = from; n < to; n++) {
@@ -548,11 +579,11 @@ window.Bach = window.Bach || {};
         var strength = age <= 0 ? 1 : Math.max(0, 1 - age / TAIL);
         // Only what has been struck is bright enough to burn a spot out, so only
         // what has been struck is measured against what is already shining there.
-        var spot = Math.round(lit.x / 4) + ":" + Math.round(lit.y / 4);
-        var share = spots[spot] === true ? 0.5 : 1;
-        spots[spot] = true;
+        var body = size * (0.75 + 0.4 * strength);
+        var share = shining(lit.x, lit.y) ? 0.5 : 1;
+        laid(lit.x, lit.y, body);
         if (strength > 0.3) glow(lit.x, lit.y, size * (2.2 + 3.4 * strength), colour, 0.22 * strength * calm * share);
-        dot(lit.x, lit.y, size * (0.75 + 0.4 * strength), colour, 0.72 * strength * calm * share);
+        dot(lit.x, lit.y, body, colour, 0.72 * strength * calm * share);
       }
 
       // A fresh telling of the ground: gold, wherever its first note falls.

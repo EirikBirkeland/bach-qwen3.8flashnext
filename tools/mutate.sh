@@ -80,6 +80,10 @@ run "wheel: a beat the music is marking is no different" src/look-round.js 's/  
 run "wheel: a struck beat is not lit" src/look-round.js 's/        if \(faded <= 0\.01\) continue;/        if (faded > 0) continue;/'
 run "wheel: a struck beat is lit gold, which is the ground's colour" src/look-round.js 's/          one\.kind === "gold" \? MARK : COOL,/          GOLD,/'
 run "wheel: the rim does not brighten for a run" src/look-round.js 's/      if \(shot\.run > 0\.02\) ring\(view\.outer, 2 \+ 4 \* shot\.run, COOL, 0\.015 \+ 0\.05 \* shot\.run\);//'
+run "wheel: a tooth is laid over a note already shining" src/look-round.js 's/        if \(shining\(here\.x, here\.y\)\) continue;\n//'
+run "wheel: the record of what is lit is a dot, not the ground its light covers" src/look-round.js 's/var reach = Math\.max\(CELL \/ 2, size\);/var reach = 0;/'
+run "wheel: the record of what is lit is never cleared" src/look-round.js 's/^      spots = \{\};\n//m'
+run "wheel: a note does not share its spot with the next one" src/look-round.js 's/var share = shining\(lit\.x, lit\.y\) \? 0\.5 : 1;/var share = 1;/'
 
 # The bar grid: a MIDI file cannot say it opened with a pickup, so the converter
 # reads that off the end of the piece (tools/bars.mjs). Get it wrong and a whole

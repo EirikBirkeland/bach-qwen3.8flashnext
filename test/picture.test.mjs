@@ -1032,11 +1032,20 @@ function wheelPlaying() {
     /** The look's own geometry for a second of the piece: bearing and angle. */
     place: (seconds) => wheelAt(scene, ground.anchor, ground.barsPerTurn, 60, seconds),
     see: function (seconds) {
-      picture.frame(seconds);
+      const alone = picture.frame(seconds);
       const count = picture.drawn.length;
       const seen = stage.frame(seconds);
-      return { frame: seen, added: stage.drawn.slice(count), hand: this.bearing(seconds) };
+      return {
+        frame: seen,
+        plain: alone,
+        added: stage.drawn.slice(count),
+        marks: stage.drawn.length,
+        hand: this.bearing(seconds),
+      };
     },
+    /** The same pair, framed in lockstep, so a burnt cell can be blamed. */
+    alone: picture,
+    air: stage.air,
   };
 }
 
@@ -1218,30 +1227,128 @@ test("BWV 582: when the wheel unwinds for the fugue, the teeth go back on the ra
   assert.ok(spread(fugue.added) < 120, "the fugue still has " + spread(fugue.added).toFixed(0) + " degrees of teeth on the rim");
 });
 
-test("BWV 582: the pulse on the rim is cheap to draw, and burns nothing out", () => {
-  const scene = sceneOf("bwv582-passacaglia-c-minor");
-  const stage = createStage(scene, { play: true });
-  const beats = [...stage.beats()];
-  let at = 0;
+test("BWV 582: the teeth on the rim are cheap to draw, and tip nothing over white", () => {
+  // Walked every sixth of a second. A tooth is 3 pixels of light laid down just
+  // inside the rim, which is exactly where the manuals' top notes are struck, and
+  // a coarser grid walks straight past the frame where the two land together -
+  // which is how a frame every two seconds hid two burnt-out cells for three
+  // sessions.
+  const play = wheelPlaying();
+  const scene = play.scene;
+  const beats = play.beats();
+  const luma = (spot) => 0.2126 * spot[0] + 0.7152 * spot[1] + 0.0722 * spot[2];
   let index = 0;
   let most = 0;
-  let burnt = 0;
+  let mean = 0;
+  let tipped = 0;
   let rung = 0;
-  for (at = 1; at < scene.data.duration; at += 2) {
+  let worstAlone = 0;
+  for (let at = 1; at < scene.data.duration; at += 1 / 6) {
     while (index < beats.length && beats[index].time < at) {
-      if (at - beats[index].time < 0.3) stage.hit(beats[index].time); // there for a beat now and then
+      if (at - beats[index].time < 0.3) play.hit(beats[index].time); // there for a beat now and then
       index++;
     }
-    const seen = stage.frame(at);
-    if (stage.drawn.length > most) most = stage.drawn.length;
-    burnt += seen.burnt;
-    assert.ok(seen.mean < 0.06, "the wheel is washed out at " + at + " s with the pulse on: mean light " + seen.mean.toFixed(3));
+    const seen = play.see(at);
+    const plainAir = play.alone.air.map(luma); // the same second, with nobody playing
+    most = Math.max(most, seen.marks);
+    mean = Math.max(mean, seen.frame.mean);
+    worstAlone = Math.max(worstAlone, seen.plain.mean);
+    rung = play.score().caught;
+    // The wheel burns a cell out where two voices strike one pitch together, and
+    // has a record for it; a cell may only go over on the pulse's account if the
+    // music had not all but done it by itself.
+    play.air.forEach((spot, k) => {
+      if (luma(spot) > 0.9 && plainAir[k] < 0.85) tipped++;
+    });
   }
-  rung = stage.rung.length;
   assert.ok(most > 200, "one frame draws only " + most + " marks with the pulse on");
   assert.ok(most < 1500, "one frame draws " + most + " boxes with the pulse on: that will not keep up");
-  assert.strictEqual(burnt, 0, burnt + " cells burned out white with the pulse on");
-  assert.ok(rung > 5, "the player struck " + rung + " bells in " + Math.round(at) + " s: the harness is not striking");
+  assert.ok(
+    mean < worstAlone + 0.004,
+    "the teeth cost too much light: worst mean " + mean.toFixed(4) + " against " + worstAlone.toFixed(4) + " without them"
+  );
+  assert.strictEqual(tipped, 0, tipped + " cells burned out white because of the pulse alone");
+  assert.ok(rung > 20, "the player struck " + rung + " bells in " + Math.round(scene.data.duration) + " s: the harness is not striking");
+});
+
+test("BWV 582: where the music is already shining, the beat's tooth steps aside", () => {
+  // The wheel keeps a record of where it has laid light, and a second mark on a
+  // spot that is already shining is drawn for less. The Passacaglia's beat teeth
+  // are the marks that needed it: they stand just inside the rim, where this
+  // keyboard arrangement strikes its highest notes, and even for half a tick laid
+  // on a note's own flare is white on white and over full scale. So a tooth steps
+  // aside there - which is plainest on a wheel built by hand: one note, struck
+  // exactly on a beat, so the tooth that beat leaves lands on the note's own core;
+  // and the same wheel empty, where the tooth has the ground to itself.
+  const bars = [];
+  for (let bar = 0; bar <= 8; bar++) bars.push(bar * 4);
+  const wheel = function (notes) {
+    const scene = {
+      slug: "hand-built",
+      data: { bars: bars, metre: { beats: 4 }, duration: bars[bars.length - 1] },
+      notes: notes,
+      look: {
+        name: "round",
+        phrase: 4,
+        pitchLow: 24,
+        pitchHigh: 72,
+        colours: { 1: "#79e2ff" },
+        bars: bars,
+        duration: bars[bars.length - 1],
+      },
+    };
+    const stage = createStage(scene, { play: true });
+    const beat = [...stage.beats()].find((one) => one.time === 8);
+    assert.ok(beat && !beat.bright, "the hand-built wheel should not be marking its own beats");
+    stage.hit(beat.time);
+    stage.frame(beat.time + 0.02);
+    // The outermost dot of the struck beat's tooth, and the whole of it: the tooth
+    // is the one mark the pulse draws in its own colour, and the note it lands on
+    // wears the voice's blue.
+    const dots = [];
+    const rest = [];
+    for (const box of stage.drawn) {
+      if (box.colour !== "#e8f1ff" || box.w > 6) continue;
+      const where = polar(box);
+      if (where.radius <= WHEEL_OUTER - 26 || where.radius > WHEEL_OUTER) continue;
+      rest.push(box);
+      if (where.radius > WHEEL_OUTER - 5) dots.push(box);
+    }
+    return { dots: dots.length, alpha: dots.length ? dots[0].alpha : 0, tooth: rest.length };
+  };
+
+  const dark = wheel([]);
+  const lit = wheel([{ voice: 1, pitch: 72, time: 8, length: 4, velocity: 0.7, role: "inner" }]);
+  assert.strictEqual(dark.dots, 1, "the tooth laid " + dark.dots + " dots where the rim's edge should have one");
+  assert.ok(dark.alpha > 0.5, "a tooth on dark ground is only " + dark.alpha.toFixed(2) + " of full light: nothing to compare");
+  assert.strictEqual(lit.dots, 0, "the tooth was drawn over a note already shining, at " + lit.alpha.toFixed(3));
+  assert.strictEqual(
+    lit.tooth,
+    dark.tooth - 1,
+    "the beat stopped being told: " + lit.tooth + " dots of tooth against " + dark.tooth + " on dark ground"
+  );
+});
+
+test("BWV 582: a frame of the wheel does not remember the frames before it", () => {
+  // That record of where light has been laid is about this frame and no other. One
+  // that kept the last frame's writing - or the whole piece's - would play the
+  // picture down towards nothing as the piece went on, and nothing else here would
+  // notice: every other claim about the wheel's light is a ceiling, not a level.
+  const scene = sceneOf("bwv582-passacaglia-c-minor");
+  const fresh = createStage(scene);
+  const played = createStage(scene);
+  const at = 400; // well into the fugue, with six and a half minutes of frames behind it
+  const first = fresh.frame(at);
+  for (let second = 1; second < at; second += 1) played.frame(second);
+  const later = played.frame(at);
+  assert.ok(
+    Math.abs(later.mean - first.mean) < 0.002,
+    "the same second holds mean light " + later.mean.toFixed(4) + " after six minutes of playing and " + first.mean.toFixed(4) + " when the page has just opened it"
+  );
+  assert.ok(
+    Math.abs(later.peak - first.peak) < 0.02,
+    at + " s is brightest at " + later.peak.toFixed(3) + " after six minutes of playing and " + first.peak.toFixed(3) + " fresh: the picture is fading out"
+  );
 });
 
 test("BWV 582: a run brightens the rim, and letting a beat go takes it back", () => {
