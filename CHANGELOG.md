@@ -1,5 +1,32 @@
 # Releases
 
+## 0.2.1 — 2026-10-11
+
+BWV 645 gets a picture of its own, and it is made for waiting.
+
+- **BWV 645 ("Wachet auf") is now a long road, not falling notes.** The chorale
+  melody — the gold line you follow — does not sing until 0:50, then stops for 29
+  seconds and again for 23. Falling notes only ever show the next few seconds, so
+  none of that came across. Now the music ahead of you climbs toward a horizon and
+  the whole three and a half minutes are on the screen at once: you see the
+  chorale a long way off before it arrives, you see the emptiness where it stops,
+  and each time it comes in after a rest it blooms on the line of sound.
+- **Repeats that begin between the phrases are found now.** The page worked out
+  that BWV 639 plays its opening again; it said "nothing in BWV 645 is played
+  twice", which was simply false — that piece brings its opening ritornello back
+  whole at 1:32, nineteen bars along, and no phrase length that starts at bar 1
+  puts a line nineteen bars along. The finder slides a window along the piece and
+  compares every pair of stretches instead of tiling the piece from the start.
+  In the long view you can watch that warm bar line approach for a minute before
+  it arrives.
+- A frame of the new picture draws about 900-1100 marks, and it stays light on a
+  dark ground: mean light 0.044 at its fullest, nothing burnt out anywhere.
+- The measuring canvas now records the colour of what a picture draws, not just
+  where: a test can tell gold from blue. Three tests had their own copies of the
+  page's script list; they read the page and the folder instead.
+- BWV 565 and BWV 582 still wear the falling picture, unchanged, until each one
+  gets its own.
+
 ## 0.2.0 — 2026-10-11
 
 The first piece gets a picture of its own. BWV 639 is no longer falling notes.
