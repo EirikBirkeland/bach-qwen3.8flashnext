@@ -8,6 +8,7 @@ import test from "node:test";
 import assert from "node:assert";
 import fs from "node:fs";
 import vm from "node:vm";
+import { pageScripts, lookScripts } from "./files.mjs";
 
 const root = new URL("..", import.meta.url); // the project folder
 
@@ -388,15 +389,10 @@ function makePage() {
   return page;
 }
 
-const SCRIPTS = [
-  "src/pieces.js",
-  "src/audio.js",
-  "src/visual.js",
-  "src/echoes.js",
-  "src/look-fall.js",
-  "src/look-braid.js",
-  "src/main.js",
-];
+// The scripts the page really loads, in the order it loads them. Reading them off
+// index.html means the harness cannot drift into testing a page that is not the
+// one the owner opens.
+const SCRIPTS = pageScripts();
 
 function openPage() {
   const page = makePage();
@@ -608,6 +604,16 @@ test("the piece ends and offers it again", async () => {
   page.nextFrame(1 / 60);
   assert.strictEqual(page.elements.end.classList.contains("shown"), true, "the end card did not appear");
   assert.match(page.elements.endLine.textContent, /Toccata and Fugue/);
+});
+
+test("every picture the folder has is loaded by the page", () => {
+  // A look that index.html never loads is a look nobody can see, and the tests
+  // would happily keep measuring it in isolation.
+  const looks = lookScripts();
+  assert.ok(looks.length >= 3, "found only " + looks.length + " picture files in src/");
+  for (const file of looks) {
+    assert.ok(SCRIPTS.indexOf(file) >= 0, file + " is never loaded by index.html");
+  }
 });
 
 test("every part of the page that main.js reaches for is in the html", () => {

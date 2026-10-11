@@ -62,7 +62,7 @@ window.Bach = window.Bach || {};
       phraseBars = Math.max(1, look.phrase || 4);
       pitchLow = look.pitchLow;
       pitchHigh = look.pitchHigh;
-      echoes = Bach.phraseEchoes(notes, bars, phraseBars);
+      echoes = Bach.echoes(notes, bars, { minBars: phraseBars });
       warmLines = {};
       for (var i = 0; i < echoes.length; i++) warmLines[String(echoes[i].at)] = true;
       from = 0;

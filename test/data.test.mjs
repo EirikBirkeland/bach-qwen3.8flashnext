@@ -6,6 +6,7 @@ import test from "node:test";
 import assert from "node:assert";
 import fs from "node:fs";
 import vm from "node:vm";
+import { pictureScripts } from "./files.mjs";
 import { readMidiFile } from "../tools/midi.mjs";
 import { buildPieceData, jsonText, jsText } from "../tools/midi2json.mjs";
 
@@ -32,7 +33,7 @@ function piecesListed() {
 /** The pictures the page has to offer, by name. */
 function looksRegistered() {
   const sandbox = { window: {} };
-  for (const file of ["src/visual.js", "src/echoes.js", "src/look-fall.js", "src/look-braid.js"]) {
+  for (const file of pictureScripts()) {
     vm.runInNewContext(fs.readFileSync(new URL(file, root), "utf8"), sandbox);
   }
   return Object.keys(sandbox.window.Bach.looks);

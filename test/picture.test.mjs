@@ -51,6 +51,7 @@ function sceneFor(piece) {
       pitchHigh: data.pitchRange[1],
       colours: coloursFor(piece),
       bars: data.bars,
+      duration: data.duration,
     },
   };
 }
@@ -200,4 +201,131 @@ test("BWV 639: the phrase that comes back is warm instead of cool", () => {
     again.warm > first.warm + 0.004,
     "the repeat " + phrase.toFixed(0) + " s in is not warmer than the first telling: " + again.warm.toFixed(4) + " against " + first.warm.toFixed(4)
   );
+});
+
+// BWV 645 wears the long view: the whole piece receding to a horizon, so that its
+// waiting, its arrival and its return can all be seen. These are the numbers that
+// stand for looking at it.
+const STAGE_WIDTH = 1280;
+const STAGE_HEIGHT = 800;
+const SOUND_Y = Math.round(STAGE_HEIGHT * 0.86); // where a note is struck
+const HORIZON_Y = Math.round(STAGE_HEIGHT * 0.17); // where the far music settles
+const WARM_LINE = "#ffb066"; // src/look-vigil.js: a bar line already heard
+
+/** How far across the screen a pitch sits, the way the look does it. */
+function across(scene, pitch) {
+  const margin = Math.min(120, STAGE_WIDTH * 0.12);
+  const span = Math.max(1, scene.look.pitchHigh - scene.look.pitchLow);
+  return margin + ((pitch - scene.look.pitchLow) / span) * (STAGE_WIDTH - margin * 2);
+}
+
+/** The marks the notes make. These are the only things on the screen drawn in a
+ *  voice's own colour: bar lines and pitch marks are cool blue, a repeat's line is
+ *  warm, and the blooms are gradients. */
+function marks(stage, scene) {
+  const worn = [];
+  for (const voice in scene.look.colours) worn.push(scene.look.colours[voice]);
+  return stage.drawn.filter((box) => worn.indexOf(box.colour) >= 0 && box.w < 40);
+}
+
+test("BWV 645: the whole piece is on the screen at once", () => {
+  const scene = sceneOf("bwv645-wachet-auf");
+  const stage = createStage(scene);
+  stage.frame(20);
+
+  const drawn = marks(stage, scene);
+  assert.ok(
+    drawn.length > scene.notes.length * 0.8,
+    "only " + drawn.length + " marks for " + scene.notes.length + " notes: the piece is not all on the screen"
+  );
+  const top = Math.min.apply(null, drawn.map((box) => box.y));
+  assert.ok(
+    top >= HORIZON_Y - 10 && top <= HORIZON_Y + 14,
+    "the far end of the piece is drawn at " + top.toFixed(1) + " px, not up at the horizon (" + HORIZON_Y + ")"
+  );
+});
+
+test("BWV 645: what has sounded is lit and what is still coming is faint", () => {
+  const scene = sceneOf("bwv645-wachet-auf");
+  const stage = createStage(scene);
+  stage.frame(66); // three voices away from the finish, as crowded as it gets
+
+  const lit = stage.drawn.filter((box) => box.alpha > 0.55 && box.w < 400);
+  assert.ok(lit.length > 3, "nothing is struck bright at the line of sound");
+  const early = lit.filter((box) => box.y < SOUND_Y - 0.01);
+  assert.strictEqual(
+    early.length,
+    0,
+    "a note was drawn lit above the line of sound, where it has not been played yet: " + JSON.stringify(early[0])
+  );
+
+  const comingUp = marks(stage, scene).filter((box) => box.y + box.h < SOUND_Y);
+  assert.ok(comingUp.length > 100, "almost nothing is still to come: " + comingUp.length);
+  assert.ok(
+    Math.max.apply(null, comingUp.map((box) => box.alpha)) < 0.55,
+    "something still to come is as bright as what has been played"
+  );
+});
+
+test("BWV 645: the ritornello coming back is warm, and warm while it is still to come", () => {
+  const scene = sceneOf("bwv645-wachet-auf");
+  const stage = createStage(scene);
+  const back = scene.data.bars[23]; // 1:32, where the opening is played again
+
+  // Twenty seconds in: the return is over a minute away and already on the screen.
+  stage.frame(20);
+  let warm = stage.drawn.filter((box) => box.colour === WARM_LINE);
+  assert.strictEqual(warm.length, 2, "the repeat's bar line is not on the screen at all: " + JSON.stringify(warm));
+  assert.ok(
+    warm.every((box) => box.y + box.h < SOUND_Y),
+    "at 0:20 the warm line is not far up the road: " + JSON.stringify(warm)
+  );
+
+  stage.frame(back + 0.4);
+  warm = stage.drawn.filter((box) => box.colour === WARM_LINE);
+  assert.ok(
+    warm.some((box) => Math.abs(box.y + box.h / 2 - SOUND_Y) < 40),
+    "the warm line never reached the line of sound: " + JSON.stringify(warm)
+  );
+});
+
+test("BWV 645: the chorale is marked while it is still to come, and blooms when it arrives", () => {
+  const scene = sceneOf("bwv645-wachet-auf");
+  const stage = createStage(scene);
+  const arrival = scene.notes.filter((note) => note.role === "melody")[0]; // it waits until 0:50
+  assert.ok(arrival.time > 40, "this test wants a line that really does keep you waiting");
+  const x = across(scene, arrival.pitch);
+
+  // Six seconds off: a lamp, small and away up the road, and no bloom yet.
+  stage.frame(arrival.time - 6);
+  const lamps = stage.drawn.filter(
+    (box) => box.w >= 20 && box.w <= 90 && Math.abs(box.x + box.w / 2 - x) < 30
+  );
+  assert.ok(lamps.length > 0, "nothing marks the chorale while it is still to come");
+  const bloomsEarly = stage.drawn.filter(
+    (box) => box.w > 120 && box.w < 600 && Math.abs(box.x + box.w / 2 - x) < 30
+  );
+  assert.strictEqual(bloomsEarly.length, 0, "it bloomed before it arrived");
+
+  stage.frame(arrival.time + 0.1);
+  const blooms = stage.drawn.filter(
+    (box) =>
+      box.w > 120 &&
+      box.w < 600 &&
+      Math.abs(box.x + box.w / 2 - x) < 30 &&
+      Math.abs(box.y + box.h / 2 - SOUND_Y) < 30
+  );
+  assert.ok(blooms.length > 0, "the arrival of the chorale drew no bloom at the line of sound");
+});
+
+test("BWV 645: a frame of the long view is cheap enough to draw sixty times a second", () => {
+  const scene = sceneOf("bwv645-wachet-auf");
+  const stage = createStage(scene);
+  let most = 0;
+  for (let at = 0; at < scene.data.duration; at += 5) {
+    stage.frame(at);
+    if (stage.drawn.length > most) most = stage.drawn.length;
+  }
+  assert.ok(most > 300, "one frame only draws " + most + " marks: is the picture missing?");
+  assert.ok(most < 1500, "one frame draws " + most + " boxes: that will not keep up with the music");
 });

@@ -46,6 +46,7 @@ function sceneFor(piece) {
       pitchHigh: data.pitchRange[1],
       colours: colours,
       bars: data.bars,
+      duration: data.duration,
     },
     data: data,
     piece: piece,
@@ -100,31 +101,27 @@ function report(slug) {
   const phrases = asked || 4;
   const table = barTable(shape);
   console.log(
-    "  " + table.length + " bars of " + shape.barSeconds + "s; a phrase is taken as " + phrases + " bars" +
+    "  " + table.length + " bars of " + shape.barSeconds + "s; a repeat must be " + phrases + " bars or longer" +
       (asked ? " (what the piece asks)" : " (nothing was asked, so four)")
   );
-  const echoes = phraseEchoesFor(scene, phrases);
+  const echoes = echoesFor(scene, phrases);
   if (echoes.length > 0) {
     console.log(
       "  said again: " +
-        echoes.map((echo) => "at " + clock(echo.at) + " (of what was heard at " + clock(echo.again) + ", " + echo.matched + ")").join(", ")
+        echoes
+          .map((echo) => "at " + clock(echo.at) + " for " + echo.bars + " bars (of what was heard at " + clock(echo.again) + ", " + echo.matched + ")")
+          .join(", ")
     );
   } else {
-    // Only a claim about whole phrases starting on these bar lines. A repeat that
-    // does not line up with the grid - BWV 645 brings its opening ritornello back
-    // whole, six bars long, but starting at bar 24 - is not seen from here.
-    console.log(
-      "  no stretch of " + phrases + " whole bars beginning on the grid is played twice over" +
-        " (a repeat that starts between the phrases is invisible from here)"
-    );
+    console.log("  nothing " + phrases + " bars or longer is played twice over");
   }
 }
 
-function phraseEchoesFor(scene, phrases) {
+function echoesFor(scene, phrases) {
   const source = fs.readFileSync(at("src/echoes.js"), "utf8");
   const sandbox = { window: {} };
   vm.runInNewContext(source, sandbox);
-  return sandbox.window.Bach.phraseEchoes(scene.notes, scene.look.bars, phrases);
+  return sandbox.window.Bach.echoes(scene.notes, scene.look.bars, { minBars: phrases });
 }
 
 function clock(seconds) {

@@ -146,6 +146,7 @@ window.Bach = window.Bach || {};
           colours: coloursFor(piece),
           bars: data.bars,
           phrase: look.phrase,
+          duration: data.duration,
         });
         elements.nowTitle.textContent = piece.title + " " + piece.subtitle;
         elements.stops.textContent = describeStops(prepared.stops);

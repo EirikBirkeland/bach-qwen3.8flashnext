@@ -8,7 +8,8 @@
 //
 // `look` says what the piece is drawn as: "fall" for anything moving along at
 // walking pace, and something else when the music has a shape of its own that
-// deserves a picture of its own (src/look-fall.js, src/look-braid.js). `phrase`
+// deserves a picture of its own (src/look-fall.js, src/look-braid.js,
+// src/look-vigil.js). `phrase`
 // is how many bars a phrase takes there, and `hint` is the one line on screen
 // that says how to read it.
 
@@ -51,7 +52,15 @@ window.Bach = window.Bach || {};
       file: "data/bwv645-wachet-auf.js",
       title: "Wachet auf, ruft uns die Stimme",
       subtitle: "chorale prelude in E flat major, BWV 645",
-      look: { name: "fall" },
+      // The chorale does not sing until 0:50 and stops twice for half a minute, so
+      // this piece is drawn as a road you can see the end of: src/look-vigil.js.
+      // Four bars make a phrase here, and the opening ritornello - eight of them -
+      // comes back whole at bar 24.
+      look: {
+        name: "vigil",
+        phrase: 4,
+        hint: "the piece recedes to a horizon · gold is the chorale · a warm bar line says it again",
+      },
       voices: {
         1: { name: "Right hand", colour: "#79e2ff", role: "inner" },
         2: { name: "Chorale melody", colour: "#ffd47a", role: "melody" },

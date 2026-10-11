@@ -8,6 +8,7 @@
 
 import fs from "node:fs";
 import vm from "node:vm";
+import { pictureScripts } from "./files.mjs";
 
 const COLS = 64;
 const ROWS = 40;
@@ -93,7 +94,18 @@ export function createStage(piece) {
       const blended = context.globalCompositeOperation === "lighter";
       const isGradient = context.fillStyle && typeof context.fillStyle.at === "function";
       if (!plain && !isGradient) return;
-      if (drawn.length < 20000) drawn.push({ x: x, y: y, w: w, h: h, alpha: context.globalAlpha });
+      if (drawn.length < 20000)
+        drawn.push({
+          x: x,
+          y: y,
+          w: w,
+          h: h,
+          alpha: context.globalAlpha,
+          // What it was filled with, as far as a plain colour goes: a look's gold
+          // and its blue look the same in numbers of light, and a test that cannot
+          // tell them apart cannot check a thing is warm.
+          colour: plain ? context.fillStyle : "(gradient)",
+        });
       const left = Math.max(0, x);
       const right = Math.min(width, x + w);
       const top = Math.max(0, y);
@@ -139,7 +151,7 @@ export function createStage(piece) {
     addEventListener() {},
   };
   const sandbox = vm.createContext({ window, console });
-  for (const file of ["src/visual.js", "src/echoes.js", "src/look-fall.js", "src/look-braid.js"]) {
+  for (const file of pictureScripts()) {
     const source = fs.readFileSync(new URL("../" + file, import.meta.url), "utf8");
     vm.runInContext(source, sandbox, { filename: file });
   }

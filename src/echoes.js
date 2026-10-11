@@ -4,106 +4,151 @@
 // hearing the piece for the first time, so the pictures mark it. This works it
 // out from the notes alone - nobody told it where the repeats are.
 //
-//   Bach.phraseEchoes(notes, bars, 4)
-//     -> [{ phrase: 1, again: 0, at: 25.9459, until: 51.89, matched: 0.98 }]
+//   Bach.echoes(notes, bars, { minBars: 4 })
+//     -> [{ at: 92.0, until: 124.0, again: 16.0, bars: 8, matched: 0.98 }]
 //
-// A phrase is `barsPerPhrase` bars long. A later phrase counts as an echo of an
-// earlier one when the two hold the same number of bars and most of the later
-// phrase was heard in the earlier one at the same pitch and in the same place in
-// the phrase. "Most" is `part`, seven parts in eight by default: that is what
-// lets a phrase come back with an ornament added and still count as the same
-// thing. BWV 639 plays its opening four bars again whole, with one extra curl in
-// the melody, and it should read as a repeat.
+// The window slides. It is not tied to phrases beginning every four bars, or at
+// any other spacing, because the music does not care how an edition bars it: BWV
+// 645 brings its opening back whole nineteen bars later, and nineteen has no
+// divisors, so a finder that tiled the piece from bar 1 could never see it.
 //
-// Notes are objects with time, pitch and length, sorted by time; bars are the
-// seconds each bar starts at.
+// How it works: every bar is written down as the set of "where in the bar : how
+// high" its notes make. Two bars agree when at least `part` of the later bar -
+// three quarters by default - was heard in the earlier one at the same pitch and
+// in the same place in the bar; that is what lets a bar come back with an
+// ornament added and still count. Then, for every distance between two bars, the
+// piece is walked along looking for a run of bars that agree with the bar the same
+// distance before them. A run of several is the music coming back; one bar on its
+// own is a figure, or a coincidence, so nothing is made of it.
+//
+// Notes are objects with time, pitch and length; bars are the seconds each bar
+// starts at, as the data file gives them.
 
 window.Bach = window.Bach || {};
 
 (function (Bach) {
-  // How finely a note's place inside its phrase is written down, in steps of a
-  // bar. Sixteenth notes - the fastest these editions write - land on the grid.
+  // How finely a note's place inside its bar is written down, in steps of a bar.
+  // Sixteenth notes - the fastest these editions write - land on the grid.
   var STEPS_PER_BAR = 32;
-  // A phrase with fewer notes than this is not a phrase, it is a handful of held
-  // notes, and two of them sounding alike would not mean anything.
-  var MIN_NOTES = 30;
+  // A bar with fewer notes than this says nothing. Two held chords agreeing with
+  // two other held chords would not mean the music came back.
+  var MIN_NOTES = 6;
 
-  /** The phrases of a piece: where each starts and ends, how many bars, and its
-   *  notes keyed by "where in the phrase : how high". */
-  function phrasesOf(notes, bars, barsPerPhrase, until) {
-    var phrases = [];
-    for (var index = 0; index < bars.length; index += barsPerPhrase) {
-      phrases.push({
-        at: bars[index],
-        until: index + barsPerPhrase < bars.length ? bars[index + barsPerPhrase] : until,
-        bars: Math.min(barsPerPhrase, bars.length - index),
-        keys: {},
-        count: 0,
-      });
+  /** How long a bar is, in seconds. The last bar stands in for itself. */
+  function barSpan(bars, index) {
+    if (index + 1 < bars.length) return bars[index + 1] - bars[index];
+    return bars.length > 1 ? bars[bars.length - 1] - bars[bars.length - 2] : 1;
+  }
+
+  /** Which bar a moment falls in, or -1 if it is before the music starts. */
+  function barIndexOf(bars, at) {
+    if (at < bars[0]) return -1;
+    var low = 0;
+    var high = bars.length - 1;
+    while (low < high) {
+      var middle = (low + high + 1) >> 1;
+      if (bars[middle] <= at) low = middle;
+      else high = middle - 1;
     }
-    for (var i = 0; i < notes.length; i++) {
-      var note = notes[i];
-      var phrase = phraseAt(phrases, note.time);
-      if (!phrase) continue;
-      var span = phrase.until - phrase.at;
-      // Where the note sits inside its phrase, written so that the same note in a
-      // phrase played at a different speed still lands in the same place.
-      var place = Math.round(((note.time - phrase.at) / span) * phrase.bars * STEPS_PER_BAR);
+    return low;
+  }
+
+  /** Every bar of the piece as the notes it holds, keyed by where in the bar each
+   *  one falls and how high it is - which is what makes two bars comparable. */
+  function barShapes(notes, bars) {
+    var shapes = [];
+    for (var i = 0; i < bars.length; i++) shapes.push({ keys: {}, count: 0 });
+    for (var n = 0; n < notes.length; n++) {
+      var note = notes[n];
+      var index = barIndexOf(bars, note.time);
+      if (index < 0) continue;
+      var place = Math.round(((note.time - bars[index]) / barSpan(bars, index)) * STEPS_PER_BAR);
+      var shape = shapes[index];
       var key = place + ":" + note.pitch;
-      if (!phrase.keys[key]) phrase.count++;
-      phrase.keys[key] = 1;
+      if (!shape.keys[key]) shape.count++;
+      shape.keys[key] = 1;
     }
-    return phrases;
+    return shapes;
   }
 
-  /** The phrase a moment falls in, or nothing if it is past the last bar line. */
-  function phraseAt(phrases, at) {
-    for (var i = 0; i < phrases.length; i++) {
-      if (at >= phrases[i].at && at < phrases[i].until) return phrases[i];
-    }
-    return null;
-  }
-
-  /** How much of `later` was already heard in `earlier`, between 0 and 1. */
-  function partHeardBefore(earlier, later) {
+  /** What two bars have in common: how many of the later bar's notes were heard in
+   *  the earlier one, out of how many there were to hear, and the share between
+   *  them. Divided by the bigger of the two, so a thin bar cannot pass itself off
+   *  as a repeat of a full one. */
+  function inCommon(earlier, later) {
     var keys = Object.keys(later.keys);
-    if (keys.length === 0) return 0;
     var heard = 0;
     for (var i = 0; i < keys.length; i++) {
       if (earlier.keys[keys[i]]) heard++;
     }
-    // Divided by the bigger of the two, so a short stretch cannot pass itself off
-    // as a repeat of a long one.
-    return heard / Math.max(Object.keys(earlier.keys).length, keys.length);
+    var of = Math.max(Object.keys(earlier.keys).length, keys.length);
+    return { heard: heard, of: of, part: of === 0 ? 0 : heard / of };
   }
 
-  function phraseEchoes(notes, bars, barsPerPhrase, part) {
-    var needed = part || 0.75;
-    barsPerPhrase = Math.max(1, barsPerPhrase || 4);
+  /** Does this bar agree with the bar a given distance before it? */
+  function agrees(shapes, earlier, later, needed) {
+    if (shapes[earlier].count < MIN_NOTES || shapes[later].count < MIN_NOTES) return null;
+    var share = inCommon(shapes[earlier], shapes[later]);
+    return share.part >= needed ? share : null;
+  }
+
+  function echoes(notes, bars, options) {
+    var settings = options || {};
+    var minBars = Math.max(2, settings.minBars || 4);
+    var needed = settings.part || 0.75;
     if (!bars || bars.length < 2 || notes.length === 0) return [];
-    var lastNote = notes[notes.length - 1];
-    var until = lastNote.time + lastNote.length + 0.001;
-    var phrases = phrasesOf(notes, bars, barsPerPhrase, until);
-    var found = [];
-    for (var later = 1; later < phrases.length; later++) {
-      for (var earlier = 0; earlier < later; earlier++) {
-        if (phrases[earlier].bars !== phrases[later].bars) continue;
-        if (phrases[later].count < MIN_NOTES || phrases[earlier].count < MIN_NOTES) continue;
-        var matched = partHeardBefore(phrases[earlier], phrases[later]);
-        if (matched >= needed) {
-          found.push({
-            phrase: later,
-            again: earlier,
-            at: phrases[later].at,
-            until: phrases[later].until,
-            matched: Math.round(matched * 100) / 100,
-          });
-          break; // the earliest thing it matches is what it is a repeat of
+
+    var shapes = barShapes(notes, bars);
+    var runs = [];
+    for (var distance = 1; distance < bars.length; distance++) {
+      var run = null;
+      for (var later = distance; later < bars.length; later++) {
+        var earlier = later - distance;
+        var share = agrees(shapes, earlier, later, needed);
+        if (!share) {
+          if (run) {
+            if (run.bars >= minBars) runs.push(run);
+            run = null;
+          }
+          continue;
         }
+        if (!run) run = { first: later, again: earlier, bars: 0, heard: 0, of: 0 };
+        run.bars++;
+        run.heard += share.heard;
+        run.of += share.of;
       }
+      if (run && run.bars >= minBars) runs.push(run);
     }
+
+    // A stretch that could be matched more than one way keeps its longest telling,
+    // and nothing is called a repeat twice.
+    runs.sort(function (a, b) {
+      return b.bars - a.bars || a.first - b.first;
+    });
+    var claimed = {};
+    var found = [];
+    for (var r = 0; r < runs.length; r++) {
+      var run2 = runs[r];
+      var already = false;
+      for (var b = 0; b < run2.bars; b++) {
+        if (claimed[run2.first + b]) already = true;
+      }
+      if (already) continue;
+      for (var c = 0; c < run2.bars; c++) claimed[run2.first + c] = true;
+      var end = run2.first + run2.bars;
+      found.push({
+        at: bars[run2.first],
+        until: end < bars.length ? bars[end] : bars[bars.length - 1] + barSpan(bars, bars.length - 1),
+        again: bars[run2.again],
+        bars: run2.bars,
+        matched: Math.round((run2.heard / run2.of) * 100) / 100,
+      });
+    }
+    found.sort(function (x, y) {
+      return x.at - y.at;
+    });
     return found;
   }
 
-  Bach.phraseEchoes = phraseEchoes;
+  Bach.echoes = echoes;
 })(window.Bach);
