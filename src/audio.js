@@ -241,16 +241,24 @@ window.Bach = window.Bach || {};
       sounding.push({ gain: gain, pipes: pipes, endsAt: end });
     }
 
+    /**
+     * Hand one note to the pipes. `left` can be shorter than the note in the data,
+     * for a note that was still held when playback was picked up again.
+     */
+    function speak(note, index, when, left) {
+      var level = noteLevel() * (0.85 + 0.3 * note.velocity);
+      var wave = waves[(note.pitch + index) % waves.length];
+      pipe(note.pitch, when, left, level, wave);
+    }
+
     function pump() {
       if (!playing) return;
       var now = time();
-      var level = noteLevel();
       while (next < playing.notes.length && playing.notes[next].time < now + LOOKAHEAD) {
         var note = playing.notes[next];
         var when = startedAt + (note.time - offset);
         var jitter = Math.random() * 0.005;
-        var wave = waves[(note.pitch + next) % waves.length];
-        pipe(note.pitch, when + jitter, note.length, level * (0.85 + 0.3 * note.velocity), wave);
+        speak(note, next, when + jitter, note.length);
         next++;
       }
       var cutoff = ctx.currentTime;
@@ -270,6 +278,25 @@ window.Bach = window.Bach || {};
       return Math.max(0, ctx.currentTime - startedAt + offset);
     }
 
+    /** Quiet every pipe running, and keep the place in the piece we got to. */
+    function quiet() {
+      if (!ctx) return;
+      var now = ctx.currentTime;
+      for (var i = 0; i < sounding.length; i++) {
+        try {
+          sounding[i].gain.gain.cancelScheduledValues(now);
+          sounding[i].gain.gain.setValueAtTime(Math.max(0.0001, sounding[i].gain.gain.value), now);
+          sounding[i].gain.gain.linearRampToValueAtTime(0.0001, now + 0.07);
+          for (var p = 0; p < sounding[i].pipes.length; p++) sounding[i].pipes[p].stop(now + 0.09);
+        } catch (e) {
+          /* a pipe already stopped is fine */
+        }
+      }
+      sounding = [];
+      offset = time();
+      playing = null;
+    }
+
     return {
       /** Must be called from a click: browsers keep audio asleep until then. */
       open: function () {
@@ -287,33 +314,35 @@ window.Bach = window.Bach || {};
         };
       },
 
-      /** Start the prepared piece from a point in seconds. */
+      /**
+       * Start the prepared piece from a point in seconds. Anything still sounding
+       * is quieted first, and a note that is still held at that point is taken up
+       * again for whatever is left of it, so the harmony is whole right away.
+       */
       play: function (piece, from) {
+        quiet();
         playing = piece;
         offset = from || 0;
-        next = 0;
-        while (next < piece.notes.length && piece.notes[next].time < offset) next++;
         startedAt = ctx.currentTime + 0.06;
+        next = 0;
+        while (next < piece.notes.length && piece.notes[next].time < offset) {
+          var held = piece.notes[next];
+          var ends = onTheGrid(held.time + held.length);
+          if (ends > offset) speak(held, next, startedAt, ends - offset);
+          next++;
+        }
         master.gain.cancelScheduledValues(ctx.currentTime);
         master.gain.setValueAtTime(VOLUME, ctx.currentTime);
       },
 
-      stop: function () {
-        if (!ctx) return;
-        var now = ctx.currentTime;
-        for (var i = 0; i < sounding.length; i++) {
-          try {
-            sounding[i].gain.gain.cancelScheduledValues(now);
-            sounding[i].gain.gain.setValueAtTime(Math.max(0.0001, sounding[i].gain.gain.value), now);
-            sounding[i].gain.gain.linearRampToValueAtTime(0.0001, now + 0.07);
-            for (var p = 0; p < sounding[i].pipes.length; p++) sounding[i].pipes[p].stop(now + 0.09);
-          } catch (e) {
-            /* a pipe already stopped is fine */
-          }
-        }
-        sounding = [];
-        offset = time();
-        playing = null;
+      /**
+       * Stop the sound. Where in the piece you are stays where you got to, unless
+       * `at` says otherwise; that place is handed back, in seconds.
+       */
+      stop: function (at) {
+        quiet();
+        if (typeof at === "number") offset = Math.max(0, at);
+        return offset;
       },
 
       time: time,

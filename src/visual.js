@@ -109,15 +109,25 @@ window.Bach = window.Bach || {};
     }
 
     function frame(now) {
+      // A jump back into the piece: the notes already on screen belong to a later
+      // moment, so start the picture again from an empty screen and from the top
+      // of the note list.
+      var jumpedBack = lastNow >= 0 && now < lastNow - 0.001;
       var elapsed = now - lastNow;
       if (lastNow < 0 || elapsed < 0 || elapsed > 0.5) elapsed = 1 / 60;
       time += elapsed;
       lastNow = now;
 
-      // Fade the last frame instead of clearing it: moving notes leave a trail.
       ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;
-      ctx.fillStyle = "rgba(5,6,11,0.26)";
+      if (jumpedBack) {
+        from = 0;
+        to = 0;
+        ctx.fillStyle = "#05060b";
+      } else {
+        // Fade the last frame instead of clearing it: moving notes leave a trail.
+        ctx.fillStyle = "rgba(5,6,11,0.26)";
+      }
       ctx.fillRect(0, 0, width, height);
 
       var spanAhead = horizon / SPEED + 1;
@@ -132,7 +142,10 @@ window.Bach = window.Bach || {};
         var note = notes[i];
         var end = note.time + note.length;
         var past = now - end;
-        var top = horizon - (note.time - now) * SPEED;
+        // The bar is the note itself: its far end (where it stops) is still above
+        // the line until it is due, and the end it started at hangs below once it
+        // has been struck. So its height is the length of the note.
+        var top = horizon - (end - now) * SPEED;
         var bottom = horizon + (now - note.time) * SPEED;
         var strength = 1;
         var incoming = note.time - now;

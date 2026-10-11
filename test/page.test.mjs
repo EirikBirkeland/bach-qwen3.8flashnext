@@ -25,7 +25,7 @@ function gradient(colours) {
 }
 
 function fakeCanvas(colours) {
-  const drawn = { fillRects: 0, rects: [] };
+  const drawn = { fillRects: 0, gradients: 0, rects: [] };
   const context = {
     globalAlpha: 1,
     globalCompositeOperation: "source-over",
@@ -33,12 +33,16 @@ function fakeCanvas(colours) {
     setTransform() {},
     fillRect(x, y, w, h) {
       drawn.fillRects++;
-      drawn.rects.push([x, y, w, h]);
+      // The colour is kept with the box: a test can tell a wipe of the whole
+      // screen from one small bar of light.
+      drawn.rects.push([x, y, w, h, context.fillStyle]);
     },
     createLinearGradient() {
+      drawn.gradients++;
       return gradient(colours);
     },
     createRadialGradient() {
+      drawn.gradients++;
       return gradient(colours);
     },
     beginPath() {},
@@ -160,6 +164,7 @@ function fakeAudio(audio) {
           audio.stopped += 1;
         },
       });
+      audio.pipes.push(osc);
       return osc;
     },
     createBiquadFilter() {
@@ -215,9 +220,9 @@ function makeElement(tag, id) {
       element.handlers[kind] = element.handlers[kind] || [];
       element.handlers[kind].push(handler);
     },
-    click() {
+    click(extra) {
       assert.ok(element.handlers.click, "#" + element.id + " has nothing to click");
-      for (const handler of element.handlers.click) handler({ type: "click" });
+      for (const handler of element.handlers.click) handler(Object.assign({ type: "click" }, extra));
     },
   };
   Object.defineProperty(element, "innerHTML", {
@@ -237,6 +242,7 @@ function makePage() {
     started: 0,
     stopped: 0,
     startTimes: [],
+    pipes: [],
     gains: 0,
     gainNodes: [],
     waves: 0,
@@ -316,6 +322,28 @@ function makePage() {
       const handler = frames.shift();
       audio.context.currentTime += stepSeconds;
       handler(audio.context.currentTime);
+    },
+    playFrames(count, stepSeconds) {
+      for (let i = 0; i < count; i++) page.nextFrame(stepSeconds);
+    },
+    press(key, target) {
+      assert.ok(window.listeners.keydown, "nothing on the page listens for the keyboard");
+      const event = {
+        key: key,
+        target: target || {},
+        prevented: false,
+        preventDefault() {
+          this.prevented = true;
+        },
+      };
+      for (const handler of window.listeners.keydown) handler(event);
+      return event;
+    },
+    /** Seconds shown on the clock in the corner, like "1:23 / 9:32". */
+    clockSeconds() {
+      const match = /^(\d+):(\d\d) \/ (\d+):(\d\d)$/.exec(elements.nowTime.textContent || "");
+      assert.ok(match, "the clock does not read like a clock: " + elements.nowTime.textContent);
+      return Number(match[1]) * 60 + Number(match[2]);
     },
   };
 
@@ -530,4 +558,306 @@ test("the piece ends and offers it again", async () => {
   page.nextFrame(1 / 60);
   assert.strictEqual(page.elements.end.classList.contains("shown"), true, "the end card did not appear");
   assert.match(page.elements.endLine.textContent, /Toccata and Fugue/);
+});
+
+test("every part of the page that main.js reaches for is in the html", () => {
+  // The stand-in document will invent any element it is asked for, so a button
+  // missing from the real page would only show up here.
+  const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const script = fs.readFileSync(new URL("../src/main.js", import.meta.url), "utf8");
+  const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));
+  const wanted = new Set([...script.matchAll(/elements\.([A-Za-z]\w*)/g)].map((m) => m[1]));
+  assert.ok(wanted.size >= 15, "found only " + wanted.size + " parts of the page in main.js");
+  for (const name of wanted) {
+    assert.ok(ids.has(name), "main.js reaches for #" + name + ", which the page does not have");
+  }
+  assert.ok(ids.has("stage"), "the page has no canvas to draw on");
+});
+
+test("pause rests the music and resume picks it up where it left off", async () => {
+  const page = openPage();
+  page.elements.pieces.children[0].click();
+  await settled();
+  page.playFrames(720, 1 / 60); // twelve seconds, where the toccata is in full flight
+  const at = page.clockSeconds();
+  assert.ok(at >= 11, "twelve seconds in, the clock says " + at);
+
+  const restedAt = page.audio.context.currentTime - 0.06; // where in the piece the organ stands
+  page.elements.pause.click();
+  assert.strictEqual(page.elements.pause.textContent, "Resume");
+  assert.strictEqual(page.elements.hud.classList.contains("shown"), true, "the player went away on pause");
+
+  const startedWhileRested = page.audio.started;
+  const pipesAtRest = page.audio.pipes.length;
+  page.playFrames(120, 1 / 60);
+  assert.strictEqual(page.audio.pipes.length, pipesAtRest, "pipes were made while the piece was rested");
+  assert.strictEqual(page.audio.started, startedWhileRested, "the organ played while it was rested");
+  assert.strictEqual(page.clockSeconds(), at, "the clock went on while the piece was rested");
+  const drawnWhileRested = page.canvas.drawn.fillRects;
+  page.nextFrame(1 / 60);
+  assert.ok(page.canvas.drawn.fillRects > drawnWhileRested, "the picture was dropped while rested");
+
+  const whenResume = page.audio.context.currentTime;
+  const startsBefore = page.audio.startTimes.length;
+  page.elements.pause.click();
+  assert.strictEqual(page.elements.pause.textContent, "Pause");
+  page.playFrames(60, 1 / 60);
+  assert.ok(page.audio.started > startedWhileRested, "nothing started up again after resume");
+
+  const data = page.window.BachData["bwv565-toccata-and-fugue-d-minor"];
+  const starts = page.audio.startTimes.slice(startsBefore).sort((a, b) => a - b);
+  // The data file holds the notes voice by voice, so the times have to be put in
+  // order before asking what was due.
+  const times = data.notes.map((row) => row[2]).sort((a, b) => a - b);
+  const due = times.filter((time) => time > restedAt + 0.05 && time <= restedAt + 0.9);
+  assert.ok(due.length > 3, "only " + due.length + " notes were due after the rest");
+  for (const time of due) {
+    const wanted = whenResume + 0.06 + (time - restedAt);
+    assert.ok(
+      starts.some((at2) => at2 >= wanted - 0.002 && at2 <= wanted + 0.01),
+      "the note at " + time + " s did not come back at its second"
+    );
+  }
+});
+
+test("a note still held when the music comes back is taken up again", () => {
+  const page = openPage();
+  const organ = page.window.Bach.createOrgan();
+  organ.open();
+  const prepared = organ.prepare({
+    format: ["voice", "pitch", "time", "duration", "velocity"],
+    duration: 12,
+    notes: [
+      [1, 48, 0, 4, 0.7], // held right through the pick-up point
+      [2, 60, 3, 1, 0.7], // sounds across it too
+      [3, 72, 6, 1, 0.7], // still to come
+    ],
+  });
+
+  organ.play(prepared, 0);
+  organ.pump();
+  assert.strictEqual(page.audio.started, 4, "only the two notes within reach should be handed over");
+
+  page.audio.context.currentTime = 3.5;
+  const restedAt = organ.stop();
+  assert.ok(Math.abs(restedAt - 3.44) < 1e-9, "stopping said the piece stood at " + restedAt + " s");
+  assert.ok(Math.abs(organ.time() - restedAt) < 1e-9, "the organ moved on after it was quieted");
+
+  const before = page.audio.pipes.length;
+  const resumedAt = page.audio.context.currentTime;
+  organ.play(prepared, restedAt);
+  const takenUp = page.audio.pipes.slice(before);
+  assert.strictEqual(takenUp.length, 4, "the two notes still held were not both taken up again");
+  for (const osc of takenUp) {
+    const sounding = osc.stopAt - osc.startAt;
+    // What was left of the note (4 - 3.44) plus its release and the safety gap.
+    assert.ok(Math.abs(sounding - (4 - restedAt) - 0.12) < 0.001, "the held note was given " + sounding + " s");
+  }
+
+  page.audio.context.currentTime = 6;
+  organ.pump();
+  const wanted = resumedAt + 0.06 + (6 - restedAt);
+  assert.ok(
+    page.audio.startTimes.some((at) => at >= wanted - 0.002 && at <= wanted + 0.01),
+    "the note still to come did not arrive at its own second"
+  );
+});
+
+test("clicking the line below moves into the piece", async () => {
+  const page = openPage();
+  page.elements.pieces.children[0].click();
+  await settled();
+  page.playFrames(60, 1 / 60);
+
+  const data = page.window.BachData["bwv565-toccata-and-fugue-d-minor"];
+  const target = 120; // seconds
+  const clicked = page.audio.context.currentTime;
+  page.elements.seek.click({ clientX: (target / data.duration) * page.window.innerWidth });
+
+  assert.ok(Math.abs(page.clockSeconds() - target) <= 1, "the clock did not go to " + target + " s");
+  const wantedWidth = (target / data.duration) * 100;
+  const shownWidth = parseFloat(page.elements.progress.style.width);
+  assert.ok(Math.abs(shownWidth - wantedWidth) < 0.5, "the line says " + shownWidth + "%, wanted " + wantedWidth);
+
+  const next = data.notes.find((row) => row[2] > target + 0.5);
+  assert.ok(next, "no note after " + target + " s to look for");
+  page.playFrames(60, 1 / 60);
+  const wanted = clicked + 0.06 + (next[2] - target);
+  assert.ok(
+    page.audio.startTimes.some((at) => at >= wanted - 0.002 && at <= wanted + 0.01),
+    "the note at " + next[2] + " s did not come at its second after the jump"
+  );
+});
+
+test("space rests the piece and the arrows move through it", async () => {
+  const page = openPage();
+  page.elements.pieces.children[0].click();
+  await settled();
+  page.playFrames(300, 1 / 60); // five seconds
+
+  page.press(" ");
+  assert.strictEqual(page.elements.pause.textContent, "Resume", "space did not rest the music");
+  const rested = page.clockSeconds();
+  const pipes = page.audio.pipes.length;
+  page.playFrames(60, 1 / 60);
+
+  page.press("ArrowRight");
+  assert.strictEqual(page.audio.pipes.length, pipes, "the organ played while rested");
+  assert.strictEqual(page.clockSeconds(), rested + 10, "the right arrow did not travel ten seconds");
+
+  page.press("ArrowLeft");
+  assert.strictEqual(page.clockSeconds(), rested, "the left arrow did not come back");
+
+  page.playFrames(30, 1 / 60);
+  page.press(" ");
+  assert.strictEqual(page.elements.pause.textContent, "Pause", "space did not start the music again");
+  const started = page.audio.started;
+  page.playFrames(30, 1 / 60);
+  assert.ok(page.audio.started > started, "the organ stayed quiet after space");
+  assert.ok(page.clockSeconds() > rested - 1, "the clock is not running again");
+
+  page.press("Home");
+  assert.strictEqual(page.clockSeconds(), 0, "Home did not go back to the start");
+
+  // The browser gives the space bar to a button that still has the focus, so the
+  // page must not take it as well and toggle twice.
+  const focusedButton = page.elements.pause;
+  focusedButton.tagName = "BUTTON";
+  const before = page.audio.started;
+  const event = page.press(" ", focusedButton);
+  assert.strictEqual(page.elements.pause.textContent, "Pause", "space was taken twice, by the page and its button");
+  page.playFrames(30, 1 / 60);
+  assert.ok(page.audio.started > before, "the music stopped for no reason when a button had the focus");
+
+  // The page never scrolls, but the browser would try to on the space bar.
+  focusedButton.tagName = "DIV";
+  assert.strictEqual(page.press(" ").prevented, true, "space was left to the browser to scroll with");
+  page.press(" ");
+});
+
+test("restart starts the piece again, rested or not", async () => {
+  const page = openPage();
+  page.elements.pieces.children[0].click();
+  await settled();
+  page.playFrames(300, 1 / 60);
+  page.elements.restart.click();
+  assert.strictEqual(page.clockSeconds(), 0, "restart left the clock at " + page.clockSeconds());
+  page.playFrames(120, 1 / 60);
+  assert.ok(page.clockSeconds() >= 1, "the piece did not carry on after the restart");
+
+  page.press(" ");
+  page.playFrames(30, 1 / 60);
+  page.elements.restart.click();
+  assert.strictEqual(page.elements.pause.textContent, "Pause", "restart left the button saying Resume");
+  assert.strictEqual(page.clockSeconds(), 0, "restart while rested left the clock somewhere else");
+  const started = page.audio.started;
+  page.playFrames(60, 1 / 60);
+  assert.ok(page.audio.started > started, "restart while rested stayed quiet");
+});
+
+test("a jump back puts the picture back there", async () => {
+  const target = 40; // seconds
+
+  const fresh = openPage();
+  fresh.elements.pieces.children[0].click();
+  await settled();
+  const data = fresh.window.BachData["bwv565-toccata-and-fugue-d-minor"];
+  fresh.playFrames(Math.round((target + 0.06) * 60), 1 / 60);
+  const beforeFresh = fresh.canvas.drawn.fillRects;
+  fresh.nextFrame(1 / 60);
+  const drawnAtTarget = fresh.canvas.drawn.fillRects - beforeFresh;
+  assert.ok(drawnAtTarget > 30, "a page at " + target + " s draws almost nothing: " + drawnAtTarget);
+
+  const page = openPage();
+  page.elements.pieces.children[0].click();
+  await settled();
+  page.playFrames(Math.round((target + 60) * 60), 1 / 60); // a minute further on
+  page.elements.seek.click({ clientX: (target / data.duration) * page.window.innerWidth });
+  const beforeJump = page.canvas.drawn.fillRects;
+  page.nextFrame(1 / 60);
+  const drawnAfterJump = page.canvas.drawn.fillRects - beforeJump;
+  assert.ok(
+    drawnAfterJump >= drawnAtTarget * 0.9,
+    "after jumping back the picture drew " + drawnAfterJump + " marks where " + drawnAtTarget + " belong"
+  );
+  const wiped = page.canvas.drawn.rects
+    .slice(-drawnAfterJump)
+    .some((r) => r[4] === "#05060b" && r[2] >= page.canvas.width / 2 - 1);
+  assert.ok(wiped, "the old picture was left under the new one");
+});
+
+test("every note sounding now has a bar of light at its pitch", async () => {
+  const page = openPage();
+  page.elements.pieces.children[0].click();
+  await settled();
+  const data = page.window.BachData["bwv565-toccata-and-fugue-d-minor"];
+  page.playFrames(2400, 1 / 60); // forty seconds in
+
+  const before = page.canvas.drawn.rects.length;
+  page.nextFrame(1 / 60);
+  const now = page.audio.context.currentTime - 0.06; // where the piece stands
+  const drawn = page.canvas.drawn.rects.slice(before);
+  assert.ok(drawn.length > 30, "one frame drew only " + drawn.length + " marks: the notes are not being drawn");
+
+  const width = page.canvas.width / 2; // the fake canvas is drawn at two ratio
+  const height = page.canvas.height / 2;
+  const horizon = Math.round(height * 0.72);
+  const margin = Math.min(120, width * 0.12);
+  const low = data.pitchRange[0];
+  const span = data.pitchRange[1] - low;
+  const xFor = (pitch) => margin + ((pitch - low) / span) * (width - margin * 2);
+  const spines = drawn.filter((r) => Math.abs(r[2] - 2.2) < 0.01); // the bright core of a bar
+
+  const due = [];
+  for (const row of data.notes) {
+    const pitch = row[1];
+    const time = row[2];
+    const length = row[3];
+    if (time > now || time + length < now) continue;
+    due.push({ pitch: pitch, seconds: length });
+  }
+  assert.ok(due.length >= 4, "at " + now.toFixed(2) + " s only " + due.length + " notes are sounding; look elsewhere");
+
+  const longest = due.reduce((a, b) => (a.seconds >= b.seconds ? a : b));
+  const shortest = due.reduce((a, b) => (a.seconds <= b.seconds ? a : b));
+  assert.ok(longest.seconds > shortest.seconds, "the moment picked has no short note to compare with");
+
+  const heights = [];
+  for (const note of due) {
+    const x = xFor(note.pitch) - 1.1;
+    const crossing = spines.filter((r) => Math.abs(r[0] - x) < 0.01 && r[1] <= horizon && r[1] + r[3] >= horizon);
+    assert.ok(
+      crossing.length > 0,
+      "nothing crosses the line of sound for the note at pitch " + note.pitch + " sounding at " + now.toFixed(2) + " s"
+    );
+    heights.push({ seconds: note.seconds, height: Math.max.apply(null, crossing.map((r) => r[3])) });
+  }
+
+  // A bar is the note: the longer the note, the taller its light.
+  const ofLongest = heights.filter((h) => h.seconds === longest.seconds)[0].height;
+  const ofShortest = heights.filter((h) => h.seconds === shortest.seconds)[0].height;
+  assert.ok(ofLongest > ofShortest, "a long note drew a shorter bar than a short one: " + ofLongest + " against " + ofShortest);
+});
+
+test("a crowded frame stays cheap enough to draw sixty times a second", async () => {
+  const page = openPage();
+  const pieces = [...page.window.Bach.pieces];
+  const heaviest = pieces[pieces.length - 1]; // the Passacaglia has the most notes on screen at once
+  page.elements.pieces.children[pieces.length - 1].click();
+  await settled();
+  page.playFrames(2, 1 / 60);
+
+  const data = page.window.BachData[heaviest.slug];
+  page.elements.seek.click({ clientX: (420 / data.duration) * page.window.innerWidth });
+  page.nextFrame(1 / 60);
+
+  const beforeRects = page.canvas.drawn.fillRects;
+  const beforeGradients = page.canvas.drawn.gradients;
+  page.nextFrame(1 / 60);
+  const rects = page.canvas.drawn.fillRects - beforeRects;
+  const gradients = page.canvas.drawn.gradients - beforeGradients;
+  console.log("    crowded frame:", rects, "boxes and", gradients, "gradients for", heaviest.slug);
+  assert.ok(rects > 100, "a crowded frame only draws " + rects + " marks: is the picture missing again?");
+  assert.ok(rects < 1500, "one frame draws " + rects + " boxes: that will not keep up with the music");
+  assert.ok(gradients < 600, "one frame makes " + gradients + " gradients: that will not keep up with the music");
 });

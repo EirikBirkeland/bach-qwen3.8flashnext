@@ -48,7 +48,7 @@ Do these quickly and roughly, in the first session if you can, and release as so
 - [x] Timing that follows the tempo changes in the MIDI file.
 - [ ] A better organ: several pipes per note, so it sounds full and not like a beep. Check the loudness by numbers
       so chords do not distort.
-- [ ] Pause, restart, and a way to move to any point in the piece.
+- [x] Pause, restart, and a way to move to any point in the piece.
 
 ### Milestone 2: a visual world for each piece
 

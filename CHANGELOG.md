@@ -1,5 +1,28 @@
 # Releases
 
+## 0.1.1 — 2026-10-11
+
+The notes are really drawn now, and you can hold the music, start it again, or
+move into it anywhere.
+
+- **The notes themselves were missing.** Every bar of light fell out of a formula
+  that gave its top and its bottom the same height, so nothing was drawn: what
+  you saw was the flash where a note crosses the line of sound, and nothing
+  else. A bar is now as tall as its note is long — a chord of half notes hangs
+  under the line, a running passage comes down in short strokes. This was a bug
+  in 0.0.1 and 0.1.0, not a look you had gone quiet about.
+- Pause, Restart and Stop sit in the corner while a piece plays. Space pauses
+  and starts again, the arrow keys travel ten seconds, Home starts over, Escape
+  goes back to the card. Clicking the line along the bottom moves to that place
+  in the piece.
+- Pausing in the middle of a held note does not cut the harmony short: when the
+  music comes back, the notes still held are taken up again for whatever was
+  left of them.
+- The picture is checked by numbers now, since nobody here can see it: a test
+  finds the moment where most notes sound at once, paints it on a measuring
+  canvas, and fails if the screen washes out or stays dark. Another test wants a
+  bar of light at the right place on the screen for every note sounding.
+
 ## 0.1.0 — 2026-10-11
 
 All four pieces are here now. Open `index.html` and choose.

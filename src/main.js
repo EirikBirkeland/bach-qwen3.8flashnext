@@ -10,10 +10,10 @@ window.Bach = window.Bach || {};
   var current = null;
   var pieceDuration = 0;
   var timer = 0;
-  var state = "idle"; // idle, loading, playing, done
+  var state = "idle"; // idle, loading, playing, paused, done
 
   var elements = {};
-  ["card", "stage", "hud", "end", "pieces", "nowTitle", "nowTime", "voices", "stop", "again", "menu", "progress", "status", "endLine"].forEach(
+  ["card", "stage", "hud", "end", "pieces", "nowTitle", "nowTime", "voices", "pause", "restart", "stop", "again", "menu", "seek", "progress", "status", "endLine"].forEach(
     function (id) {
       elements[id] = document.getElementById(id);
     }
@@ -30,6 +30,13 @@ window.Bach = window.Bach || {};
     var minutes = Math.floor(whole / 60);
     var rest = whole % 60;
     return minutes + ":" + (rest < 10 ? "0" : "") + rest;
+  }
+
+  /** The clock and the line along the bottom, both telling where you are. */
+  function showTime() {
+    var now = organ.time();
+    elements.nowTime.textContent = clockText(now) + " / " + clockText(pieceDuration);
+    if (pieceDuration > 0) elements.progress.style.width = Math.min(100, (now / pieceDuration) * 100) + "%";
   }
 
   /** The note data for a piece, loaded when it is first asked for. */
@@ -94,7 +101,7 @@ window.Bach = window.Bach || {};
   }
 
   function start(piece) {
-    if (state === "loading") return;
+    if (state === "loading" || state === "playing" || state === "paused") return;
     state = "loading";
     current = piece;
     elements.status.textContent = "opening the notes…";
@@ -114,6 +121,7 @@ window.Bach = window.Bach || {};
         fillVoices(piece, data);
         elements.status.textContent = "";
         elements.card.classList.remove("dim");
+        elements.pause.textContent = "Pause";
         show("hud");
         state = "playing";
         organ.play(prepared, 0);
@@ -127,14 +135,52 @@ window.Bach = window.Bach || {};
       });
   }
 
-  function loop() {
+  /**
+   * Rest the music where it is. The pipes are quieted and the picture holds
+   * still; the piece stays open, ready to be picked up again.
+   */
+  function pause() {
     if (state !== "playing") return;
-    organ.pump();
-    var now = organ.time();
-    visual.frame(now);
-    elements.nowTime.textContent = clockText(now) + " / " + clockText(pieceDuration);
-    elements.progress.style.width = Math.min(100, (now / pieceDuration) * 100) + "%";
-    if (now >= pieceDuration + 1.5) {
+    organ.stop(); // leaves the organ holding the place it got to
+    state = "paused";
+    elements.pause.textContent = "Resume";
+  }
+
+  function resume() {
+    if (state !== "paused") return;
+    organ.play(prepared, organ.time());
+    state = "playing";
+    elements.pause.textContent = "Pause";
+  }
+
+  function togglePause() {
+    if (state === "playing") pause();
+    else if (state === "paused") resume();
+  }
+
+  /** Move to any point in the piece, whether it is sounding or rested. */
+  function moveTo(seconds) {
+    if (state !== "playing" && state !== "paused") return;
+    var at = Math.max(0, Math.min(pieceDuration, seconds));
+    if (state === "playing") organ.play(prepared, at);
+    else organ.stop(at); // stay rested, but over there
+    showTime();
+  }
+
+  function restart() {
+    if (state === "paused") {
+      state = "playing";
+      elements.pause.textContent = "Pause";
+    }
+    moveTo(0);
+  }
+
+  function loop() {
+    if (state !== "playing" && state !== "paused") return;
+    organ.pump(); // does nothing while the piece is rested
+    visual.frame(organ.time());
+    showTime();
+    if (organ.time() >= pieceDuration + 1.5) {
       finish();
       return;
     }
@@ -153,6 +199,32 @@ window.Bach = window.Bach || {};
     if (organ.isPlaying()) organ.stop();
     state = "idle";
     show("card");
+  }
+
+  var ARROW_STEP = 10; // seconds an arrow key travels
+
+  function keyPressed(event) {
+    if (state !== "playing" && state !== "paused") return;
+    // A button that still has the focus takes the space bar for itself, which is
+    // what it is there for; taking it too would toggle twice.
+    var onAButton = String((event.target && event.target.tagName) || "").toUpperCase() === "BUTTON";
+    if (event.key === " ") {
+      if (onAButton) return;
+      togglePause();
+    } else if (event.key === "ArrowRight") {
+      moveTo(organ.time() + ARROW_STEP);
+    } else if (event.key === "ArrowLeft") {
+      moveTo(organ.time() - ARROW_STEP);
+    } else if (event.key === "Home") {
+      restart();
+    } else if (event.key === "Escape") {
+      backToMenu();
+      return;
+    } else {
+      return;
+    }
+    // The page never scrolls, but the browser would try to on space and arrows.
+    if (typeof event.preventDefault === "function") event.preventDefault();
   }
 
   function buildList() {
@@ -180,6 +252,14 @@ window.Bach = window.Bach || {};
     start(current);
   });
   elements.menu.addEventListener("click", backToMenu);
+  elements.pause.addEventListener("click", togglePause);
+  elements.restart.addEventListener("click", restart);
+  elements.seek.addEventListener("click", function (event) {
+    if (typeof event.clientX !== "number") return;
+    var across = window.innerWidth || 1;
+    moveTo((event.clientX / across) * pieceDuration);
+  });
+  window.addEventListener("keydown", keyPressed);
 
   buildList();
   show("card");
