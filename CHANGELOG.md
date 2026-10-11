@@ -1,5 +1,34 @@
 # Releases
 
+## 0.3.3 — 2026-10-11
+
+BWV 645's beat was half a beat early. Now it lands where the music does.
+
+- **The bug.** "Wachet auf" opens with a single eighth note before its first whole
+  bar - a pickup. A MIDI file cannot say such a thing: it writes a metre and counts
+  ticks, and the bar lines were drawn by arithmetic from the first tick. So every
+  bar line in that piece sat half a second too early, and for three and a half
+  minutes the player was asked to strike half a second before the music got there.
+- **How the file tells us now.** These editions end exactly on a bar line, so
+  whatever the last bar is short by is what the piece was short at the start. The
+  chord that ends "Wachet auf" holds four seconds to the very end - a whole bar -
+  so its first bar line sits at 0.5 s and its 56 bars became 55 whole ones.
+- **What that buys in the game.** BWV 645 has four gold beats where it had none:
+  the opening ritornello told twice (0:16 and 1:32) and the chorale coming home
+  twice (2:03 and 2:53). All four used to sit past the nearest beat a strike is
+  judged against, which is why nothing on its ladder was ever gold.
+- The other three pieces kept the bar lines they had. The rule is read off the end of
+  a piece, and the two that slow to a stop at the end do not look like a pickup at
+  all - BWV 582's last bar is shorter than its stretched one before it, and that is
+  the slowing, not a missing bar.
+- **Measured, since nobody here can see or hear:** the share of a piece's own
+  note-length that is struck exactly on a beat went from 26% to 64% for BWV 645; the
+  other three sit at 48, 49 and 56%, which is what a bar of four with eighths in it
+  looks like. The long view of the piece measures as it always did (fullest second
+  0.0427 mean light, nothing new burnt out), and its bells are the same size. Tests:
+  241, from 230, and four new ways to break the bar rule, every one of which a test
+  now notices.
+
 ## 0.3.2 — 2026-10-11
 
 The Passacaglia's wheel takes its pulse into its own world: no ladder over it.

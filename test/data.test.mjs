@@ -8,6 +8,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 import { pictureScripts } from "./files.mjs";
 import { readMidiFile } from "../tools/midi.mjs";
+import { barLines } from "../tools/bars.mjs";
 import { buildPieceData, jsonText, jsText } from "../tools/midi2json.mjs";
 
 const root = new URL("..", import.meta.url); // this file sits in test/
@@ -65,7 +66,18 @@ for (const name of dataFiles) {
 
   test(slug + ": the bar lines are the edition's own", () => {
     assert.ok(data.bars.length > 1, "there are no bar lines");
-    assert.strictEqual(data.bars[0], 0, "the music does not start on a bar line");
+    // The music may open part of a bar in - an anacrusis - and then the first bar
+    // line sits that far past the first note. What it may not do is lose a bar, nor
+    // end on a stump of one: see tools/bars.mjs for how the two are told apart.
+    const bar = data.bars[1] - data.bars[0];
+    assert.ok(
+      data.bars[0] < bar,
+      "the first bar line is " + data.bars[0] + " s in, which is more than a bar of " + bar.toFixed(2) + ": a bar is missing"
+    );
+    assert.ok(
+      data.duration - data.bars[data.bars.length - 1] >= bar / 2,
+      "the piece ends on a stump of a bar: only " + (data.duration - data.bars[data.bars.length - 1]).toFixed(2) + " s of one"
+    );
     assert.ok(data.bars[data.bars.length - 1] < data.duration, "a bar line is after the last note");
     assert.ok(
       data.metre.beats >= 2 && data.metre.beats <= 12,
@@ -259,4 +271,86 @@ test("every converted piece has a place on the page, and every name on the page 
       piece.slug + " names voices that are not in the data: " + [...listed].join(", ")
     );
   }
+});
+
+// --- the bar grid, and a piece that opens part of a bar in ------------------
+//
+// A MIDI file writes no bar lines: it writes a metre and counts ticks, so the bars
+// follow by arithmetic from the first tick. An edition that opens with a pickup
+// breaks that arithmetic - the music starts part of a bar in, and every bar line
+// drawn from the first tick is that much too early. tools/bars.mjs reads the
+// pickup off the end of the piece, because these editions end exactly on the line.
+
+/** A song as tools/bars.mjs wants it: one metre, one tempo, ticks to seconds. */
+function songOf(barSeconds) {
+  const ticks = 384; // a quarter note, at 60 to the minute
+  return {
+    ticksPerQuarter: ticks,
+    timeSignatures: [{ tick: 0, seconds: 0, beats: 4, beat: 4, barTicks: Math.round(barSeconds * ticks) }],
+    toSeconds: (tick) => tick / ticks,
+  };
+}
+
+test("a piece that ends exactly on the line is barred from its first note", () => {
+  const lined = barLines(songOf(4), 572); // BWV 565: 143 bars of four seconds
+  assert.strictEqual(lined.starts[0], 0);
+  assert.strictEqual(lined.starts.length, 143);
+});
+
+test("a piece that opens with a pickup has its whole grid lifted by it", () => {
+  // BWV 645: a four-second bar, a piece of 220.5 s. Left to the arithmetic the
+  // last "bar" would be half a second long, which is the eighth note the piece
+  // opened with, come round again at the end.
+  const lined = barLines(songOf(4), 220.5);
+  assert.strictEqual(lined.starts[0], 0.5, "the first bar line is a pickup in");
+  assert.strictEqual(lined.starts.length, 55, "the piece is 55 whole bars and a pickup");
+  assert.strictEqual(lined.starts[lined.starts.length - 1], 216.5);
+  assert.ok(220.5 - lined.starts[lined.starts.length - 1] === 4, "the last bar is a whole one");
+});
+
+test("a last bar stretched by a slowing at the end is not a pickup", () => {
+  // BWV 639 ends by slowing to a stop, which makes its last bar longer than a bar
+  // - and a bar the music has more of than the metre says is nothing to do with a
+  // pickup. The real file, because it takes a real ritardando to say so.
+  const data = readData("bwv639-ich-ruf-zu-dir.json");
+  const bar = data.bars[1] - data.bars[0];
+  assert.strictEqual(data.bars[0], 0, "the grid stayed at the first note");
+  assert.strictEqual(data.bars.length, 18);
+  assert.ok(
+    data.duration - data.bars[data.bars.length - 1] > bar,
+    "the last bar should be longer than a bar of " + bar.toFixed(2) + " s, and it is not"
+  );
+});
+
+test("BWV 582: its last bar is short, and is still not read as a pickup", () => {
+  // The Passacaglia slows five times in its last two minutes, so its bars stretch
+  // as it goes: the last one is shorter than the one before it, which a rule read
+  // off the last gap would mistake for an anacrusis. The middle bar is what it
+  // compares by, and the grid stays where the editor put it.
+  const data = readData("bwv582-passacaglia-c-minor.json");
+  const last = data.bars[data.bars.length - 1];
+  const before = data.bars[data.bars.length - 2];
+  assert.ok(last - before > 2.5, "its last-but-one bar is stretched by the slowing: " + (last - before).toFixed(2) + " s");
+  assert.ok(data.duration - last < last - before, "and its last bar is shorter than that");
+  assert.strictEqual(data.bars[0], 0, "so the grid stayed at the first note");
+});
+
+test("BWV 645: the chord that ends the piece fills the last bar", () => {
+  const data = readData("bwv645-wachet-auf.json");
+  const at = data.format.indexOf("time");
+  const long = data.format.indexOf("duration");
+  let last = 0;
+  for (const row of data.notes) last = Math.max(last, row[at] + row[long]);
+  assert.strictEqual(last, data.duration, "the piece ends with its last note");
+  const struck = data.notes.filter((row) => row[at] + row[long] >= last).map((row) => row[at]);
+  assert.strictEqual(Math.min(...struck), data.bars[data.bars.length - 1], "the final chord is struck on the last bar line");
+  assert.ok(last - Math.min(...struck) > 3.5, "and it holds for a whole bar");
+});
+
+test("two bar lines cannot tell you anything, so nothing is lifted", () => {
+  // The rule needs more than one gap to judge by. A piece this short is not a piece
+  // anyone would play along to, but a rule with an untested edge is a rule that
+  // quietly stops being one.
+  const lined = barLines(songOf(4), 5);
+  assert.deepStrictEqual(lined.starts, [0, 4]);
 });

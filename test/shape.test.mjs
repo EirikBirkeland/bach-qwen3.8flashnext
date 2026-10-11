@@ -161,7 +161,9 @@ for (const slug of SLUGS) pieces[slug] = loadPiece(slug);
 for (const slug of SLUGS) {
   test(slug + ": the bars run from the first note to the last", () => {
     const piece = pieces[slug];
-    assert.ok(piece.bars[0] === 0, "the first bar starts at nought");
+    // A piece may open with a pickup, in which case its first bar line is that far
+    // in - but no further, or a bar of the edition has gone missing.
+    assert.ok(piece.bars[0] >= 0 && piece.bars[0] < piece.bars[1] - piece.bars[0], "the first bar starts at nought");
     assert.ok(piece.bars[piece.bars.length - 1] < piece.duration, "the last bar has room in it");
     assert.ok(piece.bars.every((value, index) => index === 0 || value > piece.bars[index - 1]), "bar lines in order");
   });

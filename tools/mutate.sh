@@ -4,7 +4,7 @@
 set -u
 cd "$(dirname "$0")/.."
 mkdir -p /tmp/mut
-for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js; do
+for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js tools/bars.mjs; do
   cp "$f" "/tmp/mut/$(basename "$f")"
 done
 
@@ -76,8 +76,16 @@ run "wheel: a struck beat is not lit" src/look-round.js 's/        if \(faded <=
 run "wheel: a struck beat is lit gold, which is the ground's colour" src/look-round.js 's/          one\.kind === "gold" \? MARK : COOL,/          GOLD,/'
 run "wheel: the rim does not brighten for a run" src/look-round.js 's/      if \(shot\.run > 0\.02\) ring\(view\.outer, 2 \+ 4 \* shot\.run, COOL, 0\.015 \+ 0\.05 \* shot\.run\);//'
 
+# The bar grid: a MIDI file cannot say it opened with a pickup, so the converter
+# reads that off the end of the piece (tools/bars.mjs). Get it wrong and a whole
+# piece's pulse sits half a beat off the music, which is what it did to BWV 645.
+run "bars: a pickup is never noticed" tools/bars.mjs 's/  return short > 0 && short \* 2 < bar \? short : 0;/  return 0;/'
+run "bars: judged by the last bar, not the middle one" tools/bars.mjs 's/gaps\[Math.floor\(gaps.length \/ 2\)\]/gaps[gaps.length - 1]/'
+run "bars: any short last bar is taken for a pickup" tools/bars.mjs 's/short \* 2 < bar/short < bar/'
+run "bars: two bar lines are enough to judge by" tools/bars.mjs 's/if \(starts.length < 3\) return 0;//'
+
 echo "--- restoring ---"
-for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js; do
+for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js tools/bars.mjs; do
   cp "/tmp/mut/$(basename "$f")" "$f"
 done
 node --test 2>&1 | grep -E "^ℹ (tests|pass|fail)"

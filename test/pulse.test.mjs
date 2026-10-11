@@ -110,11 +110,37 @@ for (const slug of PIECES) {
     const beats = plain(Bach.beats(data));
     const perMinute = beatsPerMinute(beats, data.duration);
     assert.ok(perMinute >= 33 && perMinute <= 75, `${perMinute.toFixed(0)} beats a minute is not a rate to play along to`);
-    assert.strictEqual(beats[0].time, 0);
+    assert.strictEqual(beats[0].time, data.bars[0], "the first beat is the first bar line the edition has");
     for (let i = 1; i < beats.length; i++) {
       assert.ok(beats[i].time > beats[i - 1].time, "beats have to come one after another");
     }
     assert.ok(beats[beats.length - 1].time < data.duration);
+  });
+
+  test(`${slug}: the beat is where the music is struck`, () => {
+    // The one claim a beat grid has to pass that a bar count cannot answer on its
+    // own: a player striking on the beat must be striking where the notes are
+    // struck. Measured as the share of the piece's own note-length - long notes
+    // count for more, because they are the ones carrying the metre - that is
+    // struck within a twentieth of a second of a beat. Every piece here gets
+    // about half of itself onto the grid, which is what a bar of four with
+    // eighths and sixteenths in it looks like; a grid half a beat off the music
+    // gets a fifth, and that was BWV 645 until tools/bars.mjs lifted it.
+    const data = dataOf(slug);
+    const beats = plain(Bach.beats(data));
+    const notes = notesOf(slug);
+    let length = 0;
+    let onTheBeat = 0;
+    let at = 0;
+    for (const note of notes) {
+      length += note.length;
+      // the notes come in time order, so the beat nearest this one is never behind
+      // the beat nearest the one before it
+      while (at + 1 < beats.length && Math.abs(beats[at + 1].time - note.time) <= Math.abs(beats[at].time - note.time)) at++;
+      if (Math.abs(beats[at].time - note.time) <= 0.05) onTheBeat += note.length;
+    }
+    const share = onTheBeat / length;
+    assert.ok(share > 0.4, `only ${(share * 100).toFixed(0)}% of the note-length is struck on a beat: the grid is not where the music is`);
   });
 
   test(`${slug}: a downbeat is on the bar line the picture draws`, () => {
@@ -236,6 +262,22 @@ test("BWV 645: the chorale is taken up again after its two long waits", () => {
   assert.strictEqual(back.length, 2, "the chorale stops for 29 seconds and for 23, and for nothing else that long");
   assert.ok(Math.abs(back[0].time - 122.6) < 1, "the first is about 2:03, found " + back[0].time);
   assert.ok(Math.abs(back[1].time - 172.7) < 1, "the second is about 2:53, found " + back[1].time);
+});
+
+test("BWV 645: the moments worth marking are beats a player can strike", () => {
+  // This is the piece that opened with a pickup, so for a whole release its four
+  // big moments - the ritornello told twice, and the chorale coming home twice -
+  // sat half a beat off the grid, past the nearest beat a strike is judged against.
+  // Now every one of them is a beat, which is what makes them gold on the ladder.
+  const data = dataOf("bwv645-wachet-auf");
+  const beats = plain(Bach.beats(data));
+  const marks = plain(Bach.landmarks(notesOf("bwv645-wachet-auf"), { bars: data.bars }));
+  assert.strictEqual(marks.length, 4, "two tellings of the ritornello and two homecomings of the chorale");
+  const within = Math.min(0.2, Bach.beatGap(beats) / 3);
+  for (const mark of marks) {
+    const beat = beats.filter((one) => Math.abs(one.time - mark.time) <= within);
+    assert.strictEqual(beat.length, 1, "the moment at " + mark.time + " s is not within " + within + " s of exactly one beat");
+  }
 });
 
 test("BWV 582: the ground is a moment thirteen times over", () => {
