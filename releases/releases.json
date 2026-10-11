@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.1.0",
+    "date": "2026-10-11",
+    "summary": "All four pieces play, each line once and at the right octave",
+    "added": 11784,
+    "removed": 17,
+    "logBytes": 406580
+  },
+  {
     "version": "0.0.1",
     "date": "2026-10-11",
     "summary": "BWV 565 plays in full, the notes fall as light",
