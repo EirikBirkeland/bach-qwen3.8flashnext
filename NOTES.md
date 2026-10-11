@@ -1335,9 +1335,10 @@ What I did:
   climb (`line - step·climb(ahead)`, the look's own geometry): one to a beat while the
   beats are far enough apart to be told apart, one to a bar beyond four beats, and one to
   any beat the piece is marking for itself *however far off it is* - which is the whole
-  reason to prefer the road: the four gold beats of this piece (16.5, 92.5, 123.5, 173.5:
-  the chorale's two entrances and its two returns) stand up to a minute ahead, and a
-  ladder two beats tall can only ever show the next two and a bit. The verges are the
+  reason to prefer the road: the four gold beats of this piece (16.5 and 92.5, where the
+  opening ritornello is told, and 123.5 and 173.5, where the line to follow comes home)
+  stand up to a minute ahead, and a ladder two beats tall can only ever show the next two
+  and a bit. The verges are the
   margins no note is ever drawn in (`xFor`'s own margin, now one function called `verge`),
   lamps stand at 0.6 of that width inboard, and everything is `MARK` (#e8f1ff): gold is the
   chorale and warm is a repeat, so a marked beat is bigger and brighter instead of another

@@ -1,5 +1,35 @@
 # Releases
 
+## 0.3.4 — 2026-10-11
+
+"Wachet auf" now keeps its own beat: lamps down the sides of the road, and you can
+see the chorale coming a minute off.
+
+- **The road took the pulse.** Until now the game laid its ladder of falling beats on
+  top of this picture - two beats tall, in the middle of the screen, over a road that
+  shows the whole piece at once. The road has its own place for a beat: every beat of
+  the piece is now a lamp on each of its two verges, standing at the height that beat
+  has reached on the climb. Near at hand there is one to a beat; further off, one to a
+  bar, since past a few beats the beats themselves are a few pixels apart.
+- **What the road shows that the ladder could not.** Four beats in this piece are worth
+  more than the rest - the opening ritornello at 0:16 and 1:32, and the line to follow
+  come home at 2:03 and 2:53 - and they can stand a *minute* ahead of you. A
+  ladder two beats tall cannot show a minute; this picture can, and they are lit, bigger
+  and brighter than an ordinary bar, while they are still far up the road.
+- **What striking one does.** Light laid across the line of sound at both verges, and a
+  bell in the harmony as before. A long run lights the edges of the road itself. A click
+  with no beat near it is a dull flick at either hand. Nothing slides down the verges:
+  what has been struck has arrived.
+- The colours say what they always said - gold is the chorale, warm is a repeat - so the
+  pulse is a cold white and says nothing else. The line under the piece on the card now
+  tells you the lamps are the beat.
+- **Measured, since nobody here can see or hear:** the heaviest frame of the piece went
+  from 1128 marks to 1290 (of a budget of 1500), and its worst mean light *fell*, from
+  0.0470 with the ladder to 0.0451 with the lamps; nothing burns out that did not burn
+  out before. Tests: 248, from 241, and ten new ways to break the lamps, every one of
+  which a test now notices - which is how I found that the crowding rule I meant to write
+  would never have fired, and left it out.
+
 ## 0.3.3 — 2026-10-11
 
 BWV 645's beat was half a beat early. Now it lands where the music does.
