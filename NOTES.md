@@ -726,3 +726,120 @@ Next, in order:
    returning) out of the looks into one file before a fourth copy of it is written.
 3. Still open from milestone 1: dynamics drawn from the music instead of the flat
    velocities (582 is all 127, 565 all 90).
+
+## Session 9 — 2026-10-11 — milestone 2 finished: BWV 582 is a wheel
+
+**Released 0.2.4.** Milestone 2 is done: all four pieces wear a picture of their own.
+
+What I did:
+
+- **`src/look-round.js`, and BWV 582 wears it.** Time goes round instead of down,
+  because the piece's shape *is* a round: one turn of the wheel = one telling of
+  the ground bass. Angle is time, radius is pitch (low near the middle, the
+  manuals' C7 near the rim), a hand goes once round a turn as the line of sound,
+  the whole turn ahead is drawn as a faint shape, and the rim keeps one mark per
+  turn taken.
+- **Nothing about the wheel is typed in.** `Bach.theme` finds the ground (15 notes,
+  13 tellings) and the wheel's turn is the median gap between its tellings, measured
+  in *bars* (8 here); the anchor is the first telling; the number of turns that carry
+  the ground (20) comes from where the last telling ends; the fugue begins where that
+  last telling lets go (421.28 s). Folding by bars and not seconds is what keeps the
+  ground in its place while the player slows down five times in the last two minutes
+  (`barClock` asks the bar grid both ways: bar-of-a-second, second-of-a-bar).
+- **At the hinge the wheel unwinds**: over ten seconds the reachable window shrinks
+  from a whole turn to four seconds, so the far edge of the disc empties inwards.
+  The fugue's first note gets a flash of the picture's own cool light; after that
+  it is a hand sweeping a dark disc, which is honest — with no ground there *is*
+  nothing ahead of you to see.
+- `src/pieces.js`: 582's right hand is blue and its left hand green, because
+  **gold belongs to the ground alone**. The rim's tally marks are gold for the
+  twenty turns that carried the ground, cool since, so the rim says where the
+  piece turned into the fugue.
+- Tests: 151 pass (was 139). Twelve new ones for the wheel; the geometry ones
+  replicate the look's two formulas on purpose ("a test that cannot say where a
+  thing is drawn cannot say it was drawn").
+
+What I fixed, and it matters beyond this session:
+
+- **`test/screen.mjs` was measuring every radial glow in the wrong place.** It took
+  the *end circle's x* as the middle's y (`dy = y - args[3]` instead of `args[1]`),
+  so a bloom at (640, 400) was measured as if its middle were at (640, 640) — off
+  the screen — and counted as transparent. Every glow in every look away from the
+  top-left corner has been under-measured since 0.0.1. Also, linear gradients were
+  only measured vertically, so a sideways gradient counted as its first stop
+  everywhere (BWV 565's chord flares measured as nothing). Both fixed; all four
+  pieces' numbers moved, no picture changed, and every existing test still passed
+  — which says the old thresholds were relative enough to survive an honest fix.
+- **The burnt-out cells session 7 noticed in BWV 582 are gone** (0 of 2560 over the
+  whole piece; the fall look had 6). Three causes, all found by printing every box
+  covering the burnt cell: a note's own core and its own glow both full at the same
+  pixel (fixed by making a note's glow a *ring* with an empty middle); the seven
+  pitch rings washing cool light over everything (0.045 → 0.03 alpha); and — the
+  real one — **two voices striking the same pitch at the same moment**, which this
+  keyboard arrangement does constantly, landing two full lights on one spot. So the
+  look keeps a per-frame record of where light has been laid and draws the second
+  one there for half. That is also honest: two voices on one spot are one light.
+- `calm = 1 / (1 + 0.055 × notes sounding)`: the fuller the organ, the softer each
+  light is laid down. Same family as the subject look's breathing; without it the
+  fugue burns in nine sampled frames out of ~1450.
+- Gradients per frame: my first version made ~509 in the worst frame (every
+  upcoming note had a glow) against a maximum of 10 in any other look. Upcoming
+  notes are plain dots now unless nearly struck: 119 gradients, 668 boxes worst.
+
+Things that surprised me, and decisions that came out of them:
+
+- **The finder's ground is one note out of phase.** The 15-note figure it settles on
+  starts on the ground's *last* note (the arrival on C1) and runs into the next
+  telling, so the opening statement (0–18.3 s, the theme an octave up on the
+  manuals) is not gold. I left it: fixing the phase in `theme.js` would mean a rule
+  about which rotation of a periodic figure is "the" one, and the risk to BWV 565's
+  eight entries is not worth 14 notes of gold. The wheel treats the opening as the
+  first turn's worth of music, which is what it is.
+- **I had to drop a device I liked.** I marked "each voice taking up the fugue", but
+  the data says the right hand starts the fugue alone and the left hand is
+  accompanying from the start — and the two genuine late entries (octave line 433 s,
+  pedal 450 s) were *already* caught by the ten-second-return rule, so the device
+  was redundant as well as musically false. A mutation (drop the entries) survived
+  and that is what told me. Now it is one honest thing: the fugue's first note
+  flashes, and a voice coming back after ten seconds gone blooms in its own colour.
+- Two more mutations survived at first — the hand, and the ground's arrival bloom —
+  and the size claim for gold; all three now have tests that fail when they are
+  broken. The mutation loop used `cp` to /tmp as the undo, never `git checkout`, on
+  session 7's lesson.
+- **The fugue has no subject worth marking.** Running the finder on the fugue alone
+  gives a 33-note figure heard three times — not a subject. So the fugue half of the
+  wheel has no gold, which is also the truth of it: the ground was the thing that
+  came back, and it has stopped.
+
+Measured, since nobody can see or hear (all with the fixed canvas):
+
+- BWV 582 in the wheel: fullest second mean 0.0295, quietest 0.0253 (an empty screen
+  is 0.0253-ish, the busiest frame of the whole piece 0.0370 at 6:58), brightest
+  spot 0.79, **0 cells burnt out**, worst frame 668 boxes of which 119 gradients.
+- The others, resampled every second instead of every six: 565 worst 0.0455 (0
+  burnt), 639 worst 0.0368 (0 burnt), 645 worst 0.0467 at 0:50 with 2 cells burnt
+  (the chorale's first arrival: worth a look some session, still inside the 5%
+  allowance). `tools/look.mjs` now takes 90 s for all four; the tests take 7.5 s.
+- The wheel's own claims, checked: the ground's gold lights come back to the same
+  places a turn later (all of them, within 2 px), a turn's worth of ordinary lights
+  shares under a quarter of its places with the next turn, the fugue leaves more
+  than 120° of the wheel dark where the passacaglia leaves less than 90°, the rim
+  counts exactly `floor(bars since the anchor ÷ 8)` marks with 20 of them gold.
+
+Next, in order:
+
+1. **Milestone 3: something to do.** Nothing is designed yet; PLAN.md says write the
+   design there first. Think about what four pieces this picture language can play
+   with: the wheel's rim already counts turns, the vigil already marks arrivals, the
+   wheel and the vigil both know where the tune is coming next — a game around
+   "be there when it arrives" is closer than a made-up one.
+2. For myself, again: **the shared drawing**. Four looks now each carry their own
+   `coming`/`sounded`/`bloom`/halo, and this session wrote a fifth and sixth copy.
+   Pull them into one file, and keep the numbers identical per look (the light
+   measurements are the safety net: they are all in these notes, so a refactor that
+   changes a picture will show up).
+3. Still open from milestone 1: dynamics drawn from the music instead of the flat
+   velocities (582 is all 127, 565 all 90).
+4. Small honest debts: BWV 645 burns 2 cells at the chorale's arrival; the harness
+   still cannot see `ctx.arc` + `fill` (no look uses them, and none should until it
+   can); `theme.js`'s phase for a periodic figure (see above, deliberately left).
