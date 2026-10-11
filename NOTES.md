@@ -166,3 +166,77 @@ Next, in order:
 4. Then milestone 2, one piece per session, starting with BWV 639 (2 minutes, 3
    voices, easiest to judge) or 582 (the most obvious shape: theme, 20 variations,
    Fugue).
+
+## Session 3 — 2026-10-11 — milestone 1: hold it, start it again, move anywhere — and the bars were never there
+
+What I did:
+
+- **The note bars were never drawn.** `src/visual.js` had
+  `top = horizon - (note.time - now) * SPEED` and
+  `bottom = horizon + (now - note.time) * SPEED` — the same number, so
+  `bar()`'s `if (bottom <= top) return` threw away every note of every frame
+  since 0.0.1. What shipped was flashes at the line of sound and nothing else.
+  Now `top = horizon - (end - now) * SPEED` with `end = time + length`, so a bar
+  *is* the note: 62 px to the second tall, its struck end crossing the line of
+  sound at its own second.
+- Pause, Restart and Stop in the top corner; the line along the bottom is a
+  click target now (`#seek`, 18 px tall, `#progress` inside it). Keys: space
+  rests and starts, ← → travel ten seconds, Home starts over, Escape is the
+  card. The card says this in plain words.
+- Organ: `stop(at)` quiets everything and hands back (and keeps) where in the
+  piece you stand; `play(piece, from)` first quiets anything still sounding and
+  then **takes up again the notes still held at `from`, for whatever is left of
+  them**, so a chord held through a rest does not come back with its inner
+  voices missing. `pump` and `play` share one `speak()`.
+- `main.js` has a `paused` state. The frame loop keeps running while rested and
+  `organ.time()` is frozen, so the picture holds still and its trails settle,
+  rather than fading to black. `moveTo` works rested or running; `restart` too.
+- Visual wipes the screen and rewinds its note window when time jumps backwards
+  (`jumpedBack`): without it a jump back left the old picture and drew nothing
+  of the new place, because `from` only ever walks forward.
+- New `test/screen.mjs`: a canvas that measures light — hex and rgba, vertical
+  and radial gradients, `lighter` against `source-over` — on a 64×40 grid, and
+  `test/picture.test.mjs` asks each piece for its busiest second.
+- New tests: pause timings, a held note taken up again, seek by click, the keys,
+  restart rested or not, a backwards jump compared with a fresh page at the same
+  second, a bar of light at the right x for every note sounding, a crowded
+  frame's drawing budget, and *every `#id` main.js reaches for exists in
+  index.html* (the stand-in document invents anything, so that is the only guard
+  against a typo in the id list). 48 tests pass in about 2.4 s.
+- Released `0.1.1`.
+
+Measured, since I can neither see nor hear:
+
+- Crowded frame (Passacaglia at 420 s): 542 boxes, 203 gradients. Budgets in the
+  test are 1500 and 600.
+- Brightest frame of the busiest second, mean light over the whole screen:
+  565 0.031, 639 0.029, 645 0.034, 582 0.045 — against 0.026 for an empty
+  screen. Peak 0.18 to 1.00, burnt-out cells essentially none. The screen is
+  dark ground with bright notes, not a wash.
+- Notes on screen at once peaks at 158 (565), 315 (582), 79 (639), 63 (645).
+
+What surprised me:
+
+- Two releases shipped a picture with no notes in it, and every existing test was
+  happy: the fake canvas recorded only positions, and the "nothing off screen"
+  and "something near the line" assertions pass on the static parts alone
+  (12 rects a frame). Positions without colour could not see it; the new tests
+  check the colour of the wipe and the height of a bar against the note.
+- "A quiet second is darker than a crowded one" is not a claim I can make. In
+  BWV 639 nearly every moment has all three voices busy, and the picture draws
+  notes up to ~9 s ahead as well, so a thin moment can measure brighter than a
+  crowded one. I dropped the claim instead of softening its threshold until it
+  meant nothing.
+- BWV 565 has a real rest around 10 s in — no note at all for most of a second —
+  which is why the pause test now rests it at twelve seconds instead.
+
+Next, in order:
+
+1. Milestone 1's remaining item: a fuller organ, and dynamics taken from the
+   music rather than the flat velocities (582 is all 127, 565 all 90). Register
+   changes per section would suit the Passacaglia best.
+2. The look of the bars has never been seen by anyone. Before building milestone 2
+   on it, judge it by numbers and by eye: `node tools/inspect.mjs bwv582 410 end`
+   says what is on screen at a moment, and the picture tests print their numbers.
+   315 notes at once may want the far, faint ones drawn more cheaply.
+3. Then milestone 2, one piece per session: 565 or 582 first.
