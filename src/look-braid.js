@@ -160,8 +160,8 @@ window.Bach = window.Bach || {};
      * A ring of light round the place a beat arrived, contracting as it fades and
      * empty in the middle. A note is usually being struck on that very beat, and its
      * own core is already blazing where the line of sound is: two full lights on one
-     * spot are white rather than louder, which is why the wheel rings a struck beat
-     * instead of flooding it. Same reason, same device.
+     * spot are white rather than louder, which is the same reason the wheel of BWV
+     * 582 lays its lights as rings rather than blobs. Same reason, same device.
      */
     function ring(x, y, size, colour, strength) {
       if (size <= 0 || strength <= 0.01) return;

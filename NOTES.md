@@ -1446,3 +1446,134 @@ Next, in order:
 4. Small honest debts: the vigil's own burnt cells at the chorale's arrival (worth fixing
    before anyone adds more light there); `theme.js`'s phase for a periodic figure; the
    harness still cannot see `ctx.arc` + `fill`, which is why every glow here is rects.
+
+
+## Session 15 — 2026-10-11 — milestone 3 finished: the braid stands its beats on a ruler
+
+**Released 0.3.5.** The last open item of milestone 3: "the braid of BWV 639 could
+still breathe with its own beat, if a look at it says that reads better than the
+ladder". It reads better, and it is not breathing: it is a ruler. Three of the four
+worlds now mark the player's beats inside their own picture; the fugue picture of
+BWV 565 keeps the game's ladder, on purpose.
+
+What I did:
+
+- **The deciding, first, by numbers** (the item asked for a judgement, not a
+  device). At the braid's own pace — one phrase of four bars to a screen, 49.3 px a
+  second at 1280 wide — **a beat of BWV 639 is 80 px from the next one, and twelve
+  of them are on the screen at a time** (19.2 s ahead of the line of sound). The
+  game's ladder showed 2.2 beats, 3.6 s, at 86 px of spacing: the same spacing,
+  one sixth of the piece, on an axis at right angles to a picture whose time runs
+  sideways, laid across the music itself: its bars fall through y 514-704, and the
+  band the notes are drawn in runs from 128 to 672. And the piece has
+  exactly two beats worth striking early — 0.00 and 25.95, where the opening phrase
+  is said again — which are 26 s and 21 s off: **no ladder that is two beats tall
+  can show them, and the whole of this picture is one phrase wide.** That is the
+  same argument the long view used in 0.3.4, and here it is stronger.
+- **`src/look-braid.js` has a `pulse`.** A mark per beat stood at the x its moment
+  has reached, in two rows: one hanging above the music and one standing below it,
+  because those two strips are the only places a note is never drawn. Each mark
+  grows towards the music as its beat comes (over four beats' worth); a bar's
+  opening stands taller than the three beats inside it, so four read as one bar; a
+  beat the piece is marking for itself stands taller and brighter still however far
+  off it is, which is the thing a ladder could never say. A struck beat is gone from
+  the ruler and lays a contracting **ring** on the line of sound at both edges of
+  the band; a click with no beat near it is a dull 18 px flick; a long run lights the
+  ruler and the line of sound it is crossed by, which is this picture's version of
+  the ladder's line getting wider. `MARK` (#e8f1ff) for all of it: on this piece
+  gold is the chorale *and* a phrase said again, so a beat may take neither.
+- `pitchMargin` came out of `yFor` so the ruler and the music cannot disagree about
+  where the music ends. The card says where to look: "four bars to a screen · a bar
+  line glows gold on a repeat · the ticks mark the beat".
+- **Tests: 257 (was 248).** Ten new for the ruler, and three existing claims
+  rewritten because they said "two of the four take the pulse": the `painted()`
+  table in `test/picture.test.mjs`, the page's wiring test (which now wraps
+  `Bach.createGame` and asks the game itself, so main.js is what is being tested),
+  and the ladder test in `test/page.test.mjs`, which now uses BWV 565 — the one piece
+  that keeps the ladder — because it cannot be drawn in BWV 639 any more.
+  `tools/mutate.sh` has 13 new mutations, all caught; 74 in all, and the whole run
+  came back with nothing surviving (`node tools/mutate.sh`, about 25 minutes: it runs
+  the whole test suite once per mutation - do not edit `src/` while it runs, it
+  mutates those files in place and restores them at the end).
+
+What I found by measuring, and it matters:
+
+- **A struck beat can burn a pixel out, and mine did.** The first version laid a
+  plain round glow on the line of sound where each ruler row meets it. Measured at a
+  sixtieth of a second across the piece, **4 cells went over 0.9 where the picture
+  alone sat just under 0.85** — and the reason is that in this piece a note is *usually*
+  being struck on that very beat, so the chorale's own flare is already blazing at
+  exactly that spot. Fixed with the wheel's old device (session 9): the struck light
+  is a **ring with an empty middle** now, and nothing tips over anywhere in the piece.
+- **The wheel of BWV 582 tips a cell over white, and I left it.** At a sixth of a
+  second, its struck beat tips one cell over 0.9 at 225.83 s and at 245.83 s - and it
+  is not the glow (the wheel lays its glows as rings already), it is the **tooth**: a
+  2 px mark at 0.3 laid where a note core of 0.52-0.59 is shining, on a spot the
+  picture alone has at 0.68-0.74. Session 9's device is the answer - the wheel keeps a
+  per-frame record of where it has laid light and draws a second light there for half -
+  and `pulse` never consults it. Session 12's "0 cells burnt with the pulse on" was
+  measured one frame a second, and a one-second grid walks straight past both frames.
+  To see it: two stages of BWV 582 in `test/screen.mjs`, one with `{ play: true }`, the
+  same second framed in both a sixth of a second apart with every beat struck, then
+  compare the two `air` grids cell by cell - over 0.9 in the playing one where the
+  plain one was under 0.85 is the tell. The vigil of BWV 645 tips nothing at either
+  grid, so session 14's claim holds.
+- **Two of the four looks burn cells out by themselves, and it is by construction.**
+  The braid alone has a cell over 0.9 in 202 of 715 frames (a sixth of a second
+  apart), and BWV 565's fall look in 264 of 3432. It is a note's own three layers —
+  glow 0.09, body 0.46, core 0.90 — plus the line of sound's own light and the
+  struck flare, all meeting on a 2 px column at the moment the note is struck. That
+  is the brightest moment of the picture and it is one cell wide, so I left it
+  alone; but it is why the rule for "did *my* addition burn anything" has to be "a
+  cell may only go over if the picture alone had it above 0.85". That rule is a test
+  now, walked at a sixtieth of a second.
+- Measured, all at 1280×800, every beat struck:
+  - worst mean light over the whole piece: **0.0373 alone → 0.0397 with the ruler**,
+    against **0.0430 with the game's ladder laid over the same picture**. The ruler
+    costs about a quarter of the light the ladder cost.
+  - heaviest frame: **283 marks alone → 337 with the ruler** (the ladder was 288),
+    against a budget of 1500.
+  - cells tipped over white by the ruler alone, at 1/60 s: **none anywhere**.
+  - the marks are 80 px apart through the piece and **110 px in the final
+    ritardando** — the slowing is something you can see arriving now, which is a
+    test of its own ("the ruler stretches where the piece slows down").
+  - a marked beat stands 22 px at 0.15 alpha where a bar opening stands 13 px at
+    0.09 and a plain beat 9 px at 0.055, at the same distance off.
+
+Decisions worth keeping:
+
+- **Where a piece's time lives, the piece says.** Three worlds take the pulse and
+  one does not; nothing in `src/pieces.js` can disagree with a picture about it, and
+  the page test asks `game.painted()` rather than squinting at pixels for that case.
+- **Nothing of the ruler goes inside the music's band.** The band's edges are where
+  no note is ever drawn, so the rows hug them from outside with a 10 px gap - the
+  widest a note's own glow reaches is 11 px, so they cannot touch.
+- **No crowding rule in the code.** Session 14's lesson: the tightest two marks in
+  this piece are 80 px apart, so "skip a mark with no room for it" would be dead
+  code that no mutation can be caught by. The claim lives in a test about the piece
+  ("no two marks nearer than 40 px"), which is what will complain if a livelier piece
+  ever wears this picture.
+- **A caught beat leaves the ruler**, as it leaves the ladder: the row visibly
+  empties where you struck, and the light moved to the line of sound rather than
+  doubling up.
+- **The struck ring contracts as it fades** rather than spreading like a wave,
+  because that is what the ladder and the long view do with a strike. Consistency
+  between the four worlds beat my liking ripples.
+
+Next, in order:
+
+1. **The sound's oldest gap**, not the picture's: dynamics drawn from the music
+   instead of the flat velocities in the files (BWV 582 is all 127, BWV 565 all 90).
+   It is the last thread left over from milestone 1 and the only one that changes
+   what the player hears. `peaksAt` and `renderAcross` in `test/render.mjs` make a
+   per-bar loudness profile cheap, which is most of what it needs.
+2. **The wheel's `pulse` should consult its own "already lit" record** - see the two
+   tipped cells above, and note it is the tooth rather than the glow. Small, and its
+   test grid should go from one second to a sixth while that is being done.
+3. The shared-drawing debt, again, and bigger: `landmarks.js` and `touch.js` are
+   shared logic, but `coming`/`sounded`/`bloom`/`ring`/`halo` are now written out in
+   six places. The light numbers in these notes are the safety net for a refactor.
+4. Small honest debts: `theme.js`'s phase for a periodic figure (session 9, left on
+   purpose); the fall and braid looks' own burnt cells (by construction, but worth
+   deciding deliberately one day rather than by accident); `test/screen.mjs` still
+   cannot see `ctx.arc` + `fill`, which is why every glow here is rects.
