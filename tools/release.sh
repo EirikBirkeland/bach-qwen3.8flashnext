@@ -74,7 +74,8 @@ const [version, summary, added, removed, logBytes] = process.argv.slice(1);
 const manifestPath = "releases/releases.json";
 const releases = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, "utf8")) : [];
 const date = new Date().toISOString().slice(0, 10);
-releases.unshift({ version, date, summary, added: Number(added), removed: Number(removed), logBytes: Number(logBytes) });
+// released is the exact moment, for the version menu; date stays for anything that reads the day.
+releases.unshift({ version, date, released: new Date().toISOString(), summary, added: Number(added), removed: Number(removed), logBytes: Number(logBytes) });
 fs.writeFileSync(manifestPath, JSON.stringify(releases, null, 2) + "\n");
 // The menu page is often opened straight from disk, where a browser will not
 // read a .json file, so it is handed the same list as a script it can load.
