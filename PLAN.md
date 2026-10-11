@@ -60,8 +60,11 @@ Do these quickly and roughly, in the first session if you can, and release as so
 
 ### Milestone 3: something to do
 
-- [ ] Something for a player to do in time with the music, in the spirit of Rez, with a "just watch" mode beside it.
+- [x] Something for a player to do in time with the music, in the spirit of Rez, with a "just watch" mode beside it.
       Decide what, write the design here first, then build it.
+      Done across `0.3.0` to `0.3.5`: strike the beat of the piece, and a bell rings the harmony; the run,
+      the score line and the sentence at the end; and three of the four pieces mark their beats inside their
+      own picture rather than wearing the game's ladder. "Just watch" is one press away at any moment.
 
   - [x] The design, written down here before any of it was built - see below.
   - [x] Built and released as `0.3.0`: `src/pulse.js` for the beat grid, `src/landmarks.js` for the moments
@@ -71,12 +74,18 @@ Do these quickly and roughly, in the first session if you can, and release as so
   - [x] The ladder is laid *over* the picture, not part of it. Each piece's world could take its pulse in
         its own way - the wheel ticking one tooth of the rim to a beat, the long view planting a lamp on the
         road, the braid breathing with it. Only do it where it is better, piece by piece.
-        Done, and the deciding is done too: the wheel takes it on its rim (`0.3.2`) and the long view plants
-        lamps on its verges (`0.3.4`), where a beat of the piece has a place of its own in the picture. The
-        fugue picture and the braid keep the game's ladder on purpose - both are already a straight timeline
-        of the next few seconds, which is exactly what a ladder of falling beats is.
-  - [ ] The braid of BWV 639 could still breathe with its own beat, if a look at it says that reads better
-        than the ladder. Not decided; the ladder is not in anyone's way there.
+        Done, and the deciding is done too: the wheel takes it on its rim (`0.3.2`), the long view plants lamps
+        on its verges (`0.3.4`) and the braid stands a ruler of beats along the top and bottom of its music
+        (`0.3.5`), wherever a beat of the piece has a place of its own in the picture. The fugue picture of
+        BWV 565 keeps the game's ladder on purpose: its notes fall, and a ladder of falling beats is the same
+        shape over the same few seconds.
+  - [x] The braid of BWV 639 has taken the pulse too (`0.3.5`), and it is not breathing: it is a ruler. A bar
+        of this piece is six and a half seconds and a beat is eighty pixels along the screen, twelve of them
+        in view at a time, where the game's ladder showed two and fell straight down the middle of a picture
+        whose time runs sideways. A mark per beat, along the top of the music and along the bottom - the two
+        places a note is never drawn - a bar's opening standing taller than the beats inside it, and the beat
+        the piece marks for itself taller and brighter however far off it is: the phrase said again at 0:26 is
+        a whole screen away and already on this one, which no ladder two beats tall could ever have said.
   - [x] The wheel of BWV 582 has taken the pulse into its own world (`0.3.2`): a tooth per beat just inside
         the rim, at the bearing that beat falls on within the turn, so the hand crossing a tooth *is* the
         beat arriving; a struck beat lights the rim where its tooth stood, and a long run brightens the whole

@@ -4,7 +4,7 @@
 set -u
 cd "$(dirname "$0")/.."
 mkdir -p /tmp/mut
-for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js src/look-vigil.js tools/bars.mjs; do
+for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js src/look-vigil.js src/look-braid.js tools/bars.mjs; do
   cp "$f" "/tmp/mut/$(basename "$f")"
 done
 
@@ -99,8 +99,24 @@ run "road: a struck beat lights gold, which is the chorale's colour" src/look-vi
 run "road: a click that caught nothing is silent" src/look-vigil.js 's/          ctx\.globalAlpha = 0\.05 \* faded;/          ctx.globalAlpha = 0;/'
 run "road: the verges do not light up for a long run" src/look-vigil.js 's/      if \(shot\.run > 0\.02\) \{/      if (false) {/'
 
+# The braid of BWV 639 stands a beat on a ruler along the top of its music and the
+# bottom of it - the two places a note is never drawn - and keeps the beat the piece
+# marks for itself taller and brighter, however far off it is.
+run "braid: it keeps the game's ladder after all" src/look-braid.js 's/return \{ reset: reset, frame: frame, pulse: pulse \};/return { reset: reset, frame: frame };/'
+run "braid: no beats on the ruler at all" src/look-braid.js 's/        stand\(x, ruler\.crown - CLEAR, tall, wide, strength, true\);\n        stand\(x, ruler\.base \+ CLEAR, tall, wide, strength, false\);\n//'
+run "braid: only the top row is drawn" src/look-braid.js 's/        stand\(x, ruler\.base \+ CLEAR, tall, wide, strength, false\);\n//'
+run "braid: the beats are drawn over the music" src/look-braid.js 's/        stand\(x, ruler\.crown - CLEAR, tall, wide, strength, true\);/        stand(x, ruler.crown + 80, tall, wide, strength, true);/'
+run "braid: a beat is drawn at the wrong place on the ruler" src/look-braid.js 's/var x = ruler\.lineX \+ away \* pace;/var x = ruler.lineX + away * pace * 0.6;/'
+run "braid: a beat the music is marking is no different" src/look-braid.js 's/var rank = beat\.bright \? 1 : beat\.bar \? 0\.6 : 0\.42;/var rank = beat.bar ? 0.6 : 0.42;/'
+run "braid: a marked beat is no brighter than a plain one" src/look-braid.js 's/\(beat\.bright \? 0\.15 : beat\.bar \? 0\.09 : 0\.055\) \+ \(beat\.bright \? 0\.2 : 0\.15\) \* near/(beat.bar ? 0.09 : 0.055) + 0.15 * near/'
+run "braid: a beat is struck too bright to stand beside its neighbours" src/look-braid.js 's/\+ \(beat\.bright \? 0\.2 : 0\.15\) \* near;/+ (beat.bright ? 0.75 : 0.15) * near;/'
+run "braid: a caught beat keeps its mark" src/look-braid.js 's/        if \(beat\.taken\) continue;.*\n//'
+run "braid: a struck beat lays no light on the line of sound" src/look-braid.js 's/\(one\.truest \? 0\.12 : 0\.08\) \* faded/0.001 * faded/'
+run "braid: a struck beat is lit gold, which is the chorale's colour" src/look-braid.js 's|ring\(ruler\.lineX, ruler\.crown - CLEAR, reach, MARK,|ring(ruler.lineX, ruler.crown - CLEAR, reach, "#ffd47a",|'
+run "braid: a click that caught nothing is silent" src/look-braid.js 's/          ctx\.globalAlpha = 0\.05 \* faded;/          ctx.globalAlpha = 0;/'
+run "braid: the ruler does not brighten for a long run" src/look-braid.js 's/      if \(shot\.run > 0\.02\) \{/      if (false) {/'
 echo "--- restoring ---"
-for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js src/look-vigil.js tools/bars.mjs; do
+for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js src/look-vigil.js src/look-braid.js tools/bars.mjs; do
   cp "/tmp/mut/$(basename "$f")" "$f"
 done
 node --test 2>&1 | grep -E "^ℹ (tests|pass|fail)"

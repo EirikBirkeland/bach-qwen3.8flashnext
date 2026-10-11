@@ -1376,10 +1376,12 @@ test("the page loads what playing along needs", () => {
 });
 
 test("playing along draws its ladder on the picture, and just watching draws none", async () => {
+  // BWV 565 is the one piece that keeps the game's ladder: its picture falls, and
+  // a ladder of falling beats is the same shape over the same few seconds.
   const page = openPage();
-  page.elements.pieces.children[1].click();
+  page.elements.pieces.children[0].click();
   await settled();
-  const data = page.window.BachData[SHORT];
+  const data = page.window.BachData["bwv565-toccata-and-fugue-d-minor"];
   const beat = page.window.Bach.beats(data)[4];
   runTo(page, beat.time - 0.4);
 
@@ -1395,7 +1397,9 @@ test("playing along draws its ladder on the picture, and just watching draws non
 
   // The ladder is a pile of wide, thin bars low in the middle of the screen.
   const since = page.canvas.drawn.fillRects - playing;
-  const bars = page.canvas.drawn.rects.slice(since).filter((box) => box[2] > 90 && box[3] <= 2 && box[1] > 400);
+  const bars = page.canvas.drawn.rects
+    .slice(since)
+    .filter((box) => box[2] > 90 && box[2] < 600 && box[3] <= 2 && box[1] > 400);
   assert.ok(bars.length >= 2, "no ladder of beats was drawn: " + bars.length + " bars");
   for (const bar of bars) {
     assert.ok(Math.abs(bar[0] + bar[2] / 2 - page.window.innerWidth / 2) < 2, "the ladder is not in the middle: " + bar[0]);
@@ -1403,19 +1407,35 @@ test("playing along draws its ladder on the picture, and just watching draws non
 });
 
 test("a picture that takes the pulse keeps the ladder away from the piece", async () => {
-  // Two of these worlds mark their beats in their own picture - the wheel on its
-  // rim, the long view on its verges - so the game's ladder of falling bars must
-  // not be laid over them as well. This is the wiring in main.js: the picture is
-  // asked, and it says yes for those two only.
+  // Three of these worlds mark their beats in their own picture - the wheel on its
+  // rim, the long view on its verges, the braid along the edges of its music - so
+  // the game's ladder of falling bars must not be laid over them as well. This is
+  // the wiring in main.js: the picture is asked, and it says which ones it takes.
   const asked = [
     { slug: "bwv582-passacaglia-c-minor", at: 120 },
     { slug: "bwv645-wachet-auf", at: 40 },
+    // The braid draws wide flat bars of its own - a chorale quarter note is eighty
+    // pixels of core - so the wide-and-flat belt below cannot be used here. What
+    // the pulse itself draws is checked bar for bar in test/picture.test.mjs.
+    { slug: "bwv639-ich-ruf-zu-dir", at: 20, beams: false },
   ];
   for (const one of asked) {
     const page = openPage();
+    let game = null;
+    const makeGame = page.window.Bach.createGame;
+    page.window.Bach.createGame = function (canvas, organ) {
+      game = makeGame(canvas, organ);
+      return game;
+    };
     const listed = [...page.window.Bach.pieces];
     page.elements.pieces.children[listed.findIndex((piece) => piece.slug === one.slug)].click();
     await settled();
+    assert.ok(game, "the page never built a game for " + one.slug);
+    assert.strictEqual(
+      game.painted(),
+      true,
+      one.slug + ": its picture was asked for the pulse and did not take it, so the ladder was drawn instead"
+    );
     const data = page.window.BachData[one.slug];
     page.elements.seek.click({ clientX: (one.at / data.duration) * page.window.innerWidth });
     page.nextFrame(1 / 60);
@@ -1432,10 +1452,12 @@ test("a picture that takes the pulse keeps the ladder away from the piece", asyn
     assert.ok(playing > 0, one.slug + ": playing along drew nothing on its own picture");
 
     const frame = page.canvas.drawn.rects.slice(since);
-    // A beam of the ladder is a short wide bar. Nothing that wide and flat belongs
-    // to either picture: their own lines are as wide as the screen, or a few px.
-    const beams = frame.filter((box) => box[2] > 60 && box[2] < 600 && box[3] <= 2);
-    assert.strictEqual(beams.length, 0, one.slug + ": the ladder was laid over the picture: " + beams.length + " wide flat bars");
+    if (one.beams !== false) {
+      // A beam of the ladder is a short wide bar. Nothing that wide and flat belongs
+      // to either picture: their own lines are as wide as the screen, or a few px.
+      const beams = frame.filter((box) => box[2] > 60 && box[2] < 600 && box[3] <= 2);
+      assert.strictEqual(beams.length, 0, one.slug + ": the ladder was laid over the picture: " + beams.length + " wide flat bars");
+    }
     assert.ok(watching > 0, one.slug + " drew nothing to compare against");
   }
 });

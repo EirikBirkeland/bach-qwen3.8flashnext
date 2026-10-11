@@ -1049,10 +1049,11 @@ function onTheRim(boxes) {
 }
 
 test("only a picture that has a way to draw the pulse is given it", async () => {
-  // src/main.js asks the picture whether it wants the player's pulse. Two of
-  // these worlds are happy with the game's ladder; the wheel and the long view are
-  // not, because a wheel of time and a road of it each have their own place to
-  // put a beat.
+  // src/main.js asks the picture whether it wants the player's pulse. One of
+  // these worlds is happy with the game's ladder - the fugue picture of BWV 565
+  // falls, and a ladder of falling beats is the same shape - and the other three
+  // are not: a wheel of time, a road of it, and a weave of it each have their own
+  // place to put a beat.
   const seen = [];
   for (const slug of [
     "bwv565-toccata-and-fugue-d-minor",
@@ -1064,7 +1065,7 @@ test("only a picture that has a way to draw the pulse is given it", async () => 
   }
   assert.deepStrictEqual(seen, [
     ["bwv565-toccata-and-fugue-d-minor", false],
-    ["bwv639-ich-ruf-zu-dir", false],
+    ["bwv639-ich-ruf-zu-dir", true],
     ["bwv645-wachet-auf", true],
     ["bwv582-passacaglia-c-minor", true],
   ]);
@@ -1609,4 +1610,358 @@ test("BWV 645: a run lights the verges, and letting a beat go takes it back", ()
   play.see(next.time + 0.4);
   assert.strictEqual(play.score().chain, 0, "letting the beat go did not end the run");
   assert.strictEqual(edge(play.see(next.time + 0.45).added).length, 0, "the verges kept their light after the run ended");
+});
+
+// --- playing along: the braid stands its beats on a ruler --------------------
+//
+// BWV 639 runs sideways: one phrase of four bars is exactly one screen wide, so a
+// beat of this piece has a place of its own in the picture - about eighty pixels
+// from the next one, and twelve of them on the screen at a time. The game's ladder
+// shows two beats and falls straight down the middle of a picture whose time goes
+// sideways, so the braid takes the pulse itself: a ruler of beats along the top of
+// the music and along the bottom of it, where no note is ever drawn.
+
+const BRAID_MARK = "#e8f1ff"; // src/look-braid.js: a beat stood on the ruler
+const BRAID_CLEAR = 10; // the gap a beat keeps from the music
+const BRAID_TICK = 22; // ... and how tall it stands when it is due
+const BRAID_SOUND_X = Math.round(STAGE_WIDTH * 0.26); // the line of sound
+const BRAID_GOLD = "#ffd47a"; // the chorale's own, and a phrase said again
+
+/**
+ * The look's own geometry: how fast the music crosses the screen, and where the
+ * two rows of the ruler stand. Copied on purpose - a test that cannot say where a
+ * beat is drawn cannot say it was drawn either.
+ */
+function braidAt(scene) {
+  const barSeconds = scene.data.bars[1] - scene.data.bars[0];
+  const margin = Math.min(150, STAGE_HEIGHT * 0.16);
+  return {
+    speed: Math.max(12, Math.min(150, STAGE_WIDTH / (4 * barSeconds))),
+    lineX: BRAID_SOUND_X,
+    top: margin - BRAID_CLEAR, // the top row grows up from here
+    bottom: STAGE_HEIGHT - margin + BRAID_CLEAR, // the bottom row grows down from here
+    bandTop: margin,
+    bandBottom: STAGE_HEIGHT - margin,
+    tall: Math.max(6, Math.min(BRAID_TICK, margin - BRAID_CLEAR * 2)),
+  };
+}
+
+/** The woven picture with a player striking its beats, kept beside the same
+ *  picture on its own: `see(seconds)` frames both and hands back what playing
+ *  along added, which is the ruler and nothing else. */
+function braidPlaying() {
+  const scene = sceneOf("bwv639-ich-ruf-zu-dir");
+  const picture = createStage(scene);
+  const stage = createStage(scene, { play: true });
+  const geo = braidAt(scene);
+  return {
+    scene: scene,
+    geo: geo,
+    painted: () => stage.painted(),
+    beats: () => [...stage.beats()],
+    hit: (at) => stage.hit(at),
+    score: () => stage.score(),
+    /** Where a second of the piece stands on the screen. */
+    where: (at, now) => geo.lineX + (at - now) * geo.speed,
+    see: function (seconds) {
+      const plain = picture.frame(seconds);
+      const count = picture.drawn.length;
+      const seen = stage.frame(seconds);
+      return { frame: seen, plain: plain, added: stage.drawn.slice(count), marks: stage.drawn.length };
+    },
+    alone: picture,
+    air: stage.air,
+  };
+}
+
+/** A beat on the ruler: a thin mark, and the soft light behind it. */
+function onTheRuler(boxes, geo) {
+  return boxes.filter(
+    (box) => box.colour === BRAID_MARK && box.w <= 8 && box.h <= geo.tall + 0.01
+  );
+}
+
+/** The light a struck beat lays: a contracting ring, and the only gradient the ruler draws. */
+function braidStruck(boxes) {
+  return boxes.filter((box) => box.colour === "(gradient)");
+}
+
+test("BWV 639: the braid takes the pulse itself, and lays no ladder over it", () => {
+  const play = braidPlaying();
+  assert.strictEqual(play.painted(), true, "the woven picture did not take the pulse off the game");
+
+  const seen = play.see(20);
+  assert.ok(seen.added.length > 40, "playing along drew only " + seen.added.length + " marks");
+
+  // A beam of the ladder is a short wide bar falling down the middle of the screen.
+  const beams = seen.added.filter((box) => box.w > 60 && box.h <= 3);
+  assert.strictEqual(beams.length, 0, "a wide thin bar of the ladder was drawn across the braid");
+
+  const ruler = onTheRuler(seen.added, play.geo);
+  const above = ruler.filter((box) => box.y + box.h <= play.geo.bandTop);
+  const below = ruler.filter((box) => box.y >= play.geo.bandBottom);
+  assert.ok(above.length > 16, "only " + above.length + " marks along the top of the music");
+  assert.strictEqual(
+    below.length,
+    above.length,
+    "the two rows do not match: " + below.length + " below against " + above.length
+  );
+});
+
+test("BWV 639: a beat stands on the ruler at its own place, and none between", () => {
+  const play = braidPlaying();
+  const at = 20;
+  const seen = play.see(at);
+  const ruler = onTheRuler(seen.added, play.geo);
+  const coming = play.beats().filter(
+    (beat) => beat.time >= at - 0.3 && play.where(beat.time, at) < STAGE_WIDTH
+  );
+  assert.ok(coming.length > 10, "only " + coming.length + " beats of this phrase are on the screen");
+
+  for (const beat of coming) {
+    const x = play.where(beat.time, at);
+    const marks = ruler.filter((box) => Math.abs(box.x + box.w / 2 - x) < 1.5);
+    assert.ok(marks.length >= 2, "nothing was drawn at the beat " + beat.time.toFixed(2) + " s (" + x.toFixed(0) + " px)");
+  }
+
+  // Halfway between two beats there is nothing to strike, and nothing drawn.
+  const middle = (play.where(coming[4].time, at) + play.where(coming[5].time, at)) / 2;
+  assert.strictEqual(
+    ruler.filter((box) => Math.abs(box.x + box.w / 2 - middle) < 3).length,
+    0,
+    "there is a mark halfway between two beats, which is nobody's beat"
+  );
+
+  // And they are far enough apart to be told one from another. This is a claim
+  // about the piece: a livelier one worn by this picture would have to say so.
+  // Only the marks themselves count, not the soft light drawn under each of them,
+  // and only one row of the pair: the two of them stand one above the other.
+  const places = ruler
+    .filter((box) => box.w <= 2 && box.y + box.h <= play.geo.bandTop)
+    .map((box) => box.x + box.w / 2)
+    .sort((a, b) => a - b);
+  let nearest = 1e9;
+  for (let i = 1; i < places.length; i++) nearest = Math.min(nearest, places[i] - places[i - 1]);
+  assert.ok(nearest > 40, "the closest two marks on the ruler are " + nearest.toFixed(1) + " px apart");
+  assert.ok(places.length > 10, "only " + places.length + " beats are stood on the ruler");
+});
+
+test("BWV 639: the ruler is outside the music, along its top and its bottom", () => {
+  const play = braidPlaying();
+  for (const at of [0, 20, 60, 110]) {
+    const seen = play.see(at);
+    // Near the end there are only a few beats left on the screen, and that is
+    // honest: the piece is running out, and so is the ruler.
+    assert.ok(onTheRuler(seen.added, play.geo).length > 8, "the ruler was not drawn at " + at + " s");
+    for (const box of seen.added) {
+      const clear = box.y + box.h <= play.geo.bandTop + 0.01 || box.y >= play.geo.bandBottom - 0.01;
+      assert.ok(
+        clear,
+        "playing along drew over the music at " + at + " s: " + JSON.stringify(box)
+      );
+    }
+  }
+});
+
+test("BWV 639: the phrase said again keeps its mark a screen away, which no ladder could show", () => {
+  const play = braidPlaying();
+  const at = 8;
+  const worth = play.beats().find((beat) => beat.bright && beat.time > at);
+  assert.ok(worth, "the repeat at 0:26 should mark a beat to strike");
+  const away = worth.time - at;
+  const ladder = 2.2 * play.beats()[0].gap; // what the game's ladder reaches, in seconds
+  assert.ok(away > 5 * ladder, "this marked beat is only " + away.toFixed(1) + " s off: the test wants one a ladder could never show");
+
+  const seen = play.see(at);
+  const x = play.where(worth.time, at);
+  assert.ok(x < STAGE_WIDTH, "the marked beat is not even on the screen at " + at + " s");
+  const ruler = onTheRuler(seen.added, play.geo);
+  const mine = ruler.filter((box) => Math.abs(box.x + box.w / 2 - x) < 1.5);
+  assert.ok(mine.length >= 2, "the marked beat a whole phrase off was drawn nowhere");
+
+  // The nearest beat that the music leaves plain, at the same distance, must stand
+  // for less: taller and brighter is the only way a player can pick it out early.
+  const plain = play
+    .beats()
+    .filter((beat) => !beat.bright && beat.time > at && Math.abs(play.where(beat.time, at) - x) < 120)
+    .sort((a, b) => Math.abs(play.where(a.time, at) - x) - Math.abs(play.where(b.time, at) - x))[0];
+  assert.ok(plain, "the harness wanted a plain beat near the marked one");
+  const px = play.where(plain.time, at);
+  const theirs = ruler.filter((box) => Math.abs(box.x + box.w / 2 - px) < 1.5);
+  assert.ok(theirs.length >= 2, "the plain beat beside the marked one was drawn nowhere");
+  const brightest = (boxes) => Math.max(...boxes.map((box) => box.alpha));
+  const tallest = (boxes) => Math.max(...boxes.map((box) => box.h));
+  assert.ok(
+    brightest(mine) > 2 * brightest(theirs),
+    "a marked beat is only " + brightest(mine).toFixed(3) + " against a plain " + brightest(theirs).toFixed(3)
+  );
+  assert.ok(
+    tallest(mine) > 1.5 * tallest(theirs),
+    "a marked beat stands " + tallest(mine).toFixed(1) + " px, a plain one " + tallest(theirs).toFixed(1)
+  );
+});
+
+test("BWV 639: the ruler stretches where the piece slows down", () => {
+  const play = braidPlaying();
+  const beats = play.beats();
+  const at = 100; // four bars from the end, inside the ritardando
+  const seen = play.see(at);
+  const ruler = onTheRuler(seen.added, play.geo);
+  const gapAt = (from) => play.where(beats[from + 1].time, at) - play.where(beats[from].time, at);
+  const early = gapAt(2);
+  const late = gapAt(beats.length - 3);
+  assert.ok(late > early * 1.2, "the last beats stand " + late.toFixed(0) + " px apart against " + early.toFixed(0) + " px: the slowing is not felt");
+  assert.ok(ruler.length > 8, "so little is on the ruler near the end: " + ruler.length);
+});
+
+test("BWV 639: a struck beat lights the line of sound at both edges of the music, and a let-go one does not", () => {
+  const play = braidPlaying();
+  const caught = play.beats().find((one) => one.time > 30);
+  const letGo = play.beats().find((one) => one.time > caught.time + 6);
+
+  play.see(caught.time - 0.4);
+  assert.strictEqual(braidStruck(play.see(caught.time - 0.05).added).length, 0, "the ruler lit up before the beat was struck");
+
+  play.hit(caught.time);
+  const struck = play.see(caught.time + 0.15);
+  const blooms = braidStruck(struck.added);
+  assert.ok(blooms.length >= 2, "the beat was struck and " + blooms.length + " blooms were laid");
+  for (const bloom of blooms) {
+    const centre = [bloom.x + bloom.w / 2, bloom.y + bloom.h / 2];
+    assert.ok(Math.abs(centre[0] - play.geo.lineX) < 4, "a struck beat was lit away from the line of sound: " + JSON.stringify(bloom));
+    const onARow = Math.abs(centre[1] - play.geo.top) < 3 || Math.abs(centre[1] - play.geo.bottom) < 3;
+    assert.ok(onARow, "a struck beat was not lit where the ruler stands: " + JSON.stringify(bloom));
+  }
+
+  // A beat nobody struck, and the light has gone out on its own by now.
+  const gone = play.see(letGo.time + 1.2);
+  assert.strictEqual(braidStruck(gone.added).length, 0, "a beat nobody struck lit the ruler anyway");
+
+  // A beat caught early is gone from the ruler, where one nobody struck keeps its
+  // mark: the light moved to the line of sound, it did not double up.
+  const early = play.beats().find((one) => one.time > letGo.time + 2);
+  const moment = early.time - 0.2;
+  play.see(moment);
+  play.hit(moment);
+  const caughtEarly = play.see(moment);
+  const x = play.where(early.time, moment);
+  assert.ok(x > 0 && x < STAGE_WIDTH, "the caught beat is not on the screen to be missed");
+  assert.strictEqual(
+    onTheRuler(caughtEarly.added, play.geo).filter((box) => Math.abs(box.x + box.w / 2 - x) < 1.5).length,
+    0,
+    "the beat was caught and its mark stayed on the ruler anyway"
+  );
+  const kept = play.beats().find((one) => one.time > early.time + 1.5);
+  assert.ok(
+    onTheRuler(caughtEarly.added, play.geo).filter((box) => Math.abs(box.x + box.w / 2 - play.where(kept.time, moment)) < 1.5).length >= 2,
+    "a beat nobody struck lost its mark too"
+  );
+
+  // A click with no beat near it: a dull flick at either hand, and no bloom.
+  const far = play.beats().find((one) => one.time > letGo.time + 8);
+  play.hit(far.time + 0.6);
+  const missed = play.see(far.time + 0.65);
+  assert.strictEqual(braidStruck(missed.added).length, 0, "a click that caught nothing rang a bloom anyway");
+  const flicks = missed.added.filter(
+    (box) => box.colour === BRAID_MARK && box.h <= 2 && Math.abs(box.x + box.w / 2 - play.geo.lineX) < 12
+  );
+  assert.ok(flicks.length > 0, "a missed click drew nothing on the line of sound");
+  assert.ok(
+    flicks.some((box) => box.alpha > 0.02),
+    "a missed click drew something at no light at all: " + JSON.stringify(flicks)
+  );
+  assert.ok(flicks.every((box) => box.w <= 20), "a missed click drew something wider than a flick");
+});
+
+test("BWV 639: the pulse is never gold, because the chorale is and so is a repeat", () => {
+  const play = braidPlaying();
+  const gold = play.scene.look.colours["1"]; // the line to follow wears gold on this piece
+  assert.strictEqual(gold, BRAID_GOLD, "the chorale's gold has changed; the test should say so");
+  const worth = play.beats().find((beat) => beat.bright && beat.time > 20);
+  assert.ok(worth, "the repeat should mark a beat to strike");
+
+  play.see(worth.time - 0.2);
+  play.hit(worth.time);
+  const frames = [play.see(worth.time + 0.1), play.see(worth.time + 0.5), play.see(60), play.see(20)];
+  const isGold = (box) => String(box.colour).indexOf(BRAID_GOLD) >= 0 || String(box.fill).indexOf(BRAID_GOLD) >= 0;
+  for (const seen of frames) {
+    assert.ok(seen.added.length > 0, "playing along drew nothing to check the colour of");
+    assert.strictEqual(seen.added.filter(isGold).length, 0, "gold light was drawn by playing along at " + seen.frame.mean.toFixed(4));
+  }
+});
+
+test("BWV 639: the ruler is cheap to draw, and tips nothing over white on its own", () => {
+  // Walked every sixtieth of a second, because the harness samples one point per
+  // cell and a coarser grid can walk straight past the one frame where a struck
+  // beat lands on a note that was already blazing. This piece is two minutes, so
+  // this is the slowest thing in the folder on purpose.
+  const play = braidPlaying();
+  const scene = play.scene;
+  const beats = play.beats();
+  const luma = (spot) => 0.2126 * spot[0] + 0.7152 * spot[1] + 0.0722 * spot[2];
+  let index = 0;
+  let most = 0;
+  let mean = 0;
+  let tipped = 0;
+  let rung = 0;
+  let brightest = 0;
+  let worstAlone = 0;
+  for (let at = 1; at < scene.data.duration; at += 1 / 60) {
+    while (index < beats.length && beats[index].time < at) {
+      if (at - beats[index].time < 0.3) play.hit(beats[index].time);
+      index++;
+    }
+    const seen = play.see(at);
+    const plainAir = play.alone.air.map(luma); // the same second, with nobody playing
+    most = Math.max(most, seen.marks);
+    mean = Math.max(mean, seen.frame.mean);
+    worstAlone = Math.max(worstAlone, seen.plain.mean);
+    rung = play.score().caught;
+    // No beat is ever struck bright: a dozen of them stand down one ruler, and a
+    // heap of bright lights along a line is one white smear.
+    for (const box of onTheRuler(seen.added, play.geo)) brightest = Math.max(brightest, box.alpha);
+    // This picture already burns a cell out where a note crosses the line of
+    // sound; a cell may only go over on the ruler's account if the music had not
+    // all but done it already.
+    play.air.forEach((spot, k) => {
+      if (luma(spot) > 0.9 && plainAir[k] < 0.85) tipped++;
+    });
+  }
+  assert.ok(brightest < 0.5, "a beat is drawn at " + brightest.toFixed(2) + " of full light: the ruler would burn out white");
+  assert.ok(most > 200, "one frame draws only " + most + " marks with the pulse on: is the picture missing?");
+  assert.ok(most < 1500, "one frame draws " + most + " boxes with the pulse on: that will not keep up");
+  assert.ok(mean < worstAlone + 0.004, "the ruler costs too much light: worst mean " + mean.toFixed(4) + " against " + worstAlone.toFixed(4) + " without it");
+  assert.strictEqual(tipped, 0, tipped + " cells burned out white because of the pulse alone");
+  assert.ok(rung > 40, "the player struck " + rung + " bells in " + Math.round(scene.data.duration) + " s: the harness is not striking");
+});
+
+test("BWV 639: a run lights the ruler, and letting a beat go takes it back", () => {
+  const play = braidPlaying();
+  // The braid's own version of the ladder's line getting wider: the ruler and the
+  // line of sound it is crossed by take up a light while the player stays with it.
+  const edge = (added) =>
+    added.filter(
+      (box) => box.colour === BRAID_MARK && box.h > 300 && Math.abs(box.x + box.w / 2 - play.geo.lineX) < 12
+    );
+  const from = play.beats().find((one) => one.time > 60);
+  const four = play.beats().slice(play.beats().indexOf(from), play.beats().indexOf(from) + 4);
+  assert.strictEqual(four.length, 4, "the harness wanted four beats in a row and found " + four.length);
+
+  play.see(from.time - 0.5);
+  assert.strictEqual(edge(play.see(from.time - 0.05).added).length, 0, "the ruler was lit before anything was struck");
+
+  for (const beat of four) {
+    play.hit(beat.time);
+    play.see(beat.time + 0.05);
+  }
+  assert.strictEqual(play.score().chain, 4, "the four beats did not make a run");
+  assert.ok(edge(play.see(four[3].time + 0.1).added).length > 0, "four beats in a row and the ruler did not brighten");
+
+  // Let one go, and it is back to plain.
+  const next = play.beats().find((one) => one.time > four[3].time + 0.2);
+  play.see(next.time - 0.2);
+  play.see(next.time + 0.1);
+  play.see(next.time + 0.4);
+  assert.strictEqual(play.score().chain, 0, "letting the beat go did not end the run");
+  assert.strictEqual(edge(play.see(next.time + 0.45).added).length, 0, "the ruler kept its light after the run ended");
 });

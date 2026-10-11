@@ -21,6 +21,10 @@
 //  - the music says some things twice - the opening four bars come back whole at
 //    bar 5 - and a phrase that was already heard is warm instead of cool, so the
 //    repeat is something you can see. src/echoes.js works that out from the notes.
+//  - the pulse, when someone is playing along. The game would lay its ladder of
+//    falling beats across the middle of this picture, at right angles to a piece
+//    whose time runs sideways; the braid takes it instead, as a ruler of beats
+//    along the top and bottom of the music - see `pulse` below.
 
 window.Bach = window.Bach || {};
 
@@ -32,6 +36,12 @@ window.Bach = window.Bach || {};
   var FLASH = 0.6; // how long a struck note flares on the line of sound
   var SPEED_FLOOR = 12; // pixels a second, however long the bars are
   var SPEED_CEILING = 150;
+  var MARK = "#e8f1ff"; // a beat of the player's pulse, stood on the ruler. Never
+  // gold: on this piece gold is the chorale, and a phrase the music says again.
+  var CLEAR = 10; // the gap a beat keeps from the music, which is brighter than it
+  var TICK = 22; // how tall a beat stands when it is due and worth every pixel
+  var NEAR = 4; // beats over which one reaches its full height
+  var RULER = 16; // how wide the ruler is when a long run lights it
 
   function createBraidLook(canvas) {
     var screen = Bach.createScreen(canvas);
@@ -71,12 +81,24 @@ window.Bach = window.Bach || {};
       screen.wipe();
     }
 
+    /** How far the music is kept from either edge of the screen. Nothing of the
+     *  piece is ever drawn outside that band, which is what the beat ruler stands
+     *  in: the two rows of it hug the music from above and below. */
+    function pitchMargin(height) {
+      return Math.min(150, height * 0.16);
+    }
+
     function yFor(pitch) {
       var height = screen.height();
-      var margin = Math.min(150, height * 0.16);
+      var margin = pitchMargin(height);
       var span = Math.max(1, pitchHigh - pitchLow);
       return height - margin - ((pitch - pitchLow) / span) * (height - margin * 2);
     }
+
+    // Where the line of sound is, how fast the music crosses the screen, and where
+    // the two rows of the beat ruler stand: `crown` is the top edge of the music's
+    // band, `base` the bottom of it, and `tall` the tallest a beat may stand there.
+    var ruler = { lineX: 0, speed: 1, crown: 1, base: 1, tall: TICK };
 
     /** Is this note part of a phrase the music has already played? */
     function isEcho(note) {
@@ -119,6 +141,126 @@ window.Bach = window.Bach || {};
       ctx.fillRect(from_, y - 0.8, until - from_, 1.6);
     }
 
+    /**
+     * A beat stood on the ruler: a mark `tall` growing towards the music from the
+     * edge of its band it stands on, with a soft light behind it so a far-off beat
+     * is still something the eye can catch.
+     */
+    function stand(x, edge, tall, wide, strength, upwards) {
+      if (tall <= 0 || strength <= 0.004) return;
+      var top = upwards ? edge - tall : edge;
+      ctx.fillStyle = MARK;
+      ctx.globalAlpha = strength * 0.22;
+      ctx.fillRect(x - 4, top, 8, tall);
+      ctx.globalAlpha = strength;
+      ctx.fillRect(x - wide / 2, top, wide, tall);
+    }
+
+    /**
+     * A ring of light round the place a beat arrived, contracting as it fades and
+     * empty in the middle. A note is usually being struck on that very beat, and its
+     * own core is already blazing where the line of sound is: two full lights on one
+     * spot are white rather than louder, which is why the wheel rings a struck beat
+     * instead of flooding it. Same reason, same device.
+     */
+    function ring(x, y, size, colour, strength) {
+      if (size <= 0 || strength <= 0.01) return;
+      var round = ctx.createRadialGradient(x, y, 0, x, y, size);
+      round.addColorStop(0, "rgba(0,0,0,0)");
+      round.addColorStop(0.55, "rgba(0,0,0,0)");
+      round.addColorStop(0.82, colour);
+      round.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.globalAlpha = strength;
+      ctx.fillStyle = round;
+      var left = Math.max(0, x - size);
+      var top = Math.max(0, y - size);
+      ctx.fillRect(left, top, Math.min(screen.width(), x + size) - left, Math.min(screen.height(), y + size) - top);
+    }
+
+    /**
+     * The player's pulse, stood on the ruler the braid is woven on.
+     *
+     * The game could lay its ladder of falling beats over this picture, and does
+     * for the pieces that have nowhere else to put a beat. The braid has: its time
+     * runs sideways, so a beat has a place of its own here - one screen is a whole
+     * phrase, sixteen beats, and they walk into the line of sound at the pace the
+     * music itself goes. A ladder two beats tall shows a player the next three
+     * seconds of a twenty-six second picture; the ruler shows the phrase, and the
+     * ritardando at the end of it, which is the last thing to be caught with.
+     *
+     * So each beat stands at its own x, growing towards the music as it comes:
+     * the bar's openings taller than the beats between them, so four make a bar,
+     * and taller and brighter still a beat the piece is marking for itself - the
+     * phrase said again at 0:26 is a whole screen away, and already on this one.
+     * What the player strikes is lit on the line of sound, where the beat has got
+     * to, in a ring contracting round it, and a long run lights the ruler itself -
+     * this picture's version of the ladder's line getting wider.
+     *
+     * The shot comes from src/game.js and is only read here: this draws the pulse,
+     * it does not judge it.
+     */
+    function pulse(shot) {
+      var width = screen.width();
+      var gap = shot.gap > 0 ? shot.gap : 1;
+      var pace = ruler.speed;
+
+      ctx.globalCompositeOperation = "lighter";
+
+      // A long run lights the ruler and the line of sound it is crossed by.
+      if (shot.run > 0.02) {
+        var top = ruler.crown - CLEAR - ruler.tall;
+        var drop = ruler.base + CLEAR + ruler.tall - top;
+        ctx.fillStyle = MARK;
+        ctx.globalAlpha = 0.008 + 0.02 * shot.run;
+        ctx.fillRect(ruler.lineX - RULER / 2, top, RULER, drop);
+        ctx.globalAlpha = 0.04 + 0.16 * shot.run;
+        ctx.fillRect(ruler.lineX - 1, top, 2, drop);
+      }
+
+      // The beats, from the one a strike can still be judged against up to the
+      // further edge of the phrase on the screen.
+      for (var i = shot.pointer; i < shot.beats.length; i++) {
+        var beat = shot.beats[i];
+        var away = beat.time - shot.now;
+        var x = ruler.lineX + away * pace;
+        if (x > width + 14) break;
+        if (beat.taken) continue; // that one is light on the line of sound now
+        var near = Math.max(0, 1 - Math.max(0, away) / (NEAR * gap));
+        // A bar's opening stands taller than the beats inside it, so the four of
+        // them read as one bar; and a beat the piece is marking for itself taller
+        // and brighter still, however far off - the phrase said again at 0:26 is a
+        // whole screen away, and it is already on this screen.
+        var rank = beat.bright ? 1 : beat.bar ? 0.6 : 0.42;
+        var tall = ruler.tall * rank * (0.5 + 0.5 * near);
+        var strength =
+          (beat.bright ? 0.15 : beat.bar ? 0.09 : 0.055) + (beat.bright ? 0.2 : 0.15) * near;
+        var wide = beat.bright ? 2 : 1.5;
+        stand(x, ruler.crown - CLEAR, tall, wide, strength, true);
+        stand(x, ruler.base + CLEAR, tall, wide, strength, false);
+      }
+
+      // What the player struck, on the line of sound at both edges of the music.
+      for (var s = 0; s < shot.strikes.length; s++) {
+        var one = shot.strikes[s];
+        var faded = Math.max(0, 1 - (shot.now - one.at) / shot.fade);
+        if (faded <= 0.01) continue;
+        if (one.when === null || one.when === undefined) {
+          // A click with no beat near it: a dull flick at either hand.
+          ctx.fillStyle = MARK;
+          ctx.globalAlpha = 0.05 * faded;
+          ctx.fillRect(ruler.lineX - 9, ruler.crown - CLEAR - 1, 18, 2);
+          ctx.fillRect(ruler.lineX - 9, ruler.base + CLEAR - 1, 18, 2);
+          continue;
+        }
+        var reach = (one.truest ? 30 : 20) + 70 * faded * faded + 26 * shot.run;
+        ring(ruler.lineX, ruler.crown - CLEAR, reach, MARK, (one.truest ? 0.12 : 0.08) * faded);
+        ring(ruler.lineX, ruler.base + CLEAR, reach, MARK, (one.truest ? 0.12 : 0.08) * faded);
+      }
+
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1;
+    }
+
     function frame(now) {
       var width = screen.width();
       var height = screen.height();
@@ -126,6 +268,13 @@ window.Bach = window.Bach || {};
       var speed = speedFor(width);
       var behind = lineX / speed; // seconds of music already played, still on screen
       var ahead = (width - lineX) / speed; // seconds still to come
+
+      var margin = pitchMargin(height);
+      ruler.lineX = lineX;
+      ruler.speed = speed;
+      ruler.tall = Math.max(6, Math.min(TICK, margin - CLEAR * 2));
+      ruler.crown = margin;
+      ruler.base = height - margin;
 
       var jumped = lastNow >= 0 && (now < lastNow - 0.001 || now > lastNow + 2);
       var elapsed = now - lastNow;
@@ -246,7 +395,7 @@ window.Bach = window.Bach || {};
       ctx.globalAlpha = 1;
     }
 
-    return { reset: reset, frame: frame };
+    return { reset: reset, frame: frame, pulse: pulse };
   }
 
   Bach.looks.braid = createBraidLook;

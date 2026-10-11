@@ -45,7 +45,7 @@ window.Bach = window.Bach || {};
       look: {
         name: "braid",
         phrase: 4,
-        hint: "four bars to a screen · a bar line glows gold when the music says something again",
+        hint: "four bars to a screen · a bar line glows gold on a repeat · the ticks mark the beat",
       },
       voices: {
         1: { name: "Chorale melody", colour: "#ffd47a", role: "melody" },

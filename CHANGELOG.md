@@ -1,5 +1,33 @@
 # Releases
 
+## 0.3.5 — 2026-10-11
+
+"Ich ruf zu dir" keeps its own beat now: a ruler of ticks along the top and the bottom
+of the music, and the repeat you can see coming a whole screen away.
+
+- **The woven picture took the pulse.** Until now the game laid its ladder of falling
+  beats across the middle of this picture - two beats tall, straight down, over a piece
+  whose time runs sideways through a phrase of twenty-six seconds. The braid has its own
+  place for a beat: one tick per beat along the top of the music and along the bottom of
+  it, the two places a note is never drawn, walking into the line of sound at the pace the
+  music itself goes. A bar's opening stands taller than the three beats inside it, so the
+  four of them read as one bar.
+- **What the ruler shows that the ladder could not.** Twelve beats are on the screen at a
+  time instead of two, so the slowing down at the end of the piece is something you can
+  see arriving and slow down with. And the one beat worth more than the others here - the
+  opening phrase said again at 0:26 - stands lit and taller a whole phrase off, while it
+  is still a screen away.
+- **What striking one does.** A ring of light contracting round the line of sound at both
+  edges of the music, and a bell in the harmony as before. A caught beat leaves the ruler,
+  so you can see where you were. A long run lights the ruler and the line of sound it is
+  crossed by.
+- **One piece keeps the ladder on purpose**: the Toccata and Fugue, BWV 565. Its notes
+  fall, and a ladder of falling beats is the same shape over the same few seconds.
+- **Measured, since nobody here can see it.** The ruler costs about a quarter of the light
+  the ladder did, and nothing in the piece burns out white on its account - which needed
+  fixing: a struck beat lands where a note has just struck and is already blazing, so its
+  light is a ring with an empty middle now, the same device the Passacaglia's wheel uses.
+
 ## 0.3.4 — 2026-10-11
 
 "Wachet auf" now keeps its own beat: lamps down the sides of the road, and you can
