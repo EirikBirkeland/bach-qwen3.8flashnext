@@ -843,3 +843,112 @@ Next, in order:
 4. Small honest debts: BWV 645 burns 2 cells at the chorale's arrival; the harness
    still cannot see `ctx.arc` + `fill` (no look uses them, and none should until it
    can); `theme.js`'s phase for a periodic figure (see above, deliberately left).
+
+## Session 10 — 2026-10-11 — milestone 3: play along, and the bell rings in the harmony
+
+**Released 0.3.0.** Milestone 3's first item: something to do, with "just watch" beside it.
+
+What I did:
+
+- **Wrote the design in PLAN.md first, as the item asked**, then built it. The player clicks anywhere on the
+  picture (or presses Enter) in time with the piece's pulse; a catch rings a bell whose note is the lowest
+  note *sounding* then, two octaves up, so the taps are always notes of the harmony actually being played.
+  A run is beats caught in a row; a beat let go ends it, and so does a click with no beat near it.
+- **Why the pulse and not the notes** - measured first, which is the part worth keeping:
+  the line to follow comes at 3.3 notes a second in BWV 565 and 5.9 in BWV 582 (unplayable), and the tune
+  that comes back is far too rare to chase (the ground is heard 13 times in 12 minutes; the 645 chorale is
+  74 notes with a 31 s hole in it). The pulse is the one thing all four mark at a rate a hand can hold:
+  **37 a minute (639), 60 (565 and 645), 72 (582)**, and it is steady - every "line to follow" I measured
+  sits between 19 and 166 a minute depending on the moment. For reference, the bass line as played (the
+  lowest sounding note, thinned to no two targets under 0.45 s) would have been 63–98 a minute: playable,
+  but arbitrary where a chordal passage thins it. The pulse also *makes you listen*: 582 slows five times
+  in its last two minutes and 639 four times at the end, so a run there means slowing down with the organ.
+- **`src/pulse.js`** - the beat grid from the data's own `bars` and `metre`: `bar start + k × bar ÷ beats`.
+  Nothing per piece typed in; a downbeat lands exactly on a bar line the picture already draws; a
+  ritardando stretches its beats (582's widest beat is 1.75 s against a usual 0.83).
+- **`src/landmarks.js`** - the moments worth marking: a line back after ten seconds gone, five struck
+  together, a telling of the tune. `src/look-subject.js` had **private copies of two of these**; they moved
+  here and the look calls the shared ones - the first payment on session 9's "shared drawing" debt.
+  `src/theme.js` now keeps one answer per (note list, gap), because the fugue picture and the game both ask
+  and the Passacaglia takes a fifth of a second to answer.
+- **`organ.chime(pitch, when, weight)`** - a struck bell: one wave (unison, octave, twelfth and above),
+  6 ms up, 1.2 s away, two strikes 6 cents apart so the ring moves, wired past the tremulant into the same
+  lowpass and the same room. `when` omitted means now, which is what a strike means.
+- **`src/game.js`** - judging, the run, the ladder, the words. Windows: ±0.11 s struck true, ±0.3 s caught.
+  The ladder is a pile of wide thin bars low in the middle of the screen falling onto a line 96 px above the
+  bottom; its pace comes from the piece's own beat (always about 2.2 beats in view, whether the piece is
+  639's 1.62 s or 582's 0.83 s). A gold beat is one a landmark sits within min(0.2 s, a third of a beat).
+- **The page**: "Play along" beside Pause (it reads "Just watch" while on), the `P` key, a click on the
+  canvas, Enter, a score line top-centre ("12 in a row · best 15 · 63 of 224"), and a sentence on the end
+  pane. Switching resets the count. `test/page.test.mjs` has a player who is there for 21 beats running in
+  BWV 639 through the real wiring and catches all 21.
+- 206 tests pass (was 151). `tools/mutate.sh` is new: it breaks 24 things in turn and insists a test notices.
+
+Loudness by numbers, since the bell is the first thing added on top of the organ:
+
+- One bell, both strikes in phase, heaviest weight: **0.166** of full scale.
+- The widest chord of each piece with that bell on top: 0.345 / 0.373 / 0.501 / 0.396, and the two peaks
+  landing in the same instant: **0.51–0.67**, all under the limiter's 0.708. With the room and the tremulant
+  counted on top of that: 0.71–0.92, under full scale. That is the claim in `test/organ.test.mjs`;
+  `node tools/loudness.mjs` now prints both columns.
+
+Five mutations survived the first round, and each was a hole in a test, not bad luck:
+
+- **A mutation that never applied.** A previous `perl` edit had eaten the backslashes in `beats\[pointer\]`,
+  so the pattern was a character class and matched nothing: "SURVIVED" meant "never tried". `tools/mutate.sh`
+  now compares the file first and prints `NO PATTERN` when the mutation changed nothing.
+- Two page tests checked "no bell rang" at a second **where no beat was near**, so a stray click and no click
+  looked identical. They now aim at a real beat, which is the only moment the difference is visible.
+- The bell's `start()` was unchecked: the harness counted created oscillators. Now `audio.started` must grow
+  by two, and the start times must be now (that also pins the decision that the bell rings **when the player
+  struck**, not when the beat was).
+- The landmark-ordering test had only one moment to order. Now it is a chord at 20 s and a return at 40 s,
+  found in the wrong order and needing the sort.
+- `if (at >= end) break;` in the beat grid was unobservable for all four pieces (the last bar's length is
+  taken from the duration, so beats land inside it by construction). There is now a piece whose bar lines
+  run past its own end, and the grid still stops at the music.
+
+A bug the tidy-up flushed out, worth remembering: naming the ladder's line of sound `line` inside `draw`
+**shadowed the game's own `line()` function**, so the strike's light was laid at `NaN` and simply never
+appeared - no test noticed, because a gradient with NaN in it still counts as a gradient. The game's fake
+canvas now asserts every `fillRect` and `createRadialGradient` argument is a finite number, and seven tests
+failed at once when I put the shadowing back. One day the same rule belongs in `test/screen.mjs`.
+
+Decisions worth keeping:
+
+- The beat grid is per-bar subdivision, not the MIDI tempo marks: downbeats on bar lines mattered more than
+  exact subdivisions inside a bar that changes tempo mid-way (639's last bar is 8.96 s with the slows inside
+  it; its four beats are spread evenly, which is honest but not the same as the audio).
+- A bell rings when **you** struck, at `ctx.currentTime`, not at the beat's second. Checked through the
+  harness: the organ leads the page by 0.06 s and `organ.time()` accounts for it, so the two line up.
+- A beat let go ends the run even though the player may only want the gold ones. Chosen: a run should mean
+  "I was with it", and the alternative (only misses near gold beats count) made the number meaningless.
+- Striking is a click whose `target` is the canvas itself. The HUD layers are `pointer-events: none` except
+  their own controls, so a click over the music reaches the canvas and a click on a button does not, with no
+  geometry to keep in sync.
+
+What surprised me:
+
+- The fugue of BWV 565 never reaches five notes struck together, so "five struck together" is a toccata-and-
+  finale mark only - pinned as a claim about the notes (`test/pulse.test.mjs`), the same fact session 8 used
+  for the chord flare.
+- BWV 645's chorale is taken up exactly twice after a ten-second wait (2:03 and 2:53), which is the same two
+  blooms the vigil already draws. Two looks and the game now agree on those moments from the same finder.
+- Re-running `tools/look.mjs bwv565` after moving the look's private finders: worst frame 0.0455, 0 cells
+  burnt - exactly session 9's numbers, so the refactor laid no light down differently.
+
+Next, in order:
+
+1. Milestone 3 has two open follow-ups written in PLAN.md: the ladder is laid *over* the picture instead of
+   being part of each piece's world (the wheel could tick a rim tooth per beat, the vigil plant a lamp on the
+   road, the braid breathe), and the bell is one struck sound for all four pieces when 639 and 582 are
+   worlds apart in touch. Both want a decision per piece, by numbers where possible.
+2. The rest of session 9's shared-drawing debt: the four looks still each carry their own
+   `coming`/`sounded`/`bloom`/halo. `landmarks.js` is the first piece of shared logic out of them; the light
+   helpers are next, and the light measurements in these notes are the safety net.
+3. Still open from milestone 1: dynamics drawn from the music instead of the flat velocities (582 is all
+   127, 565 all 90). `render.mjs` and `loudness.mjs` would let that be checked by numbers.
+4. Small honest debts: BWV 645 burns 2 cells at the chorale's arrival; `test/screen.mjs` still cannot see
+   `ctx.arc` + `fill`; `theme.js`'s phase for a periodic figure (session 9, deliberately left); and
+   `test/page.test.mjs`'s harness does not yet insist drawn numbers are finite - `test/game.test.mjs` does
+   and it caught a real bug in minutes.
