@@ -38,13 +38,21 @@ function gradient(kind, args) {
     at(x, y) {
       let along = 0;
       if (kind === "linear") {
+        // Any direction: how far along the line from the first point to the second
+        // this point lies, square-on, so a gradient drawn sideways is measured as
+        // the sideways thing it is and not as its first colour everywhere.
+        const across = args[2] - args[0];
         const rise = args[3] - args[1];
-        along = rise === 0 ? 0 : (y - args[1]) / rise;
+        const span = across * across + rise * rise;
+        along = span === 0 ? 0 : ((x - args[0]) * across + (y - args[1]) * rise) / span;
       } else {
-        const radius = args[5] - args[2];
+        // createRadialGradient(x0, y0, r0, x1, y1, r1). Every glow here is one
+        // circle inside another, so the middle is the first pair of numbers and
+        // the two radii are the third and the sixth.
         const dx = x - args[0];
-        const dy = y - args[3];
-        along = (Math.sqrt(dx * dx + dy * dy) - args[2]) / (radius || 1);
+        const dy = y - args[1];
+        const radius = args[5] - args[2] || 1;
+        along = (Math.sqrt(dx * dx + dy * dy) - args[2]) / radius;
       }
       along = Math.max(0, Math.min(1, along));
       let before = stops[0];

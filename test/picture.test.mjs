@@ -88,8 +88,9 @@ for (const { piece, scene } of scenes) {
   });
 
   test(piece.slug + ": no part of it washes out", () => {
-    // One look every twelve seconds, all the way through.
-    const worst = brightestFrame(scene, Math.ceil(data.duration / 12) + 1, 0.5, 12);
+    // One look every two seconds, all the way through: a picture can burn out in a
+    // part of the piece nobody thought to look at.
+    const worst = brightestFrame(scene, Math.ceil(data.duration / 2) + 1, 0.5, 2);
     assert.ok(
       worst.mean < 0.45,
       "the screen is washed out at " + worst.at.toFixed(0) + " s: mean light " + worst.mean.toFixed(3)
@@ -576,4 +577,401 @@ test("BWV 565: a frame of the fugue picture is cheap enough to keep up", () => {
   }
   assert.ok(most > 100, "one frame draws only " + most + " marks: is the picture missing?");
   assert.ok(most < 800, "one frame draws " + most + " boxes: that will not keep up with the music");
+});
+
+// BWV 582 wears the wheel: time goes round instead of down, one turn to one
+// telling of the ground bass, so that the repetition which *is* the piece can be
+// seen, and so that the seven minutes where the ground is said and the five where
+// it has stopped being said look different from one another. These are the numbers
+// that stand for looking at it.
+
+const WHEEL = { rim: 0.42, hub: 0.055, bend: 0.85, top: -0.25 }; // src/look-round.js
+const WHEEL_GOLD = "#ffd47a"; // ... and GOLD: the ground bass, and nothing else
+const WHEEL_COOL = "#bcd0f0"; // ... and COOL: the wheel's own light, and the fugue's first note
+const CENTRE = { x: STAGE_WIDTH / 2, y: STAGE_HEIGHT / 2 };
+const WHEEL_OUTER = Math.min(STAGE_WIDTH, STAGE_HEIGHT) * WHEEL.rim;
+
+/** Which bar of the piece a second falls on, counting into the bar. */
+function barAt(bars, seconds) {
+  let low = 0;
+  let high = bars.length - 1;
+  while (low < high) {
+    const middle = (low + high + 1) >> 1;
+    if (bars[middle] <= seconds) low = middle;
+    else high = middle - 1;
+  }
+  if (low >= bars.length - 1) return low + (seconds - bars[low]) / (bars[low] - bars[low - 1]);
+  return low + (seconds - bars[low]) / (bars[low + 1] - bars[low]);
+}
+
+/** How far the middle of a drawn box is out from the middle of the wheel, and at
+ *  what angle round it. */
+function polar(box) {
+  const x = box.x + box.w / 2;
+  const y = box.y + box.h / 2;
+  return {
+    radius: Math.hypot(x - CENTRE.x, y - CENTRE.y),
+    degrees: ((Math.atan2(y - CENTRE.y, x - CENTRE.x) * 180) / Math.PI + 450) % 360,
+  };
+}
+
+/** Where the wheel draws one pitch at one moment: the look's own two lines of
+ *  geometry, here so that a test can say where a thing belongs and so prove it was
+ *  drawn there at all. */
+function wheelAt(scene, anchor, barsPerTurn, pitch, seconds) {
+  const turn = (barAt(scene.look.bars, seconds) - anchor) / barsPerTurn;
+  const angle = (turn - Math.floor(turn) + WHEEL.top) * Math.PI * 2;
+  const span = Math.min(STAGE_WIDTH, STAGE_HEIGHT);
+  const inner = span * WHEEL.hub;
+  const share = Math.max(
+    0,
+    Math.min(1, (pitch - scene.look.pitchLow) / (scene.look.pitchHigh - scene.look.pitchLow))
+  );
+  const radius = inner + (WHEEL_OUTER - inner) * Math.pow(share, WHEEL.bend);
+  return {
+    x: CENTRE.x + Math.cos(angle) * radius,
+    y: CENTRE.y + Math.sin(angle) * radius,
+    radius: radius,
+    angle: angle,
+  };
+}
+
+/** What the wheel calls the ground: the tune, its turn in bars, and where a turn
+ *  starts. All of it the look works out for itself; a test needs it to ask where. */
+function groundOf(stage, scene) {
+  const tune = stage.bach.theme(scene.notes, { bars: scene.look.bars });
+  const apart = [];
+  for (let i = 1; i < tune.heard.length; i++) {
+    apart.push(barAt(scene.look.bars, tune.heard[i].time) - barAt(scene.look.bars, tune.heard[i - 1].time));
+  }
+  apart.sort((a, b) => a - b);
+  const barsPerTurn = Math.max(2, Math.round(apart[Math.floor(apart.length / 2)]));
+  const notes = [];
+  for (const telling of tune.heard) notes.push(...telling.notes);
+  return {
+    tune: tune,
+    notes: notes,
+    barsPerTurn: barsPerTurn,
+    anchor: barAt(scene.look.bars, tune.heard[0].time),
+    turns: Math.ceil((barAt(scene.look.bars, tune.heard[tune.heard.length - 1].until) - barAt(scene.look.bars, tune.heard[0].time)) / barsPerTurn),
+  };
+}
+
+/** The notes' own lights: flat squares of a voice's colour, inside the rim. The
+ *  clock face, the rim and the hand are all outside it or cool, so they are left
+ *  out of what is counted as a note. */
+function lights(stage, scene) {
+  const worn = Object.keys(scene.look.colours).map((key) => scene.look.colours[key]);
+  return stage.drawn.filter((box) => {
+    const isNote = box.colour === WHEEL_GOLD || worn.indexOf(box.colour) >= 0;
+    return isNote && box.w >= 3 && box.w <= 14 && polar(box).radius <= WHEEL_OUTER - 2;
+  });
+}
+
+/** The gold ones among them. */
+function goldLights(stage, scene) {
+  return lights(stage, scene).filter((box) => box.colour === WHEEL_GOLD);
+}
+
+test("BWV 582: the wheel turns once to a telling of the ground, and the ground is in the same place each turn", () => {
+  const scene = sceneOf("bwv582-passacaglia-c-minor");
+  const stage = createStage(scene);
+  const ground = groundOf(stage, scene);
+
+  assert.strictEqual(ground.barsPerTurn, 8, "the tellings of the ground are not eight bars apart");
+  assert.strictEqual(ground.tune.heard.length, 13, "the ground is heard thirteen times, and the wheel is built on that");
+  assert.strictEqual(scene.look.phrase, ground.barsPerTurn, "the piece does not ask for the turn the music says");
+
+  // Two turns of the wheel apart, the ground has been said again: its lights have
+  // to come back to exactly the same places, or the wheel is not telling anyone
+  // anything about the repetition.
+  const at = 62;
+  stage.frame(at);
+  const one = goldLights(stage, scene).map((box) => polar(box));
+  stage.frame(at + ground.barsPerTurn * (scene.data.bars[1] - scene.data.bars[0]));
+  const twice = goldLights(stage, scene).map((box) => polar(box));
+  assert.ok(one.length > 6 && twice.length > 6, "barely any ground is lit at " + at + " s: " + one.length + " and " + twice.length);
+  const matched = one.filter((place) =>
+    twice.some((other) => Math.abs(other.radius - place.radius) < 2 && Math.abs(other.degrees - place.degrees) < 1)
+  ).length;
+  assert.ok(matched >= one.length - 1, "the ground's lights came back to " + matched + " of " + one.length + " places, not all of them");
+});
+
+test("BWV 582: gold is the ground bass, and no other note is gold", () => {
+  const scene = sceneOf("bwv582-passacaglia-c-minor");
+  for (const voice in scene.look.colours) {
+    assert.notStrictEqual(scene.look.colours[voice], WHEEL_GOLD, "a voice wears gold too, so gold cannot be the ground");
+  }
+  const stage = createStage(scene);
+  const ground = groundOf(stage, scene);
+
+  const at = 66; // the ground is being said, and the manuals are busy above it
+  stage.frame(at);
+  const sounding = soundingAt(scene, at);
+  // The ground is one line, one note at a time, so "what it is saying" is what it
+  // has struck in the last couple of seconds and not yet let go of.
+  const singing = ground.notes.filter((note) => note.time <= at && note.time + note.length + 2 > at);
+  const company = sounding.filter((note) => ground.notes.indexOf(note) < 0);
+  assert.ok(singing.length >= 2, "the ground should have struck notes at " + at + " s, and has " + singing.length + "");
+  assert.ok(company.length >= 2, "and it should have company, or this proves something");
+
+  const gold = goldLights(stage, scene).map((box) => polar(box));
+  for (const note of singing) {
+    const place = wheelAt(scene, ground.anchor, ground.barsPerTurn, note.pitch, note.time);
+    const here = { radius: place.radius, degrees: polar({ x: place.x, y: place.y, w: 0, h: 0 }).degrees };
+    assert.ok(
+      gold.some((box) => Math.abs(box.radius - here.radius) < 3 && Math.abs(box.degrees - here.degrees) < 1.2),
+      "the ground's own note at " + note.pitch + " was not gold"
+    );
+  }
+  for (const note of company) {
+    const place = wheelAt(scene, ground.anchor, ground.barsPerTurn, note.pitch, note.time);
+    // A note the ground is also playing, at the same moment and pitch, would be
+    // drawn on top of it: that is the ground being doubled, not a mistake.
+    const doubled = singing.some((one) => {
+      const other = wheelAt(scene, ground.anchor, ground.barsPerTurn, one.pitch, one.time);
+      return Math.hypot(other.x - place.x, other.y - place.y) < 8;
+    });
+    if (doubled) continue;
+    assert.ok(
+      gold.every((box) => Math.abs(box.radius - place.radius) > 3 || Math.abs(box.degrees - place.degrees) > 1.2),
+      "an ordinary note (" + note.voice + " at " + note.pitch + ") was drawn gold"
+    );
+  }
+});
+
+test("BWV 582: a note is drawn where its pitch and its moment put it", () => {
+  const scene = sceneOf("bwv582-passacaglia-c-minor");
+  const stage = createStage(scene);
+  const ground = groundOf(stage, scene);
+  const at = 214; // four voices going, well inside a turn
+  stage.frame(at);
+  const sounding = soundingAt(scene, at).filter((note) => note.time + 0.05 < at);
+  assert.ok(sounding.length >= 4, "this moment should have four lines sounding, and has " + sounding.length);
+  const lit = lights(stage, scene).map((box) => polar(box));
+  for (const note of sounding) {
+    const place = wheelAt(scene, ground.anchor, ground.barsPerTurn, note.pitch, note.time);
+    const degrees = polar({ x: place.x, y: place.y, w: 0, h: 0 }).degrees;
+    assert.ok(
+      lit.some((box) => Math.abs(box.radius - place.radius) < 3 && Math.abs(box.degrees - degrees) < 1.2),
+      "the note at " + note.pitch + " struck at " + note.time + " s was not drawn where it belongs"
+    );
+  }
+  // And the wheel reads high notes outwards, which is what a wheel of pitch means.
+  const high = wheelAt(scene, ground.anchor, ground.barsPerTurn, 96, at);
+  const low = wheelAt(scene, ground.anchor, ground.barsPerTurn, 24, at);
+  assert.ok(high.radius > low.radius * 4, "the top of the piece is barely further out than the bottom");
+});
+
+test("BWV 582: each turn of the wheel is written new above the ground", () => {
+  const scene = sceneOf("bwv582-passacaglia-c-minor");
+  const stage = createStage(scene);
+  const ground = groundOf(stage, scene);
+  const turn = ground.barsPerTurn * (scene.data.bars[1] - scene.data.bars[0]);
+  stage.frame(100);
+  const one = lights(stage, scene).map((box) => Math.round(polar(box).radius) + ":" + Math.round(polar(box).degrees));
+  stage.frame(100 + turn);
+  const twice = lights(stage, scene).map((box) => Math.round(polar(box).radius) + ":" + Math.round(polar(box).degrees));
+  assert.ok(one.length > 40 && twice.length > 40, "a turn of the wheel holds only " + one.length + " lights");
+  const shared = one.filter((place) => twice.indexOf(place) >= 0).length;
+  assert.ok(
+    shared < (one.length + twice.length) / 4,
+    shared + " of " + twice.length + " lights are in the same place a turn later: this variation looks like the last"
+  );
+});
+
+test("BWV 582: the ground stops coming back, and the wheel comes apart", () => {
+  const scene = sceneOf("bwv582-passacaglia-c-minor");
+  const stage = createStage(scene);
+  const ground = groundOf(stage, scene);
+  const hinge = scene.data.bars[Math.floor(ground.anchor + ground.turns * ground.barsPerTurn)];
+  assert.ok(hinge > 400 && hinge < 440, "the fugue should take off about seven minutes in, not at " + hinge + " s");
+
+  // While the ground is being said, the whole turn is on the screen: you can see
+  // the shape of the variation coming, so there is no dark side to the wheel.
+  for (const at of [60, 200, 380]) {
+    stage.frame(at);
+    const gap = biggestGap(lights(stage, scene).map((box) => polar(box).degrees));
+    assert.ok(gap < 90, "at " + at + " s a whole " + gap.toFixed(0) + " degrees of the wheel is dark: the turn is not all there");
+  }
+  // After the hinge there is no ground, so nothing is gold anywhere, and what is
+  // lit is a hand sweeping a dark disc: a big piece of the wheel is dark.
+  for (const at of [hinge + 30, 520, 660]) {
+    stage.frame(at);
+    assert.strictEqual(goldLights(stage, scene).length, 0, "something was gold after the ground stopped, at " + at + " s");
+    const gap = biggestGap(lights(stage, scene).map((box) => polar(box).degrees));
+    assert.ok(gap > 120, "at " + at + " s the fugue fills the whole wheel (" + gap.toFixed(0) + " degrees dark at best)");
+  }
+});
+
+/** The widest gap between a set of bearings round the wheel, in degrees. */
+function biggestGap(degrees) {
+  const sorted = degrees.slice().sort((a, b) => a - b);
+  if (sorted.length === 0) return 360;
+  let gap = 360 - (sorted[sorted.length - 1] - sorted[0]);
+  for (let i = 1; i < sorted.length; i++) gap = Math.max(gap, sorted[i] - sorted[i - 1]);
+  return gap;
+}
+
+test("BWV 582: the rim keeps count of the turns, and says where the ground stopped", () => {
+  const scene = sceneOf("bwv582-passacaglia-c-minor");
+  const stage = createStage(scene);
+  const ground = groundOf(stage, scene);
+  const rimMarks = () => stage.drawn.filter((box) => polar(box).radius > WHEEL_OUTER + 10 && box.w <= 6);
+
+  stage.frame(20);
+  assert.strictEqual(rimMarks().length, 0, "the rim had marks before a turn of the wheel was done");
+  for (const at of [100, 300]) {
+    stage.frame(at);
+    const done = Math.max(0, Math.floor((barAt(scene.look.bars, at) - ground.anchor) / ground.barsPerTurn));
+    assert.strictEqual(rimMarks().length, done, "the rim counts wrong at " + at + " s");
+  }
+  stage.frame(700);
+  const marks = rimMarks();
+  assert.ok(marks.length > 30, "the rim only counted " + marks.length + " turns of the whole piece");
+  const gold = marks.filter((box) => box.colour === WHEEL_GOLD).length;
+  assert.strictEqual(gold, ground.turns, "the rim does not say how many turns carried the ground");
+});
+
+test("BWV 582: a voice come back after a long silence blooms in its own colour", () => {
+  const scene = sceneOf("bwv582-passacaglia-c-minor");
+  const stage = createStage(scene);
+  const ground = groundOf(stage, scene);
+  const lastSaid = ground.tune.heard[ground.tune.heard.length - 1].until;
+  // The pedal is the last line into the fugue, half a minute after it let go of the
+  // ground for the last time.
+  const pedal = scene.notes.filter((note) => note.voice === 6 && note.time > lastSaid)[0];
+  assert.ok(pedal.time - lastSaid > 10, "the pedal should wait a while before it speaks again");
+  const worn = scene.look.colours["6"];
+  const place = wheelAt(scene, ground.anchor, ground.barsPerTurn, pedal.pitch, pedal.time);
+
+  const blooms = () =>
+    stage.drawn.filter(
+      (box) =>
+        box.colour === "(gradient)" &&
+        String(box.fill).indexOf(worn) === 0 &&
+        Math.hypot(box.x + box.w / 2 - place.x, box.y + box.h / 2 - place.y) < 60
+    );
+  stage.frame(pedal.time - 0.5);
+  assert.strictEqual(blooms().length, 0, "the pedal's second coming bloomed before it was struck");
+  stage.frame(pedal.time + 0.3);
+  assert.ok(blooms().length > 0, "the pedal came back after 29 s of silence and nothing was made of it");
+});
+
+test("BWV 582: the fugue's first note is a scene of its own", () => {
+  const scene = sceneOf("bwv582-passacaglia-c-minor");
+  const stage = createStage(scene);
+  const ground = groundOf(stage, scene);
+  const lastSaid = ground.tune.heard[ground.tune.heard.length - 1].until;
+  const opening = scene.notes.filter((note) => note.time >= lastSaid)[0];
+  assert.ok(opening, "nothing was struck after the ground's last note let go");
+  const place = wheelAt(scene, ground.anchor, ground.barsPerTurn, opening.pitch, opening.time);
+  // The picture's own colour, not a voice's: this is the piece turning a corner.
+  const flash = () =>
+    stage.drawn.filter(
+      (box) =>
+        box.colour === "(gradient)" &&
+        String(box.fill).indexOf(WHEEL_COOL) === 0 &&
+        box.w > 150 &&
+        Math.hypot(box.x + box.w / 2 - place.x, box.y + box.h / 2 - place.y) < 150
+    );
+  stage.frame(opening.time - 0.5);
+  assert.strictEqual(flash().length, 0, "the fugue was flashed before it began");
+  stage.frame(opening.time + 0.5);
+  assert.ok(flash().length > 0, "the fugue began and nothing was made of it");
+});
+
+test("BWV 582: the hand is the line of sound, bent round, and it goes once to a turn", () => {
+  const scene = sceneOf("bwv582-passacaglia-c-minor");
+  const stage = createStage(scene);
+  const ground = groundOf(stage, scene);
+  const inner = Math.min(STAGE_WIDTH, STAGE_HEIGHT) * WHEEL.hub;
+  const dashes = () =>
+    stage.drawn.filter((box) => {
+      const where = polar(box);
+      return box.colour === WHEEL_COOL && box.w <= 6 && where.radius > inner * 0.4 && where.radius < WHEEL_OUTER;
+    });
+  const bearingOf = (box) =>
+    Math.atan2(box.y + box.h / 2 - CENTRE.y, box.x + box.w / 2 - CENTRE.x);
+
+  for (const at of [40, 120, 300]) {
+    stage.frame(at);
+    const lit = dashes();
+    assert.ok(lit.length > 15, "the hand is barely drawn at " + at + " s: " + lit.length + " marks");
+    const due = wheelAt(scene, ground.anchor, ground.barsPerTurn, 60, at).angle;
+    for (const box of lit) {
+      // Every dash of the hand lies along the one bearing this moment of the turn
+      // is on - which is what makes it a line of sound and not a scatter.
+      const off = Math.abs(((bearingOf(box) - due + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+      assert.ok(off < 0.06, "a dash of the hand is off its line at " + at + " s by " + off.toFixed(3) + " radians");
+    }
+  }
+
+  // And it travels: half a turn later it is on the other side of the wheel.
+  stage.frame(120);
+  const before = bearingOf(dashes()[0]);
+  stage.frame(120 + ground.barsPerTurn * (scene.data.bars[1] - scene.data.bars[0]) * 0.5);
+  const after = bearingOf(dashes()[0]);
+  const moved = Math.abs(((after - before + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+  assert.ok(moved > 2.5, "half a turn of the piece moved the hand by only " + moved.toFixed(2) + " radians");
+});
+
+test("BWV 582: a telling of the ground blooms gold where it begins, and not before", () => {
+  const scene = sceneOf("bwv582-passacaglia-c-minor");
+  const stage = createStage(scene);
+  const ground = groundOf(stage, scene);
+  const telling = ground.tune.heard.find((one) => one.time > 100);
+  assert.ok(telling, "no telling of the ground after 100 s");
+  const place = wheelAt(scene, ground.anchor, ground.barsPerTurn, telling.pitch, telling.time);
+  const near = (box) => Math.hypot(box.x + box.w / 2 - place.x, box.y + box.h / 2 - place.y) < 120;
+  const goldGlow = () =>
+    stage.drawn.filter((box) => box.colour === "(gradient)" && String(box.fill).indexOf(WHEEL_GOLD) === 0 && near(box));
+
+  stage.frame(telling.time - 0.5);
+  assert.strictEqual(goldGlow().length, 0, "the ground glowed before it was said again");
+  stage.frame(telling.time + 0.4);
+  const fresh = goldGlow();
+  assert.ok(fresh.length > 0, "the ground came back at " + telling.time + " s and no gold light marked it");
+  stage.frame(telling.time + 1.8);
+  const fading = goldGlow();
+  assert.ok(fading.length > 0, "the glow had nothing to fade in: it was gone 1.8 s in");
+  assert.ok(
+    Math.max.apply(null, fading.map((box) => box.alpha)) < Math.max.apply(null, fresh.map((box) => box.alpha)),
+    "the ground's arrival glow never fades: it would just be a permanent gold blob"
+  );
+  stage.frame(telling.time + 6);
+  assert.strictEqual(goldGlow().length, 0, "the ground was still glowing six seconds after it began");
+});
+
+test("BWV 582: the ground is the stoutest light on the wheel", () => {
+  const scene = sceneOf("bwv582-passacaglia-c-minor");
+  const stage = createStage(scene);
+  stage.frame(120); // the ground going, with three voices above it
+  const worn = Object.keys(scene.look.colours).map((key) => scene.look.colours[key]);
+  // Only what has been struck and is still bright counts, so a note still coming
+  // up - drawn small on purpose - cannot answer for one that is sounding.
+  const lit = lights(stage, scene).filter((box) => box.alpha > 0.4);
+  const gold = lit.filter((box) => box.colour === WHEEL_GOLD);
+  const others = lit.filter((box) => worn.indexOf(box.colour) >= 0);
+  assert.ok(gold.length > 1 && others.length > 3, "not enough is lit at 120 s to compare anything");
+  assert.ok(
+    Math.min.apply(null, gold.map((box) => box.w)) > Math.max.apply(null, others.map((box) => box.w)),
+    "a voice is drawn as stout as the ground: gold would be the only thing saying which is which"
+  );
+});
+
+test("BWV 582: a frame of the wheel is cheap, and nothing on it burns out", () => {
+  const scene = sceneOf("bwv582-passacaglia-c-minor");
+  const stage = createStage(scene);
+  let most = 0;
+  let burnt = 0;
+  for (let at = 1; at < scene.data.duration; at += 1) {
+    const seen = stage.frame(at);
+    if (stage.drawn.length > most) most = stage.drawn.length;
+    burnt += seen.burnt;
+    assert.ok(seen.mean < 0.06, "the wheel is washed out at " + at + " s: mean light " + seen.mean.toFixed(3));
+  }
+  assert.ok(most > 150, "one frame draws only " + most + " marks: is the picture missing?");
+  assert.ok(most < 1500, "one frame draws " + most + " boxes: that will not keep up with the music");
+  assert.strictEqual(burnt, 0, burnt + " cells of the grid burned out white somewhere in the piece");
 });

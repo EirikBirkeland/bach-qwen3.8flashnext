@@ -3,7 +3,9 @@
 // at its busiest, how dark it goes at its quietest, whether any of it is burnt
 // out white, and whether a repeat shows up as warmer light. It ends with what the
 // piece keeps coming back to - the tune the page's own finder hears - since that is
-// what a look gets built on.
+// what a look gets built on. The sweep over the whole piece samples every second,
+// which is slow for the Passacaglia and is what catches a picture that flares white
+// somewhere in the middle where nobody thought to look.
 //
 //   node tools/look.mjs              # every piece
 //   node tools/look.mjs bwv639       # one piece
@@ -81,8 +83,8 @@ function report(slug) {
   const loud = busiestSecond(scene.data);
   const busy = brightestFrame(scene, 60, loud);
   const quiet = quietestFrame(scene, duration);
-  const over = brightestFrame(scene, Math.ceil(duration / 6) + 1, 0.5, 6);
-  const warm = warmestFrame(scene, Math.ceil(duration / 6) + 1, 0.5, 6);
+  const over = brightestFrame(scene, Math.ceil(duration) + 1, 0.5, 1);
+  const warm = warmestFrame(scene, Math.ceil(duration / 2) + 1, 0.5, 2);
 
   console.log(path.basename(slug) + " - " + piece.title);
   console.log("  looks: " + spoken(piece.look));

@@ -78,11 +78,18 @@ window.Bach = window.Bach || {};
       file: "data/bwv582-passacaglia-c-minor.js",
       title: "Passacaglia and Fugue",
       subtitle: "in C minor, BWV 582",
-      look: { name: "fall" },
+      // The Passacaglia is one 15-note ground in the pedal, said again every eight
+      // bars for seven minutes, so this piece is drawn as a wheel that turns once to
+      // a telling of it: src/look-round.js. Gold is the ground, so no voice wears it.
+      look: {
+        name: "round",
+        phrase: 8,
+        hint: "the wheel turns once to the ground bass · gold is the ground · the rim counts the turns",
+      },
       voices: {
-        1: { name: "Right hand", colour: "#ffd47a", role: "melody" },
+        1: { name: "Right hand", colour: "#79e2ff", role: "melody" },
         2: { name: "Octave above", colour: "#ff9bb0", role: "inner" },
-        3: { name: "Left hand", colour: "#79e2ff", role: "inner" },
+        3: { name: "Left hand", colour: "#9dff9b", role: "inner" },
         6: { name: "Pedal", colour: "#c39bff", role: "pedal" },
       },
     },
