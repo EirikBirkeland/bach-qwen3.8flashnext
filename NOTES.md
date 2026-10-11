@@ -79,3 +79,16 @@ Next, in order:
 4. A fuller organ: more pipes per note, and dynamics drawn from the music rather
    than the flat velocities. Also consider reverb that changes with the section.
 5. Only then milestone 2 looks per piece.
+
+How this was verified (no browser here, so nothing was listened to):
+
+- `node --check` on every script; `node --test` = 14 passing.
+- `test/data.test.mjs` reconverts BWV 565 from the MIDI and compares every note
+  with the committed JSON, and checks the generated `.js` byte for byte; it also
+  checks order, positive lengths, the pitch range, the stated duration, and that
+  no chord is wider than 24 notes.
+- `test/midi.test.mjs` works the expected seconds out by hand on a file built in
+  the test: 0.125 s, 0.2 s, 0.2417 s — so the tempo map is right, not just stable.
+- `test/page.test.mjs` (see above) checks pipe start times against the note times.
+- Released as `0.0.1`; `releases/v0.0.1/` holds the playable copy, and the menu
+  page lists it first.
