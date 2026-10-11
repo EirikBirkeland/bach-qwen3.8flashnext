@@ -369,6 +369,12 @@ function makePage() {
       for (const handler of window.listeners.keydown) handler(event);
       return event;
     },
+    /** A click that reaches the page through the window, aimed at something. */
+    tap(target) {
+      assert.ok(window.listeners.click, "nothing on the page listens for a click");
+      const event = { type: "click", target: target || {} };
+      for (const handler of window.listeners.click) handler(event);
+    },
     /** Seconds shown on the clock in the corner, like "1:23 / 9:32". */
     clockSeconds() {
       const match = /^(\d+):(\d\d) \/ (\d+):(\d\d)$/.exec(elements.nowTime.textContent || "");
@@ -1103,4 +1109,219 @@ test("a piece is drawn the picture it asks for", async () => {
     );
     page.elements.stop.click(); // back to the card, so the next piece can start
   }
+});
+
+// --- playing along -----------------------------------------------------------
+
+// The organ starts its clock a hair after the page does, so a frame count has to
+// be paid that debt before it says what second of the piece it is at.
+function runTo(page, seconds) {
+  const step = 1 / 120;
+  const total = seconds + 0.06;
+  const frames = Math.max(1, Math.round(total / step));
+  page.playFrames(frames, total / frames);
+  return total / frames;
+}
+
+const SHORT = "bwv639-ich-ruf-zu-dir";
+
+test("the page offers playing along, and says which way it is", async () => {
+  const page = openPage();
+  page.elements.pieces.children[1].click();
+  await settled();
+
+  assert.strictEqual(page.elements.play.textContent, "Play along");
+  page.playFrames(30, 1 / 60);
+  assert.strictEqual(page.elements.score.textContent, "", "nothing is scored while you are only watching");
+
+  page.elements.play.click();
+  assert.strictEqual(page.elements.play.textContent, "Just watch", "the button says what pressing it will do");
+  assert.match(page.elements.score.textContent, /^0 in a row · best 0 · 0 of \d+$/, "no run has started, and the count of beats is there");
+
+  page.elements.play.click();
+  assert.strictEqual(page.elements.play.textContent, "Play along");
+  assert.strictEqual(page.elements.score.textContent, "", "and it all goes away when you are just watching");
+});
+
+test("P turns playing along on and off", async () => {
+  const page = openPage();
+  page.elements.pieces.children[1].click();
+  await settled();
+  page.press("p");
+  assert.strictEqual(page.elements.play.textContent, "Just watch");
+  page.press("p");
+  assert.strictEqual(page.elements.play.textContent, "Play along");
+});
+
+test("clicking the picture on a beat rings a bell and starts a run", async () => {
+  const page = openPage();
+  page.elements.pieces.children[1].click();
+  await settled();
+  page.elements.play.click();
+
+  const data = page.window.BachData[SHORT];
+  const beat = page.window.Bach.beats(data)[4];
+  const sounding = data.notes.filter((row) => row[2] <= beat.time && row[2] + row[3] > beat.time);
+  assert.ok(sounding.length > 0, "nothing was sounding at " + beat.time + " s");
+  const low = Math.min(...sounding.map((row) => row[1]));
+  assert.ok(low + 24 >= 60 && low + 24 <= 91, "the bell would be out of register: " + low);
+
+  runTo(page, beat.time);
+  assert.ok(Math.abs(page.clockSeconds() - Math.floor(beat.time)) <= 1, "the harness lost the beat it was aiming at");
+
+  const before = page.audio.oscillators;
+  const startedBefore = page.audio.started;
+  const gain = page.audio.gainNodes.length;
+  page.tap(page.canvas);
+
+  assert.strictEqual(page.audio.oscillators, before + 2, "a bell is two strikes, a hair apart");
+  assert.strictEqual(page.audio.started, startedBefore + 2, "the bell was made but never struck");
+  const bell = page.audio.pipes[page.audio.pipes.length - 1];
+  const wanted = 440 * Math.pow(2, (low + 24 - 69) / 12);
+  assert.ok(
+    Math.abs(bell.frequency.value - wanted) < 0.01,
+    "the bell rang " + bell.frequency.value + " Hz; the lowest note sounding two octaves up is " + wanted
+  );
+  assert.strictEqual(page.audio.gainNodes.length, gain + 1, "the bell was given more than one bell");
+  assert.ok(
+    page.audio.reaches(page.audio.gainNodes[page.audio.gainNodes.length - 1], page.audio.context.destination, 0),
+    "the bell never reaches the speakers"
+  );
+  // It rings when the player struck, not when the beat was: that is the whole
+  // point of a strike being the player's own.
+  for (const at of page.audio.startTimes.slice(-2)) {
+    assert.ok(Math.abs(at - page.audio.context.currentTime) < 0.02, "the bell rang late: " + at);
+  }
+  assert.match(page.elements.score.textContent, /^1 in a row/, "the run was not counted on screen");
+});
+
+test("Enter strikes too, and nothing else is disturbed", async () => {
+  const page = openPage();
+  page.elements.pieces.children[1].click();
+  await settled();
+  page.elements.play.click();
+  const data = page.window.BachData[SHORT];
+  const beat = page.window.Bach.beats(data)[3];
+  runTo(page, beat.time);
+
+  const before = page.audio.oscillators;
+  const event = page.press("Enter", {});
+  assert.strictEqual(page.audio.oscillators, before + 2, "Enter did not ring the bell");
+  assert.strictEqual(page.elements.pause.textContent, "Pause", "and the piece was not rested by it");
+  assert.strictEqual(event.prevented, false, "Enter has nothing on the page to prevent");
+});
+
+test("a click on the line at the bottom is a jump, not a strike", async () => {
+  const page = openPage();
+  page.elements.pieces.children[1].click();
+  await settled();
+  page.elements.play.click();
+  const data = page.window.BachData[SHORT];
+  // Aimed at a beat on purpose: were the click taken for a strike, it would land.
+  runTo(page, page.window.Bach.beats(data)[3].time);
+
+  const before = page.audio.oscillators;
+  page.tap(page.elements.seek);
+  assert.strictEqual(page.audio.oscillators, before, "a jump was counted as a beat struck");
+  assert.match(page.elements.score.textContent, /^0 in a row/, "and it did not start a run");
+});
+
+test("a click that belongs to a button is the button's, not the player's", async () => {
+  const page = openPage();
+  page.elements.pieces.children[1].click();
+  await settled();
+  page.elements.play.click();
+  const data = page.window.BachData[SHORT];
+  runTo(page, page.window.Bach.beats(data)[3].time);
+
+  const before = page.audio.oscillators;
+  page.tap(page.elements.pause);
+  assert.strictEqual(page.audio.oscillators, before, "the click was over a button, so nothing was struck");
+  assert.strictEqual(page.elements.pause.textContent, "Pause", "and the button itself was not pressed by it either");
+});
+
+test("the end of a piece you played along with says what you were there for", async () => {
+  const page = openPage();
+  page.elements.pieces.children[1].click();
+  await settled();
+  page.elements.play.click();
+  const data = page.window.BachData[SHORT];
+  const beat = page.window.Bach.beats(data)[2];
+  runTo(page, beat.time);
+  page.tap(page.canvas);
+  assert.match(page.elements.score.textContent, /^1 in a row/);
+
+  page.audio.context.currentTime = data.duration + 2;
+  page.nextFrame(1 / 60);
+  assert.strictEqual(page.elements.end.classList.contains("shown"), true, "the end card did not appear");
+  assert.match(
+    page.elements.endLine.textContent,
+    /were there for 1 of \d+ beats · longest run 1/,
+    "the end card says: " + page.elements.endLine.textContent
+  );
+});
+
+test("the page loads what playing along needs", () => {
+  // A file that index.html never loads is a thing nobody can use, and its tests
+  // would happily keep measuring it in isolation.
+  for (const file of ["src/pulse.js", "src/landmarks.js", "src/game.js"]) {
+    assert.ok(SCRIPTS.indexOf(file) >= 0, file + " is never loaded by index.html");
+  }
+  const page = openPage();
+  assert.strictEqual(typeof page.window.Bach.beats, "function", "the page cannot say where the beats are");
+  assert.strictEqual(typeof page.window.Bach.landmarks, "function", "the page cannot say what is worth marking");
+  assert.strictEqual(typeof page.window.Bach.createGame, "function", "the page has no game in it");
+  assert.strictEqual(typeof page.window.Bach.createOrgan().chime, "function", "the organ cannot ring a bell");
+});
+
+test("playing along draws its ladder on the picture, and just watching draws none", async () => {
+  const page = openPage();
+  page.elements.pieces.children[1].click();
+  await settled();
+  const data = page.window.BachData[SHORT];
+  const beat = page.window.Bach.beats(data)[4];
+  runTo(page, beat.time - 0.4);
+
+  const rested = page.canvas.drawn.fillRects;
+  page.nextFrame(1 / 60);
+  const watching = page.canvas.drawn.fillRects - rested;
+
+  page.elements.play.click();
+  const before = page.canvas.drawn.fillRects;
+  page.nextFrame(1 / 60);
+  const playing = page.canvas.drawn.fillRects - before;
+  assert.ok(playing > watching, "the ladder added nothing to the picture: " + playing + " against " + watching);
+
+  // The ladder is a pile of wide, thin bars low in the middle of the screen.
+  const since = page.canvas.drawn.fillRects - playing;
+  const bars = page.canvas.drawn.rects.slice(since).filter((box) => box[2] > 90 && box[3] <= 2 && box[1] > 400);
+  assert.ok(bars.length >= 2, "no ladder of beats was drawn: " + bars.length + " bars");
+  for (const bar of bars) {
+    assert.ok(Math.abs(bar[0] + bar[2] / 2 - page.window.innerWidth / 2) < 2, "the ladder is not in the middle: " + bar[0]);
+  }
+});
+
+test("a player who is there for every beat catches every beat", async () => {
+  // The whole chain, end to end: the grid the page says the piece has, the click
+  // arriving at that second, the bell, the run on the screen.
+  const page = openPage();
+  page.elements.pieces.children[1].click();
+  await settled();
+  page.elements.play.click();
+
+  const started = page.audio.context.currentTime; // the organ leads the page by 0.06 s
+  const at = () => page.audio.context.currentTime - started - 0.06;
+  const goTo = (seconds) => {
+    while (at() < seconds - 1e-9) page.playFrames(1, Math.min(0.25, seconds - at()));
+  };
+
+  const beats = [...page.window.Bach.beats(page.window.BachData[SHORT])].slice(4, 25);
+  assert.ok(beats.length === 21);
+  for (const beat of beats) {
+    goTo(beat.time);
+    page.tap(page.canvas);
+  }
+
+  assert.strictEqual(at(), beats[beats.length - 1].time, "the harness did not land where it aimed");
+  assert.match(page.elements.score.textContent, /^21 in a row · best 21 · 21 of \d+$/, "score said: " + page.elements.score.textContent);
 });

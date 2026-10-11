@@ -355,3 +355,42 @@ export function rolesFor(piece) {
   }
   return roles;
 }
+
+/**
+ * The bell the player strikes when playing along, in the same plain numbers: the
+ * bell's own mix, its own envelope, and the two strikes a few cents apart that
+ * make the ring move. Like `render`, this lines the strikes up in phase with the
+ * pipes, which a real bell never is - so what comes out is louder than the truth.
+ */
+export function renderChime(spec, pitch, options) {
+  const settings = options || {};
+  const rate = settings.sampleRate || 44100;
+  const at = settings.at || 0;
+  const level = spec.chime.level * Math.min(spec.chime.heaviest, settings.weight || 1);
+  const wave = waveFor(spec.chime.mix);
+  const out = new Float64Array(Math.round((at + spec.chime.decay + 0.05) * rate));
+  const from = Math.round(at * rate);
+  for (const cents of [-3, 3]) {
+    const freq = hz(pitch) * Math.pow(2, cents / 1200);
+    for (let i = from; i < out.length; i++) {
+      const t = i / rate - at;
+      let share;
+      if (t < spec.chime.attack) share = t / spec.chime.attack;
+      else
+        share = Math.pow(0.0001, (t - spec.chime.attack) / (spec.chime.decay - spec.chime.attack));
+      if (share <= 0) continue;
+      let phase = (freq * t) % 1;
+      if (phase < 0) phase += 1;
+      out[i] += level * share * wave[Math.floor(phase * PERIOD)];
+    }
+  }
+  for (let i = 0; i < out.length; i++) out[i] *= spec.volume;
+  return out;
+}
+
+/** Two sounds laid on each other. */
+export function together(first, second) {
+  const out = new Float64Array(Math.max(first.length, second.length));
+  for (let i = 0; i < out.length; i++) out[i] = (first[i] || 0) + (second[i] || 0);
+  return out;
+}

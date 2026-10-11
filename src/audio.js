@@ -36,6 +36,20 @@ window.Bach = window.Bach || {};
   // belongs to is part of the registration, and the pedals breathe harder.
   var BREATH_SECONDS = 0.16;
 
+  // The bell the player strikes when playing along. It is struck, not held, so it
+  // has an envelope of its own, and it is deliberately small beside the pipes:
+  // the heaviest chord of a piece is allowed to reach `ceiling`, and a bell or
+  // two landing on top of it must not push that over full scale. So the whole
+  // bell is under a tenth of full scale however hard it was struck, and what it
+  // sounds through is the same room the pipes do.
+  var CHIME = {
+    level: 0.07, // the whole bell, before the master volume
+    heaviest: 1.5, // the most a struck-true, on a moment when the music moved, may make it
+    attack: 0.006, // a struck thing is there at once
+    decay: 1.2, // ... and gone to nothing about a second and a bit later
+    mix: [1, 0.45, 0.24, 0.1, 0.05], // unison, octave, twelfth, and the thin notes above
+  };
+
   // The harmonic content of the pipes, as far as the ear can tell them apart.
   // A large open flue puts most of its sound in the unison and the octave above
   // and loses the rest little by little; a stopped pipe is poor in the even
@@ -202,6 +216,21 @@ window.Bach = window.Bach || {};
   }
 
   /**
+   * One wave for the bell, made once: a struck thing is mostly unison and octave
+   * with a twelfth over it, which is what makes it ring like metal and not like a
+   * flute.
+   */
+  function makeBell(ctx) {
+    var real = [0];
+    var imag = [0];
+    for (var harmonic = 1; harmonic <= CHIME.mix.length; harmonic++) {
+      imag.push(CHIME.mix[harmonic - 1]);
+      real.push(0);
+    }
+    return ctx.createPeriodicWave(real, imag);
+  }
+
+  /**
    * The stops drawn for a line of the music.
    */
   function stopsFor(registration, role) {
@@ -332,9 +361,11 @@ window.Bach = window.Bach || {};
     var master = null;
     var tremulant = null;
     var voices = {}; // the waves of each rank, made once
+    var bell = null; // the wave of the bell the player strikes, made once
     var wind = null; // the breath of a pipe, as a short buffer
     var windFilter = null; // ... and the one band it is heard through
     var room = null;
+    var tone = null; // the master lowpass, which the bells go through as well
     var playing = null; // the piece currently sounding, or null
     var startedAt = 0; // ctx time when playback began
     var offset = 0; // seconds into the piece when playback began
@@ -346,6 +377,7 @@ window.Bach = window.Bach || {};
       var Context = window.AudioContext || window.webkitAudioContext;
       ctx = new Context();
       voices = buildVoices(ctx);
+      bell = makeBell(ctx);
       wind = makeBreath(ctx);
 
       master = ctx.createGain();
@@ -362,7 +394,7 @@ window.Bach = window.Bach || {};
       limiter.release.value = 0.15;
 
       // Keep the very top off: an organ in a room never has all its fizz.
-      var tone = ctx.createBiquadFilter();
+      tone = ctx.createBiquadFilter();
       tone.type = "lowpass";
       tone.frequency.value = 6200;
       tone.Q.value = 0.6;
@@ -506,6 +538,39 @@ window.Bach = window.Bach || {};
       breath(when, base * drawn.breath);
     }
 
+    /**
+     * Strike the bell: one note, at once, ringing away. `weight` is how hard it
+     * was struck, from the game: 1 for a beat caught, more for one that the music
+     * itself was marking. It goes past the tremulant - a bell is not a pipe - but
+     * through the same lowpass and the same room, so it sits in the same building
+     * as the organ. With no time given it rings now, which is what the player means.
+     */
+    function chime(pitch, when, weight) {
+      if (!ctx) return;
+      var at = typeof when === "number" ? when : ctx.currentTime;
+      var level = CHIME.level * Math.min(CHIME.heaviest, Math.max(0.2, weight || 1));
+      var gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.linearRampToValueAtTime(level, at + CHIME.attack);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + CHIME.decay);
+
+      // Two strikes a few cents apart, so the ring moves instead of humming.
+      var pipes = [];
+      for (var i = 0; i < 2; i++) {
+        var oscillator = ctx.createOscillator();
+        oscillator.setPeriodicWave(bell);
+        oscillator.frequency.value = frequency(pitch);
+        oscillator.detune.value = i === 0 ? -3 : 3;
+        oscillator.connect(gain);
+        oscillator.start(at);
+        oscillator.stop(at + CHIME.decay + 0.02);
+        pipes.push(oscillator);
+      }
+
+      gain.connect(tone);
+      sounding.push({ gain: gain, pipes: pipes, endsAt: at + CHIME.decay + 0.03 });
+    }
+
     function pump() {
       if (!playing) return;
       var now = time();
@@ -624,6 +689,7 @@ window.Bach = window.Bach || {};
 
       time: time,
       pump: pump,
+      chime: chime,
       isPlaying: function () {
         return playing !== null;
       },
@@ -645,6 +711,7 @@ window.Bach = window.Bach || {};
     volume: VOLUME,
     envelope: ENVELOPE,
     breathSeconds: BREATH_SECONDS,
+    chime: CHIME,
     stopsFor: stopsFor,
     pipesFor: pipesFor,
     struck: struck,

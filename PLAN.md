@@ -63,6 +63,67 @@ Do these quickly and roughly, in the first session if you can, and release as so
 - [ ] Something for a player to do in time with the music, in the spirit of Rez, with a "just watch" mode beside it.
       Decide what, write the design here first, then build it.
 
+  - [x] The design, written down here before any of it was built - see below.
+  - [x] Built and released as `0.3.0`: `src/pulse.js` for the beat grid, `src/landmarks.js` for the moments
+        worth marking, `organ.chime` for the bell, `src/game.js` for the run and the ladder and the words,
+        and the page wired to them - "Play along" beside Pause, or the `P` key, or a click on the picture,
+        or Enter. Just watching is what it was before, and one press away.
+  - [ ] The ladder is laid *over* the picture, not part of it. Each piece's world could take its pulse in
+        its own way - the wheel ticking one tooth of the rim to a beat, the long view planting a lamp on the
+        road, the braid breathing with it. Only do it where it is better, piece by piece.
+  - [ ] The bell is one struck sound for all four pieces. A piece as different in touch as BWV 639 from
+        BWV 582 might want it heavier or lighter; decide by the numbers, as everything else here.
+
+#### The design: strike the beat
+
+**What the player does.** While a piece plays, click anywhere on the picture (or press Enter) in time with
+its pulse. Every beat of the piece is a chance; you take the ones you like. Nothing fails, nothing stops:
+the organ plays every note of the piece whatever the player does. "Just watch" is the same thing with the
+game switched off, and one button (or `P`) turns it on and off at any moment.
+
+**Why the pulse, and not the notes.** Measured from the data before choosing (the numbers are written in
+`NOTES.md`): the notes of the line to follow come at 3.3 a second in BWV 565 and 5.9 in BWV 582, which no
+hand can do; the tune that comes back is far too rare to chase — the ground bass is heard 13 times in twelve
+minutes. The beat is the one thing all four pieces mark at a rate a hand can keep, and it is steady:
+37 a minute in BWV 639 (♩=37), 60 in BWV 565 and BWV 645, 72 in BWV 582. It also has to be *listened* to:
+BWV 582 slows five times in its last two minutes and BWV 639 four times at its end, so a player who wants
+the run has to slow down with the organ.
+
+**Where the beats come from.** The data file already holds the piece's own bar lines (seconds, from the
+MIDI's tempo map) and its metre, so the grid is `bar start + k × bar length ÷ beats`. No new number is
+typed in per piece, a downbeat lands exactly on the bar line the picture already draws, and a ritardando
+stretches the beats with the bars.
+
+**What happens when you catch one.** A bell rings. Its note is the lowest note sounding at that moment,
+two octaves up, so whatever the player strikes is a note of the harmony that is actually sounding: the taps
+shimmer over the organ and pick out the chords. That is the Rez idea — what the player does is part of the
+music, not a score laid beside it.
+
+**What is worth more.** A beat on which the music itself does something is gold on the ladder and rings
+louder: the tune coming back (`src/theme.js`), a line taken up again after ten seconds of silence, a chord
+of five or more struck together.
+
+**The scoring.** A run is beats caught one after another. A beat that passes untouched ends it, and so does
+a click with no beat near it (which is what stops drumming on the mouse). At the end the page says how many
+of the beats you were there for and your longest run. Caught = within 0.3 s of the beat, struck true =
+within 0.11 s (a true one lights brighter).
+
+**The picture.** The game draws one thing, low in the middle of the screen and nowhere else: a ladder of
+short bars falling onto a catch line about a hundred pixels above the bottom, the next beats only, about
+two of them visible however fast the piece is (the ladder's pace comes from the piece's own beat). A caught
+beat is gone from the ladder and lights the catch line; the longer the run, the wider and brighter that
+line. Everything else on screen is the piece's own picture, untouched.
+
+Built in this order:
+
+1. `src/pulse.js` — the beat grid out of the data's own bars and metre.
+2. `src/landmarks.js` — the moments worth marking: a line come back, a chord struck together, a telling of
+      the tune. `src/look-subject.js` had private copies of two of these; they move here.
+3. `organ.chime(pitch, when, weight)` — a struck bell, through the same room as the pipes, and quiet
+      enough by numbers that a chord and a bell together still fit under full scale.
+4. `src/game.js` — the grid, the judging, the run, the ladder, the score line.
+5. `main.js` + `index.html` — the button, `P`, a click on the picture, the score, a line on the end pane.
+
 ### After that
 
 Yours to plan. Add milestones here as you learn what works. The owner may add more pieces to `music/`.

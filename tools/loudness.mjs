@@ -15,6 +15,8 @@
 //             once the room and the tremulant are counted
 //   rms       the widest chord, averaged: peak over rms is how spiky it is
 //   pipes     how many oscillators the busiest moment opens
+//   chord+bell  that widest chord and the heaviest bell playing along, together
+//   bell alone  what one of those bells reaches on its own
 
 import {
   loadOrgan,
@@ -25,6 +27,8 @@ import {
   heaviestMoment,
   render,
   renderAcross,
+  renderChime,
+  together,
   peak,
   rms,
   pipesOf,
@@ -45,7 +49,7 @@ const limiter = Math.pow(10, -3 / 20); // where the page's limiter starts to squ
 console.log("ceiling " + spec.ceiling + " of full scale, master volume " + spec.volume);
 console.log("the limiter starts at " + limiter.toFixed(3) + "; full scale is 1.000\n");
 
-const columns = ["piece", "loudest at", "widest", "weight", "gain", "bound", "peak + room", "rms", "crest", "pipes"];
+const columns = ["piece", "loudest at", "widest", "weight", "gain", "bound", "peak + room", "rms", "crest", "pipes", "chord+bell", "bell alone"];
 
 for (const piece of pieces) {
   if (wanted && piece.slug.indexOf(wanted) < 0) continue;
@@ -75,6 +79,11 @@ for (const piece of pieces) {
   const pipes = heaviest.notes.reduce((sum, note) => sum + pipesOf(note, spec).length, 0);
   const room = loudest * (1 + 0.34 * 0.85) * (1 + 0.045 + 0.03); // the convolver, then the tremulant
 
+  // Playing along rings a bell over the music: the heaviest one, struck on top of
+  // the loudest chord, with both of its strikes in phase with the pipes.
+  const bell = renderChime(spec, 60, { weight: spec.chime.heaviest });
+  const withBell = peak(together(samples, bell));
+
   rows.push([
     piece.slug.replace(/^bwv/, ""),
     throughout.at.toFixed(1) + "s",
@@ -86,6 +95,8 @@ for (const piece of pieces) {
     average.toFixed(3),
     (loudest / Math.max(average, 1e-9)).toFixed(1),
     String(pipes),
+    withBell.toFixed(3),
+    peak(bell).toFixed(3),
   ]);
 }
 

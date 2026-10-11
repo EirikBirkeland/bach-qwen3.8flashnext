@@ -124,6 +124,17 @@
         letter-spacing: 0.14em;
         color: #7e8ca6;
       }
+      #score {
+        position: absolute;
+        left: 50%;
+        top: 26px;
+        transform: translateX(-50%);
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        color: #8ea0c2;
+        text-shadow: 0 0 18px rgba(0, 0, 0, 0.9);
+        white-space: nowrap;
+      }
       #stops {
         position: absolute;
         left: 26px;
@@ -229,10 +240,12 @@
     <div id="hud" class="pane">
       <div id="nowTitle"></div>
       <div id="nowTime"></div>
+      <div id="score"></div>
       <div id="stops"></div>
       <div id="voices"></div>
       <div id="lookHint"></div>
       <div id="controls">
+        <button id="play" class="plain" type="button">Play along</button>
         <button id="pause" class="plain" type="button">Pause</button>
         <button id="restart" class="plain" type="button">Restart</button>
         <button id="stop" class="plain" type="button">Stop</button>
@@ -249,6 +262,7 @@
       <p class="note" id="status"></p>
       <p class="hint">loudspeakers or headphones, please</p>
       <p class="hint">space pauses &middot; &larr; &rarr; move &middot; click the line below to jump</p>
+      <p class="hint">play along: click the picture, or press Enter, on the beat &middot; P turns it on and off</p>
     </div>
 
     <div id="end" class="pane">
@@ -262,11 +276,14 @@
     <script src="src/visual.js"></script>
     <script src="src/echoes.js"></script>
     <script src="src/theme.js"></script>
+    <script src="src/landmarks.js"></script>
+    <script src="src/pulse.js"></script>
     <script src="src/look-fall.js"></script>
     <script src="src/look-braid.js"></script>
     <script src="src/look-vigil.js"></script>
     <script src="src/look-subject.js"></script>
     <script src="src/look-round.js"></script>
+    <script src="src/game.js"></script>
     <script src="src/main.js"></script>
   </body>
 </html>

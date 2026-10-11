@@ -23,6 +23,8 @@ import {
   partials,
   partialsOfChord,
   bandShares,
+  renderChime,
+  together,
   hz,
   waveFor,
   soundingAt,
@@ -128,6 +130,49 @@ test("the room and the tremulant still find headroom over the loudest moment", (
       one.piece.slug + " could reach " + worst.toFixed(3) + " of full scale once the room is counted"
     );
   }
+});
+
+test("a bell struck on the loudest moment of a piece still fits", () => {
+  // Playing along rings a bell over whatever the organ is doing, so the bell has
+  // to fit in the headroom the design already keeps. The worst case below is the
+  // loudest chord of the piece with the heaviest bell anyone can ask for, both
+  // strikes of it in phase with each other and with the pipes - which a struck
+  // bell never is - and the room counted on top afterwards.
+  const smear = 1 + 0.34 * 0.85;
+  const tremulant = 1 + 0.045 + 0.03;
+  const limiter = Math.pow(10, -3 / 20);
+  for (const one of loud) {
+    const bell = renderChime(spec, 60, { weight: spec.chime.heaviest });
+    assert.ok(peak(bell) > 0.05, "a bell on its own is inaudible: " + peak(bell).toFixed(3));
+    const struck = peak(together(one.samples, bell));
+    assert.ok(
+      struck < limiter,
+      one.piece.slug + ": its loudest chord with a bell on it reaches " + struck.toFixed(3) + ", where the limiter starts at " + limiter.toFixed(3)
+    );
+    // ... and the worst case of all: the two of them topping out in the same
+    // instant, however little chance a struck thing and a blowing one have of it.
+    const both = peak(one.samples) + peak(bell);
+    assert.ok(
+      both < limiter,
+      one.piece.slug + ": chord and bell topping out together would reach " + both.toFixed(3)
+    );
+    const worst = both * smear * tremulant;
+    assert.ok(
+      worst < 1,
+      one.piece.slug + ": chord and bell could reach " + worst.toFixed(3) + " of full scale once the room is counted"
+    );
+  }
+});
+
+test("a bell is a struck thing, not a held one", () => {
+  // It has to be gone again: a bell that rang on for five seconds would smear the
+  // whole piece into noise, whatever its level.
+  const bell = renderChime(spec, 60, { weight: 1 });
+  const first = peak(bell.slice(0, Math.round(0.25 * 44100)));
+  const after = peak(bell.slice(Math.round((spec.chime.decay - 0.05) * 44100)));
+  assert.ok(first > 0, "nothing was struck");
+  assert.ok(after < first * 0.01, "the bell was still ringing at " + after.toFixed(4) + " against " + first.toFixed(3));
+  assert.ok(spec.chime.decay < 2, "a bell that rings for " + spec.chime.decay + " s is a cymbal");
 });
 
 test("a chord is louder than one note, which is what dynamics mean", () => {

@@ -148,12 +148,7 @@ window.Bach = window.Bach || {};
     return bars[1] - bars[0];
   }
 
-  function theme(notes, options) {
-    var settings = options || {};
-    // A copy must wait two bars, unless told otherwise: shorter than that and it
-    // is more likely the same bar again at another pitch.
-    var gap = settings.gap === undefined ? barSeconds(settings.bars) * 2 : settings.gap;
-
+  function find(notes, gap) {
     var voices = lines(notes);
     var best = null;
     for (var v = 0; v < voices.order.length; v++) {
@@ -201,6 +196,29 @@ window.Bach = window.Bach || {};
       steps: best.figure.steps,
       heard: heard,
     };
+  }
+
+  // One answer kept. A picture and the game both ask about the same notes, and
+  // the longest piece takes a fifth of a second to answer, so the question is
+  // only asked once - keyed on the very list that was handed over, which is the
+  // same array for as long as a piece is open.
+  var asked = null;
+  var answer = null;
+
+  /**
+   * The tune a piece keeps coming back to, or null when nothing of eight notes or
+   * more does. A copy has to wait two bars before it counts, unless `gap` in
+   * seconds says otherwise.
+   */
+  function theme(notes, options) {
+    var settings = options || {};
+    // A copy must wait two bars, unless told otherwise: shorter than that and it
+    // is more likely the same bar again at another pitch.
+    var gap = settings.gap === undefined ? barSeconds(settings.bars) * 2 : settings.gap;
+    if (asked && asked.notes === notes && asked.gap === gap) return answer;
+    asked = { notes: notes, gap: gap };
+    answer = find(notes, gap);
+    return answer;
   }
 
   Bach.theme = theme;

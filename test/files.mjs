@@ -23,8 +23,14 @@ export function lookScripts() {
     .map((name) => "src/" + name);
 }
 
-/** What a picture needs to exist: the drawing it shares, the two finders it can
+/** What a picture needs to exist: the drawing it shares, the finders it can
  *  ask about the music, and every picture there is. */
 export function pictureScripts() {
-  return ["src/visual.js", "src/echoes.js", "src/theme.js"].concat(lookScripts());
+  return ["src/visual.js", "src/echoes.js", "src/theme.js", "src/landmarks.js"].concat(lookScripts());
+}
+
+/** What playing along needs: the beat grid, the finders it pays out on, and the
+ *  game itself. The organ is handed in, so audio.js comes with it. */
+export function gameScripts() {
+  return ["src/audio.js", "src/theme.js", "src/landmarks.js", "src/pulse.js", "src/game.js"];
 }

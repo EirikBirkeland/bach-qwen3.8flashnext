@@ -6,6 +6,7 @@ window.Bach = window.Bach || {};
 (function (Bach) {
   var organ = Bach.createOrgan();
   var visual = null;
+  var game = null;
   var prepared = null;
   var current = null;
   var pieceDuration = 0;
@@ -13,7 +14,7 @@ window.Bach = window.Bach || {};
   var state = "idle"; // idle, loading, playing, paused, done
 
   var elements = {};
-  ["card", "stage", "hud", "end", "pieces", "nowTitle", "nowTime", "stops", "voices", "lookHint", "pause", "restart", "stop", "again", "menu", "seek", "progress", "status", "endLine"].forEach(
+  ["card", "stage", "hud", "end", "pieces", "nowTitle", "nowTime", "stops", "voices", "lookHint", "pause", "restart", "stop", "again", "menu", "seek", "progress", "status", "endLine", "play", "score"].forEach(
     function (id) {
       elements[id] = document.getElementById(id);
     }
@@ -138,6 +139,7 @@ window.Bach = window.Bach || {};
         prepared = organ.prepare(data, rolesFor(piece));
         pieceDuration = data.duration;
         if (!visual) visual = Bach.createVisual(elements.stage);
+        if (!game) game = Bach.createGame(elements.stage, organ);
         var look = piece.look || {};
         visual.reset(prepared.notes, {
           name: look.name,
@@ -148,6 +150,8 @@ window.Bach = window.Bach || {};
           phrase: look.phrase,
           duration: data.duration,
         });
+        game.open(prepared.notes, data);
+        describeGame();
         elements.nowTitle.textContent = piece.title + " " + piece.subtitle;
         elements.stops.textContent = describeStops(prepared.stops);
         elements.lookHint.textContent = look.hint || "";
@@ -166,6 +170,20 @@ window.Bach = window.Bach || {};
         show("card");
         state = "idle";
       });
+  }
+
+  /**
+   * The button that says what it does: play along with the pulse of the piece,
+   * or just watch it. The piece plays the same either way.
+   */
+  function describeGame() {
+    elements.play.textContent = game.enabled() ? "Just watch" : "Play along";
+    elements.score.textContent = game.line();
+  }
+
+  function toggleGame() {
+    game.toggle();
+    describeGame();
   }
 
   /**
@@ -212,6 +230,9 @@ window.Bach = window.Bach || {};
     if (state !== "playing" && state !== "paused") return;
     organ.pump(); // does nothing while the piece is rested
     visual.frame(organ.time());
+    game.frame(organ.time());
+    var said = game.line();
+    if (said !== elements.score.textContent) elements.score.textContent = said;
     showTime();
     if (organ.time() >= pieceDuration + 1.5) {
       finish();
@@ -223,7 +244,9 @@ window.Bach = window.Bach || {};
   function finish() {
     state = "done";
     cancelAnimationFrame(timer);
-    elements.endLine.textContent = current.title + " is finished.";
+    var said = current.title + " is finished.";
+    var score = game.summary();
+    elements.endLine.textContent = score === "" ? said : said + " " + score;
     show("end");
   }
 
@@ -237,6 +260,22 @@ window.Bach = window.Bach || {};
   }
 
   var ARROW_STEP = 10; // seconds an arrow key travels
+
+  /**
+   * A strike, wherever it came from: a click on the picture itself, or the Enter
+   * key. A click on anything the page offers - the buttons, the line along the
+   * bottom - is that thing being used, not the player striking.
+   */
+  function strike() {
+    if (state !== "playing" || !game) return;
+    game.hit(organ.time());
+    describeGame();
+  }
+
+  function clicked(event) {
+    if (event && event.target !== elements.stage) return;
+    strike();
+  }
 
   function keyPressed(event) {
     if (state !== "playing" && state !== "paused") return;
@@ -252,6 +291,13 @@ window.Bach = window.Bach || {};
       moveTo(organ.time() - ARROW_STEP);
     } else if (event.key === "Home") {
       restart();
+    } else if (event.key === "Enter") {
+      if (onAButton) return; // the button was being used, not the player striking
+      strike();
+      return;
+    } else if (event.key === "p" || event.key === "P") {
+      toggleGame();
+      return;
     } else if (event.key === "Escape") {
       backToMenu();
       return;
@@ -283,6 +329,7 @@ window.Bach = window.Bach || {};
   }
 
   elements.stop.addEventListener("click", backToMenu);
+  elements.play.addEventListener("click", toggleGame);
   elements.again.addEventListener("click", function () {
     start(current);
   });
@@ -295,6 +342,7 @@ window.Bach = window.Bach || {};
     moveTo((event.clientX / across) * pieceDuration);
   });
   window.addEventListener("keydown", keyPressed);
+  window.addEventListener("click", clicked);
 
   buildList();
   show("card");

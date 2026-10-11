@@ -220,3 +220,15 @@ test("BWV 645: the opening ritornello comes back once, far along", () => {
   const back = found.heard[1].time;
   assert.ok(Math.abs(back - data.bars[23]) < 1, "it is back at bar 24 (" + data.bars[23] + " s), said it was at " + back);
 });
+
+test("the same question about the same notes is answered once", () => {
+  // A picture and the game both ask, and the longest piece takes a fifth of a
+  // second to answer. They are handed the same list, so it must be the same work.
+  const notes = notesOf("bwv639-ich-ruf-zu-dir");
+  const bars = dataOf("bwv639-ich-ruf-zu-dir").bars;
+  const once = theme(notes, { bars: bars });
+  const twice = theme(notes, { bars: bars });
+  assert.strictEqual(once, twice, "the finder went through the piece again");
+  // ... and a different question is not answered with the old answer.
+  assert.notStrictEqual(theme(notes, { bars: bars, gap: 1 }), once);
+});

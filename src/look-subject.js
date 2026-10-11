@@ -100,64 +100,14 @@ window.Bach = window.Bach || {};
             for (var i = 0; i < heard.length; i++) subject[keyOf(heard[i])] = true;
           }
         }
-        wakes = returns(list);
-        chords = struckTogether(list);
+        wakes = Bach.returns(list, WAKE);
+        chords = Bach.struckTogether(list, CHORD);
       }
 
       from = 0;
       to = 0;
       lastNow = -1;
       screen.wipe();
-    }
-
-    /**
-     * Where a voice comes back after having been gone WAKE seconds or more. Not
-     * the first time it speaks - that is only it starting.
-     */
-    function returns(list) {
-      var ended = {};
-      var found = [];
-      for (var i = 0; i < list.length; i++) {
-        var note = list[i];
-        var line = String(note.voice);
-        var end = note.time + note.length;
-        if (ended[line] === undefined) {
-          ended[line] = end;
-          continue; // a voice's first note is not a return
-        }
-        if (note.time - ended[line] >= WAKE) found.push(note);
-        if (end > ended[line]) ended[line] = end;
-      }
-      return found;
-    }
-
-    /**
-     * Where CHORD notes or more begin together, as one moment: when it was struck,
-     * and how far across the screen the notes of it reach.
-     */
-    function struckTogether(list) {
-      var found = [];
-      var group = [];
-      for (var i = 0; i <= list.length; i++) {
-        var note = list[i];
-        // Notes arrive in time order, so a group is a run of them beginning within
-        // a twentieth of a second of the first.
-        if (note && group.length > 0 && note.time - group[0].time < 0.02) {
-          group.push(note);
-          continue;
-        }
-        if (group.length >= CHORD) {
-          var low = group[0].pitch;
-          var high = group[0].pitch;
-          for (var g = 0; g < group.length; g++) {
-            if (group[g].pitch < low) low = group[g].pitch;
-            if (group[g].pitch > high) high = group[g].pitch;
-          }
-          found.push({ time: group[0].time, low: low, high: high, notes: group.length });
-        }
-        group = note ? [note] : [];
-      }
-      return found;
     }
 
     function xFor(pitch) {
