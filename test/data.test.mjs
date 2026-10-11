@@ -29,6 +29,15 @@ function piecesListed() {
   return sandbox.window.Bach.pieces;
 }
 
+/** The pictures the page has to offer, by name. */
+function looksRegistered() {
+  const sandbox = { window: {} };
+  for (const file of ["src/visual.js", "src/echoes.js", "src/look-fall.js", "src/look-braid.js"]) {
+    vm.runInNewContext(fs.readFileSync(new URL(file, root), "utf8"), sandbox);
+  }
+  return Object.keys(sandbox.window.Bach.looks);
+}
+
 test("there is converted music to play", () => {
   assert.ok(dataFiles.length > 0, "data/ holds no .json files");
 });
@@ -51,6 +60,34 @@ for (const name of dataFiles) {
       fs.readFileSync(new URL("data/" + slug + ".js", root), "utf8"),
       "run: node tools/midi2json.mjs"
     );
+  });
+
+  test(slug + ": the bar lines are the edition's own", () => {
+    assert.ok(data.bars.length > 1, "there are no bar lines");
+    assert.strictEqual(data.bars[0], 0, "the music does not start on a bar line");
+    assert.ok(data.bars[data.bars.length - 1] < data.duration, "a bar line is after the last note");
+    assert.ok(
+      data.metre.beats >= 2 && data.metre.beats <= 12,
+      "the metre " + data.metre.beats + "/" + data.metre.beat + " is not a metre anyone writes"
+    );
+    assert.ok(
+      [1, 2, 4, 8, 16].indexOf(data.metre.beat) >= 0,
+      "the metre " + data.metre.beats + "/" + data.metre.beat + " is not a metre anyone writes"
+    );
+
+    // A bar is as long as a bar is. The last one here is only twice as long as the
+    // others because the editor slows down at the end.
+    let previous = data.bars[0];
+    for (const bar of data.bars.slice(1)) {
+      assert.ok(bar > previous, "bar lines out of order at " + bar);
+      assert.ok(bar - previous > 0.5, "a bar of " + (bar - previous).toFixed(2) + " s at " + bar + " s");
+      assert.ok(bar - previous < 30, "a bar of " + (bar - previous).toFixed(2) + " s at " + bar + " s");
+      previous = bar;
+    }
+
+    // The bar lines come out of the MIDI file, so so does this.
+    const fresh = buildPieceData(readMidiFile(fs.readFileSync(new URL(data.source, root))), slug, data.source);
+    assert.deepStrictEqual(fresh.bars, data.bars, "the bar lines are not what the MIDI file's metre says");
   });
 
   test(slug + ": nothing was invented, and nothing was dropped in silence", () => {
@@ -196,6 +233,15 @@ test("every converted piece has a place on the page, and every name on the page 
     assert.ok(fs.existsSync(new URL(piece.file, root)), piece.file + " is missing: run node tools/midi2json.mjs");
 
     const data = readData(piece.slug + ".json");
+    const looks = looksRegistered();
+    const wanted = (piece.look && piece.look.name) || "fall";
+    assert.ok(
+      looks.indexOf(wanted) >= 0,
+      piece.slug + " asks to be drawn as " + wanted + ", which the page cannot do (it has " + looks.join(", ") + ")"
+    );
+    if (piece.look && piece.look.hint) {
+      assert.ok(piece.look.hint.length < 90, "the line saying how to read " + piece.slug + " is too long to read at a glance");
+    }
     const listed = new Set(Object.keys(piece.voices).map(Number));
     for (const voice of data.voices) {
       const known = piece.voices[voice.index];

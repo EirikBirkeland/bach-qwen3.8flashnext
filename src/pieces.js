@@ -5,6 +5,12 @@
 // line that matters most - the cantus firmus where there is one - so the eye can
 // follow it through every piece, and the ear too: `role` is what tells the organ
 // which line to give the melody stops and which one is played on the pedals.
+//
+// `look` says what the piece is drawn as: "fall" for anything moving along at
+// walking pace, and something else when the music has a shape of its own that
+// deserves a picture of its own (src/look-fall.js, src/look-braid.js). `phrase`
+// is how many bars a phrase takes there, and `hint` is the one line on screen
+// that says how to read it.
 
 window.Bach = window.Bach || {};
 
@@ -15,6 +21,7 @@ window.Bach = window.Bach || {};
       file: "data/bwv565-toccata-and-fugue-d-minor.js",
       title: "Toccata and Fugue",
       subtitle: "in D minor, BWV 565",
+      look: { name: "fall" },
       voices: {
         1: { name: "Right hand", colour: "#ffd47a", role: "melody" },
         2: { name: "Left hand", colour: "#79e2ff", role: "inner" },
@@ -26,6 +33,13 @@ window.Bach = window.Bach || {};
       file: "data/bwv639-ich-ruf-zu-dir.js",
       title: "Ich ruf zu dir, Herr Jesu Christ",
       subtitle: "chorale prelude in F minor, BWV 639",
+      // Four bars make a phrase here, and the whole piece is phrases of four: the
+      // opening one comes back unchanged at bar 5. See src/look-braid.js.
+      look: {
+        name: "braid",
+        phrase: 4,
+        hint: "four bars to a screen · a bar line glows gold when the music says something again",
+      },
       voices: {
         1: { name: "Chorale melody", colour: "#ffd47a", role: "melody" },
         3: { name: "Left hand", colour: "#79e2ff", role: "inner" },
@@ -37,6 +51,7 @@ window.Bach = window.Bach || {};
       file: "data/bwv645-wachet-auf.js",
       title: "Wachet auf, ruft uns die Stimme",
       subtitle: "chorale prelude in E flat major, BWV 645",
+      look: { name: "fall" },
       voices: {
         1: { name: "Right hand", colour: "#79e2ff", role: "inner" },
         2: { name: "Chorale melody", colour: "#ffd47a", role: "melody" },
@@ -48,6 +63,7 @@ window.Bach = window.Bach || {};
       file: "data/bwv582-passacaglia-c-minor.js",
       title: "Passacaglia and Fugue",
       subtitle: "in C minor, BWV 582",
+      look: { name: "fall" },
       voices: {
         1: { name: "Right hand", colour: "#ffd47a", role: "melody" },
         2: { name: "Octave above", colour: "#ff9bb0", role: "inner" },

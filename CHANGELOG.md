@@ -1,5 +1,31 @@
 # Releases
 
+## 0.2.0 — 2026-10-11
+
+The first piece gets a picture of its own. BWV 639 is no longer falling notes.
+
+- **BWV 639 ("Ich ruf zu dir") is woven, not falling.** A bar of this piece takes
+  six and a half seconds, so notes falling at walking pace showed almost nothing at
+  a time. Now time runs sideways and one phrase — four bars, twenty-six seconds —
+  is exactly as wide as the screen: the whole shape of a phrase is in front of you
+  while it is played. The three lines are unbroken strands of light (these editions
+  write everything legato) crossing a line of sound a quarter of the way in. The
+  line to follow is drawn the stoutest and an inner voice the thinnest, in the same
+  order the organ plays them, and a faint line at every C lets you watch the piece
+  sink, because its notes do.
+- **The repeat is something you can see.** This piece plays its opening four bars
+  again, whole, at 0:25. The page works that out from the notes themselves — nobody
+  told it where the repeats are — and the phrase that was already heard is warm gold
+  instead of cool blue, with its bar line glowing as it arrives.
+- **The page knows the bar lines now.** The converter reads the time signature the
+  edition wrote into each MIDI file and keeps where every bar starts, in seconds:
+  BWV 639 has 18 bars of 6.49 s, the Passacaglia 293 bars of 2.5 s. That is the
+  editor's own way of barring the music, not one invented here.
+- A small line in the corner of the screen says how to read the picture you are
+  looking at.
+- The other three pieces still wear the falling picture, unchanged, until each one
+  gets its own.
+
 ## 0.1.2 — 2026-10-11
 
 The organ has ranks now. A note is no longer one pipe, and the corner of the

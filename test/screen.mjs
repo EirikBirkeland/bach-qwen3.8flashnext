@@ -64,20 +64,24 @@ function luma(air) {
   return 0.2126 * air[0] + 0.7152 * air[1] + 0.0722 * air[2];
 }
 
+/** Warm light is what gold looks like: more red than blue. Cool is the other way. */
+function warmth(air) {
+  return air[0] - air[2];
+}
+
+const DARK = [0.02, 0.024, 0.043]; // the dark of the page
+
 /**
- * Watch frames of the picture and hand back the brightest one: how bright the
- * whole screen was on average, the brightest spot of it, how many cells of the
- * grid were burnt out, and how many cells there are to burn out.
- *
- * Frames are a sixtieth of a second apart unless `strideSeconds` says otherwise,
- * which is how a whole piece can be walked over without waiting for it.
+ * A screen the picture can draw on, and the grid of light it collects. Every
+ * frame starts from the same dark, so what is measured is one frame, not what a
+ * trail left behind.
  */
-export function brightestFrame(piece, frames, startAt, strideSeconds) {
-  const stride = strideSeconds || 1 / 60;
+export function createStage(piece) {
   const width = 1280;
   const height = 800;
   const air = [];
-  for (let i = 0; i < COLS * ROWS; i++) air.push([0.02, 0.024, 0.043]); // the dark of the page
+  for (let i = 0; i < COLS * ROWS; i++) air.push(DARK.slice());
+  const drawn = []; // every box the picture drew in the last frame
 
   const context = {
     globalAlpha: 1,
@@ -89,6 +93,7 @@ export function brightestFrame(piece, frames, startAt, strideSeconds) {
       const blended = context.globalCompositeOperation === "lighter";
       const isGradient = context.fillStyle && typeof context.fillStyle.at === "function";
       if (!plain && !isGradient) return;
+      if (drawn.length < 20000) drawn.push({ x: x, y: y, w: w, h: h, alpha: context.globalAlpha });
       const left = Math.max(0, x);
       const right = Math.min(width, x + w);
       const top = Math.max(0, y);
@@ -134,40 +139,95 @@ export function brightestFrame(piece, frames, startAt, strideSeconds) {
     addEventListener() {},
   };
   const sandbox = vm.createContext({ window, console });
-  const source = fs.readFileSync(new URL("../src/visual.js", import.meta.url), "utf8");
-  vm.runInContext(source, sandbox, { filename: "src/visual.js" });
+  for (const file of ["src/visual.js", "src/echoes.js", "src/look-fall.js", "src/look-braid.js"]) {
+    const source = fs.readFileSync(new URL("../" + file, import.meta.url), "utf8");
+    vm.runInContext(source, sandbox, { filename: file });
+  }
 
   const look = window.Bach.createVisual(canvas);
   look.reset(piece.notes, piece.look);
-
-  let worst = { mean: 0, peak: 0, burnt: 0, at: 0, cells: 0 };
+  return {
+    air: air,
+    drawn: drawn,
+    /** One frame, measured: how bright the screen was all over, at its brightest
+     *  spot, how much of it was gold rather than blue, and how much was burnt out. */
+    frame: function (now) {
+      for (const spot of air) spot.slice(0, 3).forEach((value, k) => (spot[k] = DARK[k]));
+      drawn.length = 0;
+      look.frame(now);
+      let mean = 0;
+      let peak = 0;
+      let burnt = 0;
+      let warm = 0;
+      for (const spot of air) {
+        const bright = luma(spot);
+        mean += bright;
+        warm += warmth(spot);
+        if (bright > peak) peak = bright;
+        if (bright > 0.9) burnt++;
+      }
+      return {
+        mean: mean / air.length,
+        peak: peak,
+        burnt: burnt,
+        warm: warm / air.length,
+        cells: air.length,
+      };
+    },
+  };
+}
+/**
+ * Watch frames of the picture and hand back the one that scores highest on
+ * `ranking` - which is how the brightest frame, or the goldiest one, gets found.
+ *
+ * Frames are a sixtieth of a second apart unless `strideSeconds` says otherwise,
+ * which is how a whole piece can be walked over without waiting for it.
+ */
+function measure(piece, frames, startAt, strideSeconds, ranking) {
+  const stride = strideSeconds || 1 / 60;
+  const stage = createStage(piece);
+  let worst = { mean: 0, peak: 0, burnt: 0, warm: 0, at: 0, cells: 0 };
+  let bestScore = -Infinity;
   for (let frame = 0; frame < frames; frame++) {
-    for (const spot of air) {
-      spot[0] = 0.02;
-      spot[1] = 0.024;
-      spot[2] = 0.043;
-    }
     const now = startAt + frame * stride;
-    look.frame(now);
-    let sum = 0;
-    let peak = 0;
-    let burnt = 0;
-    for (const spot of air) {
-      const bright = luma(spot);
-      sum += bright;
-      if (bright > peak) peak = bright;
-      if (bright > 0.9) burnt++;
+    const seen = stage.frame(now);
+    const score = ranking(seen);
+    if (score > bestScore) {
+      bestScore = score;
+      worst = Object.assign({ at: now }, seen);
     }
-    const mean = sum / air.length;
-    if (mean > worst.mean) worst = { mean, peak, burnt, at: now, cells: air.length };
   }
   return worst;
 }
 
-/** The notes of a data file, as the picture wants them. */
-export function notesFor(data) {
+/** The frame of a piece that lights the most of the screen. */
+export function brightestFrame(piece, frames, startAt, strideSeconds) {
+  return measure(piece, frames, startAt, strideSeconds, (seen) => seen.mean);
+}
+
+/** The frame of a piece that is goldiest overall - warm light minus cool light. */
+export function warmestFrame(piece, frames, startAt, strideSeconds) {
+  return measure(piece, frames, startAt, strideSeconds, (seen) => seen.warm);
+}
+
+/**
+ * The notes of a data file, as the picture wants them.
+ *
+ * `roles` is what src/pieces.js calls each voice - "melody", "inner", "pedal".
+ * On the page the picture is handed the organ's own notes, which carry their
+ * role (see toObjects in src/audio.js, done the same way here), so that a look
+ * can give the line to follow a different weight from the line under it. The
+ * measuring has to hand the same notes, or it measures a different picture.
+ */
+export function notesFor(data, roles) {
   return data.notes
-    .map((row) => ({ voice: row[0], pitch: row[1], time: row[2], length: row[3] }))
+    .map((row) => ({
+      voice: row[0],
+      pitch: row[1],
+      time: row[2],
+      length: row[3],
+      role: (roles && roles[String(row[0])]) || "inner",
+    }))
     .sort((a, b) => a.time - b.time);
 }
 

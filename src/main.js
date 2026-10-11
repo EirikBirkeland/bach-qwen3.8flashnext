@@ -13,7 +13,7 @@ window.Bach = window.Bach || {};
   var state = "idle"; // idle, loading, playing, paused, done
 
   var elements = {};
-  ["card", "stage", "hud", "end", "pieces", "nowTitle", "nowTime", "stops", "voices", "pause", "restart", "stop", "again", "menu", "seek", "progress", "status", "endLine"].forEach(
+  ["card", "stage", "hud", "end", "pieces", "nowTitle", "nowTime", "stops", "voices", "lookHint", "pause", "restart", "stop", "again", "menu", "seek", "progress", "status", "endLine"].forEach(
     function (id) {
       elements[id] = document.getElementById(id);
     }
@@ -138,13 +138,18 @@ window.Bach = window.Bach || {};
         prepared = organ.prepare(data, rolesFor(piece));
         pieceDuration = data.duration;
         if (!visual) visual = Bach.createVisual(elements.stage);
+        var look = piece.look || {};
         visual.reset(prepared.notes, {
+          name: look.name,
           pitchLow: data.pitchRange[0],
           pitchHigh: data.pitchRange[1],
           colours: coloursFor(piece),
+          bars: data.bars,
+          phrase: look.phrase,
         });
         elements.nowTitle.textContent = piece.title + " " + piece.subtitle;
         elements.stops.textContent = describeStops(prepared.stops);
+        elements.lookHint.textContent = look.hint || "";
         fillVoices(piece, data);
         elements.status.textContent = "";
         elements.card.classList.remove("dim");
@@ -225,6 +230,7 @@ window.Bach = window.Bach || {};
     cancelAnimationFrame(timer);
     if (organ.isPlaying()) organ.stop();
     elements.stops.textContent = "";
+    elements.lookHint.textContent = "";
     state = "idle";
     show("card");
   }

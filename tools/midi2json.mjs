@@ -11,6 +11,9 @@
 //                     to the page. Browsers will not let a page opened straight
 //                     from disk read a .json file, so this copy is what loads.
 //
+// The bar lines the edition wrote into the file come along too, in seconds, so
+// the page can keep time with the music and not only play it.
+//
 // Copies are left out: a track that repeats another track at the octave is an
 // octave coupler and a repeated note is one struck key. The JSON says what was
 // left out, so nothing is lost quietly. See pickVoices below.
@@ -20,6 +23,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { barLines } from "./bars.mjs";
 import { readMidiFile } from "./midi.mjs";
 
 const COLUMNS = ["voice", "pitch", "time", "duration", "velocity"];
@@ -132,18 +136,22 @@ export function buildPieceData(song, slug, source) {
   const single = withoutUnisonCopies(song.notes.filter((note) => playable.has(note.track)));
   const notes = single.notes;
   const rows = notes.map((note) => [note.track, note.pitch, note.time, note.duration, note.velocity]);
-  const ends = notes.reduce((latest, note) => Math.max(latest, note.time + note.duration), 0);
+  const ends = round(notes.reduce((latest, note) => Math.max(latest, note.time + note.duration), 0));
+  const bars = barLines(song, ends);
 
   return {
     slug,
     source,
     format: COLUMNS,
-    duration: round(ends),
+    duration: ends,
     noteCount: rows.length,
     // Every note of the MIDI file is either here or accounted for below.
     sourceNoteCount: song.notes.length,
     copies: { octaveTracks: plan.octaveTracks, unisonNotes: single.copies },
     pitchRange: rangeOf(notes),
+    metre: bars.metre,
+    // Where each bar starts, in seconds, as the edition bars the music.
+    bars: bars.starts,
     tempo: song.tempoChanges.map((change) => ({ time: change.seconds, bpm: change.bpm })),
     voices: song.tracks
       .filter((track) => track.notes > 0 && playable.has(track.index))

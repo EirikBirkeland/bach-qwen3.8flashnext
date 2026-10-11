@@ -9,7 +9,7 @@
 //   node tools/shape.mjs bwv582 --json      # the same numbers as JSON
 //
 // Everything here is measured from the notes: bars come from the metre written
-// in the MIDI file, themes are found by looking for a melody that turns up more
+// in the MIDI file (the converter puts them in the data file), themes are found by looking for a melody that turns up more
 // than once (allowed to be at another pitch, the way a fugue subject is), and a
 // rest is where a voice stops for a beat or more - these editions write
 // everything else legato, so there are not many.
@@ -18,7 +18,6 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { readMidiFile } from "./midi.mjs";
 
 // Everything is read from this folder's parent, the project, so the tool works
 // however it is started.
@@ -76,8 +75,8 @@ export function loadPiece(slug) {
     .map((note) => ({ ...note, end: Math.round((note.time + note.length) * 10000) / 10000 }))
     .sort((a, b) => a.time - b.time || a.pitch - b.pitch);
 
-  const metre = barsOf(data.source, data.duration);
-  const barSeconds = metre.starts.length > 1 ? round(metre.starts[1] - metre.starts[0]) : 0;
+  const bars = data.bars;
+  const barSeconds = bars.length > 1 ? round(bars[1] - bars[0]) : 0;
   return {
     slug,
     title: listed.title || slug,
@@ -90,45 +89,12 @@ export function loadPiece(slug) {
       noteCount: voice.noteCount,
       range: voice.pitchRange,
     })),
-    bars: metre.starts,
-    metre: metre.metre,
+    bars,
+    metre: data.metre,
     barSeconds,
     // How long a copy of a figure has to wait to count as the figure coming back,
     // rather than as the same bar again at another pitch (which is a sequence).
     copiedAfter: round(barSeconds * 2),
-  };
-}
-
-/**
- * Where the bars start, in seconds, from the metre written in the MIDI file.
- * These are the bar lines of the edition that made the file: the editor put that
- * metre there. BWV 582 is written 3/4 there and its ground bass is eight bars
- * long, which is how the reading of the denominator was checked.
- */
-function barsOf(source, duration) {
-  const song = readMidiFile(fs.readFileSync(at(source)));
-  const marks =
-    song.timeSignatures.length > 0
-      ? song.timeSignatures
-      : [{ tick: 0, seconds: 0, beats: 4, beat: 4, barTicks: song.ticksPerQuarter * 4 }];
-  const starts = [];
-  for (const mark of marks) {
-    let tick = mark.tick;
-    // Walk back to the last bar line before this change of metre, so the new
-    // metre starts a bar rather than landing in the middle of one.
-    while (tick - mark.barTicks >= marks[0].tick) tick -= mark.barTicks;
-    for (; ; tick += mark.barTicks) {
-      const seconds = song.toSeconds(tick);
-      // A bar line with no music after it is not worth a bar: many of these
-      // editions end exactly on the line.
-      if (seconds > duration - 0.05) break;
-      if (seconds >= (starts.length > 0 ? starts[starts.length - 1] : -1)) starts.push(round(seconds));
-    }
-  }
-  starts.sort((a, b) => a - b);
-  return {
-    starts: starts.filter((value, index) => index === 0 || value > starts[index - 1] + 0.001),
-    metre: { beats: marks[0].beats, beat: marks[0].beat },
   };
 }
 

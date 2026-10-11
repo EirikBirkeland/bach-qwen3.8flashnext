@@ -388,7 +388,15 @@ function makePage() {
   return page;
 }
 
-const SCRIPTS = ["src/pieces.js", "src/audio.js", "src/visual.js", "src/main.js"];
+const SCRIPTS = [
+  "src/pieces.js",
+  "src/audio.js",
+  "src/visual.js",
+  "src/echoes.js",
+  "src/look-fall.js",
+  "src/look-braid.js",
+  "src/main.js",
+];
 
 function openPage() {
   const page = makePage();
@@ -1042,4 +1050,48 @@ test("a crowded frame stays cheap enough to draw sixty times a second", async ()
   assert.ok(rects > 100, "a crowded frame only draws " + rects + " marks: is the picture missing again?");
   assert.ok(rects < 1500, "one frame draws " + rects + " boxes: that will not keep up with the music");
   assert.ok(gradients < 600, "one frame makes " + gradients + " gradients: that will not keep up with the music");
+});
+
+test("a piece is drawn the picture it asks for", async () => {
+  // src/pieces.js says what each piece is drawn as, src/main.js hands that on, and
+  // src/visual.js picks it out of the pictures the page has. If the name were ever
+  // dropped every piece would be drawn falling and nothing else would notice, so
+  // this asks the page what it really chose - and checks the line telling the
+  // player how to read the picture came with it.
+  const page = openPage();
+  const pieces = [...page.window.Bach.pieces];
+
+  const worn = [];
+  const makePicture = page.window.Bach.createVisual;
+  page.window.Bach.createVisual = function (canvas) {
+    const picture = makePicture(canvas);
+    const startOver = picture.reset;
+    picture.reset = function (notes, look) {
+      worn.push({ name: (look && look.name) || "fall", notes: notes.length });
+      return startOver(notes, look);
+    };
+    return picture;
+  };
+
+  for (const piece of pieces) {
+    page.elements.pieces.children[pieces.indexOf(piece)].click();
+    await settled();
+    page.playFrames(30, 1 / 60);
+
+    const wanted = (piece.look && piece.look.name) || "fall";
+    assert.ok(
+      page.window.Bach.looks[wanted],
+      piece.slug + " asks to be drawn as " + wanted + ", which the page has no picture of"
+    );
+    const last = worn[worn.length - 1];
+    assert.ok(last, piece.slug + " never asked for a picture");
+    assert.strictEqual(last.name, wanted, piece.slug + " was drawn as " + last.name + ", asked for " + wanted);
+    assert.ok(last.notes > 0, piece.slug + " asked for a picture with no notes in it");
+    assert.strictEqual(
+      page.elements.lookHint.textContent,
+      (piece.look && piece.look.hint) || "",
+      piece.slug + " does not say, on screen, how to read it"
+    );
+    page.elements.stop.click(); // back to the card, so the next piece can start
+  }
 });
