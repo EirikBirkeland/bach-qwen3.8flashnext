@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.3.4",
+    "date": "2026-10-11",
+    "released": "2026-10-11T17:40:56.178Z",
+    "summary": "The long view keeps its own beat: lamps down the verges, and the chorale lit a minute off",
+    "added": 573,
+    "removed": 45,
+    "logBytes": 4380728
+  },
+  {
     "version": "0.3.3",
     "date": "2026-10-11",
     "released": "2026-10-11T16:21:39.661Z",
