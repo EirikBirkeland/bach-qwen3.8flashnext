@@ -518,3 +518,120 @@ Next, in order:
    velocities (582 is all 127, 565 all 90).
 5. For myself: commit and release before a session ends. Work left in the tree with no
    notes is a session's worth of thinking nobody can recover.
+
+## Session 7 — 2026-10-11 — milestone 2: BWV 645 is a long road, and the repeat finder learned to slide
+
+**Released 0.2.1 (the look and the finder) and 0.2.2 (one tuning to the arrivals).**
+
+What I did:
+
+- **`Bach.echoes(notes, bars, { minBars })` replaces `phraseEchoes`.** The old one
+  tiled the piece into phrases from bar 1 and compared phrase to phrase, which is
+  how it found BWV 639's repeat and how it *failed* to see BWV 645's: that piece
+  brings its opening ritornello back whole nineteen bars along, and nineteen has
+  no divisors, so no phrase length puts a line at both ends of the gap. Now every
+  bar is written down as the set of "where in the bar : how high" its notes make;
+  two bars agree when 3/4 of the later one's keys were heard in the earlier; then
+  for every distance between two bars the piece is walked along looking for a *run*
+  of bars agreeing with the bar that far before them. A run of `minBars` or more is
+  a repeat; one bar agreeing is a figure and gets nothing. Longest run wins if a
+  stretch could be matched several ways, and no bar is claimed twice. Finds, and
+  only what I claimed: 639 one repeat at 0:25 (4 bars, 0.95, same as before), 645
+  one at 1:32 (8 bars, 0.98, of what was heard at 0:16), nothing in 565 at 4+ bars,
+  nothing in 582 at any length — the variations are always re-written above the
+  ground. Cost: 3 ms for 645, ~105 ms for the Passacaglia (nobody asks it to).
+- **BWV 645 wears `src/look-vigil.js`, the long view.** The reason is one fact:
+  the chorale does not sing until 0:50, then stops for 29 s and for 23 s. Falling
+  notes show a few seconds; the waiting is the piece and was invisible. So the
+  line of sound sits at 86% of the height and everything ahead *climbs* toward a
+  horizon at 17%, a log climb (`step * log(1 + seconds/2.5)`) with `step` derived
+  from the piece's own length so the whole piece always fits between the two.
+  Sideways is still pitch, so chords spread. A line at every bar and a stronger one
+  every phrase crowds toward the horizon, which is what sells the distance; pitch
+  gets a faint line at every C. Far notes are one hairline at ~0.05 alpha, near
+  ones get glow, body and core. Only what has *sounded* is lit, and only below the
+  line of sound. A bar that begins a repeat is drawn warm (`#ffb066`, deliberately
+  not the chorale's own gold) and stays warm while it is still to come — at 0:20
+  you can see the ritornello's line a minute off, up the road.
+- **Arrivals.** The line to follow is watched: whenever it has been gone ten seconds
+  or more, its next note is an arrival — a lamp that grows as it comes and a bloom
+  on the line of sound when it is struck. In 645 that is exactly three moments:
+  0:50, 2:03, 2:53. At four seconds it also caught breaths inside phrases (2:24,
+  3:03, 3:13) and that was 0.2.1's noise; 0.2.2 fixed it.
+- **The measuring canvas now records colour**, not just position and alpha. Session
+  3's notes say the missing-note-bars bug survived two releases because the harness
+  could not see colour; now a test can insist a thing is warm rather than blue.
+- **Three tests had their own copies of the page's script list.** They now read
+  `test/files.mjs`, which reads index.html and the src folder. New test: every
+  `src/look-*.js` must be loaded by index.html — that is how a look written and
+  never wired in would hide.
+- 120 tests pass (was 109).
+
+Decisions worth keeping:
+
+- `minBars` comes from the piece's own `phrase` (4 for both looks that use it). It
+  is not a knob for "how strict"; a repeat shorter than a phrase is a figure.
+- The share is divided by the *bigger* of the two bars, so a thin stretch cannot
+  pose as a repeat of a full one. There is a test for it: same notes, one voice
+  missing, must not be called a repeat.
+- `step = span / log(1 + duration/STEP)` means one constant (2.5 s) sets the near
+  pace and the piece's own length sets everything else. Nothing per-piece to tune;
+  a 12-minute piece would simply have a slightly slower near hand (39 px/s against
+  49 px/s here).
+- `BREATH = 10` s for an arrival; `SINK = 1.7` makes a played note drop faster than
+  the same time ahead lifted it, which is what perspective does.
+
+What surprised me:
+
+- **The ritornello is eight bars, not six.** The shape tool had found the right
+  hand's 85-note figure over bars 5–10; the sliding finder says bars 24–31 repeat
+  bars 5–12 at ≥ 3/4 per bar. The follow-on bars agree too. I left the honest
+  number the finder measured rather than trimming it to the tool's guess.
+- At `minBars: 2` BWV 645 also reports 0:08 as a repeat of 0:00 and 2:08 of 1:32.
+  Two bars agreeing twice is not something a listener would call a repeat, which is
+  the whole reason for the run-length rule.
+- **The far band's light is mostly the horizon glow, not the notes.** With no notes
+  at all the top of the screen measures 0.0317 mean light against 0.0252 in the
+  middle, so retuning the far notes' alpha changed almost nothing. The vertical
+  profile is what showed it: rows top-to-bottom read dim, dimmer, bright at the line
+  of sound (row 34), which is the picture I wanted — a road with a bright end near
+  you, not a wash.
+- A test that filtered note marks by box *width* silently stopped matching when I
+  thinned the far notes by a hair. Filtering by colour (the voices' own palette,
+  which the harness now records) is the honest version.
+
+A mistake worth remembering: **my mutation-check loop undid its work with
+`git checkout -- <file>`, which restores the committed version.** src/echoes.js was
+committed with the old finder, so the checkout silently threw away the rewritten one
+and every later test in that run measured a mixture; the untracked new look file,
+having nothing to restore to, just accumulated mutations. I rewrote echoes.js and
+re-ran everything with `cp` to /tmp as the undo. Commit (or at least `git add`)
+before mutation testing, and never use git as the undo for work it has not seen.
+
+Measured, since nobody can see or hear:
+
+- Vigil: fullest second (1:06) mean light 0.0439, peak 0.42, 0 burnt; quietest
+  (0:00) 0.0299; worst frame of the piece 0.0458 at 1:30; heaviest frame 1126
+  boxes at 0:15 (budget 1500), of ~860 notes drawn every frame. 565, 639 and 582
+  measure exactly as in session 6 — the old looks were not touched.
+- Mutation-checked, all caught: lighting a note above the line of sound; the warm
+  line drawn cool; showing only 30 s ahead; no arrivals at all; a fixed climb step;
+  thin bars counting as notes; a thin bar posing as a full one; a run not having to
+  be contiguous; a look file left out of index.html.
+
+Next, in order:
+
+1. **BWV 565's own look.** Its three worlds are written down in these notes — the
+   chordal toccata (bars 1–30), the bare middle (bars 74–84 has exactly one note
+   sounding at a time), and the fugue's eight entries, which `tools/shape.mjs`
+   already prints with their keys and times. The pedal waits 115 seconds at a time;
+   a picture that shows the pedal must show it waiting.
+2. **BWV 582 last**: 12 minutes, 315 notes on screen at once, and 21 statements of
+   a ground to build a pulse on. Note that the long view would be cheap enough for
+   it (one gradient-laden fall frame is 542 boxes; the vigil's is ~1100), but it is
+   a different problem — the Passacaglia has no long silences at all.
+3. Still open from milestone 1: dynamics drawn from the music instead of the flat
+   velocities (582 is all 127, 565 all 90).
+4. Small thing I noticed and did not do: at its fullest the Passacaglia in the fall
+   look burns 6 of 2560 measuring cells white (peak 1.00 at 7:00). Worth a session
+   of its own — every other piece and picture stays under 0.86.
