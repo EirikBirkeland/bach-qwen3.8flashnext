@@ -11,16 +11,24 @@
 
 import fs from "node:fs";
 import vm from "node:vm";
-import { gameScripts } from "./files.mjs";
+import { gameScripts, organScripts } from "./files.mjs";
 
 const root = new URL("..", import.meta.url);
 
-/** The page's own organ module, loaded the way a browser would load it. */
+/**
+ * The page's own organ module, loaded the way a browser would load it - which
+ * brings src/dynamics.js with it, since the organ asks how each note is played
+ * before it works out how loud it may play.
+ */
+let built = null;
 export function loadOrgan() {
-  const source = fs.readFileSync(new URL("src/audio.js", root), "utf8");
-  const sandbox = { window: {} };
-  vm.runInNewContext(source, sandbox);
-  return sandbox.window.Bach;
+  if (built) return built;
+  const sandbox = vm.createContext({ window: {} });
+  for (const file of organScripts()) {
+    vm.runInContext(fs.readFileSync(new URL(file, root), "utf8"), sandbox, { filename: file });
+  }
+  built = sandbox.window.Bach;
+  return built;
 }
 
 /** What pieces.js says the page can play. */
@@ -124,7 +132,7 @@ export function envelope(t, length, spec) {
 /** Every pipe one note opens, as the engine would open it. */
 export function pipesOf(note, spec) {
   const drawn = spec.stopsFor(spec.registration, note.role);
-  const base = spec.struck(note.velocity);
+  const base = spec.struck(note.velocity) * spec.shadeOf(note);
   const out = [];
   for (const stop of spec.pipesFor(drawn.stops, note.pitch)) {
     out.push({
@@ -145,10 +153,11 @@ export function pipeCount(note, spec) {
 
 /**
  * Render notes into seconds of sound. Each note needs pitch, role, time, length
- * and velocity, as the organ's own prepared notes do; `gain` is what the organ
- * worked out for the piece. Notes are rendered without detuning, which lines the
- * pipes up more neatly than they ever are in a real instrument - so what comes
- * out is if anything louder than the organ will be.
+ * and velocity, as the organ's own prepared notes do - and their `shade`, which is
+ * how loud each one is played; `gain` is what the organ worked out for the piece.
+ * Notes are rendered without detuning, which lines the pipes up more neatly than
+ * they ever are in a real instrument - so what comes out is if anything louder than
+ * the organ will be.
  */
 export function render(notes, options) {
   const spec = options.spec;
@@ -160,7 +169,7 @@ export function render(notes, options) {
   for (const note of notes) {
     const when = note.time - (options.from || 0);
     const length = note.length;
-    const base = options.gain * spec.struck(note.velocity);
+    const base = options.gain;
     for (const pipe of pipesOf(note, spec)) {
       const first = Math.max(0, Math.floor(when * rate));
       const last = Math.min(horizon, Math.ceil((when + length + spec.envelope.release + 0.03) * rate));
@@ -322,7 +331,7 @@ export function soundingAt(notes, at) {
 export function partialsOfChord(notes, spec, gain) {
   const found = [];
   for (const note of notes) {
-    const base = gain * spec.struck(note.velocity);
+    const base = gain * spec.struck(note.velocity) * spec.shadeOf(note);
     for (const pipe of pipesOf(note, spec)) {
       const mix = spec.mixes[spec.ranks[pipe.rank].mix];
       const peak = wavePeak(mix);
@@ -359,6 +368,28 @@ export function bandShares(partials) {
 }
 
 /**
+ * Where a piece's sound lies, taken a chord at a time: each band as the middle of
+ * the chords sampled every `every` seconds. Asking this of one chord is fragile -
+ * the fullest chord of the Passacaglia is a dozen manual notes over a pedal C1,
+ * and 32 Hz is under the bottom of the lowest band - and what an instrument is made
+ * of is a claim about a piece, not about one moment in it.
+ */
+export function bandSharesAcross(notes, spec, gain, every) {
+  const step = every || 10;
+  const last = notes.length ? notes[notes.length - 1].time : 0;
+  const each = [];
+  for (let at = 0; at <= last; at += step) {
+    const sounding = soundingAt(notes, at);
+    if (sounding.length > 0) each.push(bandShares(partialsOfChord(sounding, spec, gain)));
+  }
+  if (each.length === 0) return bandShares([]);
+  return each[0].map((band, i) => {
+    const shares = each.map((one) => one[i].share).sort((a, b) => a - b);
+    return { low: band.low, high: band.high, share: shares[Math.floor(shares.length / 2)] };
+  });
+}
+
+/**
  * The heaviest moment of a piece: where the pipes sounding at once add up to
  * most. That moment is what the whole piece is played quietly enough for.
  */
@@ -385,9 +416,15 @@ export function heaviestMoment(notes, spec) {
 }
 
 /** The rows of a data file, as the organ sees them, with a role from pieces.js. */
-export function preparedNotes(data, roles) {
+/**
+ * The rows of a data file, as the organ sees them: in order, with a role from
+ * pieces.js, and with the shaping the organ gives each note - which is worked out
+ * by the page's own src/dynamics.js here, not by a copy of it, so a measurement
+ * cannot drift from the sound.
+ */
+export function preparedNotes(data, roles, phrase) {
   const format = data.format;
-  return data.notes
+  const notes = data.notes
     .map((row) => ({
       voice: row[format.indexOf("voice")],
       pitch: row[format.indexOf("pitch")],
@@ -397,6 +434,11 @@ export function preparedNotes(data, roles) {
       role: (roles && roles[String(row[format.indexOf("voice")])]) || "inner",
     }))
     .sort((a, b) => a.time - b.time || a.pitch - b.pitch);
+  const shades = loadOrgan().dynamics(notes, { bars: data.bars, duration: data.duration, phrase: phrase });
+  notes.forEach((one, i) => {
+    one.shade = shades[i];
+  });
+  return notes;
 }
 
 export function rolesFor(piece) {
@@ -407,6 +449,16 @@ export function rolesFor(piece) {
     }
   }
   return roles;
+}
+
+/** How many bars a phrase takes in a piece, which is what the organ shapes it by. */
+export function phraseOf(piece) {
+  return piece.look && piece.look.phrase;
+}
+
+/** How many bars a phrase takes in a piece - which is how the organ breathes. */
+export function phraseFor(piece) {
+  return piece.look ? piece.look.phrase : undefined;
 }
 
 /**

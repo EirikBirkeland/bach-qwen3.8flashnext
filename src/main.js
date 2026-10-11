@@ -136,11 +136,13 @@ window.Bach = window.Bach || {};
     organ.open();
     loadData(piece)
       .then(function (data) {
-        prepared = organ.prepare(data, rolesFor(piece));
+        var look = piece.look || {};
+        // The card says how many bars a phrase takes here, and the organ needs that
+        // to know how to breathe: src/dynamics.js shapes the piece phrase by phrase.
+        prepared = organ.prepare(data, rolesFor(piece), look.phrase);
         pieceDuration = data.duration;
         if (!visual) visual = Bach.createVisual(elements.stage);
         if (!game) game = Bach.createGame(elements.stage, organ);
-        var look = piece.look || {};
         visual.reset(prepared.notes, {
           name: look.name,
           pitchLow: data.pitchRange[0],

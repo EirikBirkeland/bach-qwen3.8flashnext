@@ -25,6 +25,8 @@ import {
   loadPieces,
   loadData,
   rolesFor,
+
+  phraseFor,
   preparedNotes,
   heaviestMoment,
   render,
@@ -70,8 +72,8 @@ const columns = [
 for (const piece of pieces) {
   if (wanted && piece.slug.indexOf(wanted) < 0) continue;
   const data = loadData(piece.slug);
-  const notes = preparedNotes(data, rolesFor(piece));
-  const prepared = page.createOrgan().prepare(data, rolesFor(piece));
+  const notes = preparedNotes(data, rolesFor(piece), phraseFor(piece));
+  const prepared = page.createOrgan().prepare(data, rolesFor(piece), phraseFor(piece));
   const heaviest = heaviestMoment(notes, spec);
 
   const seconds = 1.2;
@@ -131,8 +133,8 @@ console.log("\nwhere the widest chord's energy lies (body / middle / presence / 
 for (const piece of pieces) {
   if (wanted && piece.slug.indexOf(wanted) < 0) continue;
   const data = loadData(piece.slug);
-  const notes = preparedNotes(data, rolesFor(piece));
-  const prepared = page.createOrgan().prepare(data, rolesFor(piece));
+  const notes = preparedNotes(data, rolesFor(piece), phraseFor(piece));
+  const prepared = page.createOrgan().prepare(data, rolesFor(piece), phraseFor(piece));
   const heaviest = heaviestMoment(notes, spec);
   const bands = bandShares(partialsOfChord(heaviest.notes, spec, prepared.gain));
   console.log(

@@ -29,6 +29,8 @@ import {
   loadPieces,
   loadData,
   rolesFor,
+
+  phraseFor,
   preparedNotes,
   partialsOfChord,
   heaviestMoment,
@@ -99,8 +101,8 @@ const facts = [];
 for (const piece of pieces) {
   if (wanted && piece.slug.indexOf(wanted) < 0) continue;
   const data = loadData(piece.slug);
-  const notes = preparedNotes(data, rolesFor(piece));
-  const prepared = organ.prepare(data, rolesFor(piece));
+  const notes = preparedNotes(data, rolesFor(piece), phraseFor(piece));
+  const prepared = organ.prepare(data, rolesFor(piece), phraseFor(piece));
   // The game itself, so the beats, their length and the note each would ring come
   // from the page's own code and not from a copy of it here.
   const game = page.createGame(fakeCanvas(), organ);

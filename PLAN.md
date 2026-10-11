@@ -149,6 +149,30 @@ Built in this order:
 4. `src/game.js` — the grid, the judging, the run, the ladder, the score line.
 5. `main.js` + `index.html` — the button, `P`, a click on the picture, the score, a line on the end pane.
 
+### Milestone 4: the instrument breathes
+
+- [x] Play every note was the first job; play every note *at one level* was never the plan. These editions
+      carry no dynamics at all - every key of the Passacaglia was struck at 127, every key of the Toccata at
+      90 - so the shaping had to be read out of the notes. `src/dynamics.js` gives every note a level from
+      three things a piece says about itself, and nothing in it is typed in per piece: where the note sits in
+      its phrase (a phrase is begun held back, grows to two thirds along, and settles at its cadence); how
+      many notes are going (a single line is played up, a tutti held back, against what this piece usually
+      has going); and whether this line is coming back into something after a silence - which is what an
+      entry is, and it is struck firmer, most on the note that starts it. The organ weighs its ceiling after
+      the shaping, so the shaping moves the loudness about inside a piece without ever making a piece louder.
+      Released `0.4.0`; `node tools/dynamics.mjs` prints the measuring, bar by bar, with and without.
+
+  - [ ] The bell is sized per piece, not per moment. `src/touch.js` gives each piece one bell from how full
+        the piece runs where its beats are, and that is now the coarsest thing left in the sound: over BWV
+        565 the bell sits 7 dB under the music on a beat in the bare middle and 3 dB under it in the toccata.
+        Session 11 left this out on purpose, because a bell grows exactly where the chord is widest, which is
+        where the headroom is already spoken for. Measured again since the shaping went in: the four pieces
+        sit within 1.7 to 1 of their own music, which is as good as a per-piece rule gets.
+  - [ ] The wheel of BWV 582 tips one cell of the picture white twice in the piece (225.8 s and 245.8 s,
+        measured a sixtieth of a second apart, found in session 15): its beat tooth is laid where a note's
+        own core is shining, and `pulse` never consults the record of where the light has already been laid.
+        Small, and the grid the tests measure on should go from one second to a sixth while it is done.
+
 ### After that
 
 Yours to plan. Add milestones here as you learn what works. The owner may add more pieces to `music/`.

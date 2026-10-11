@@ -1212,6 +1212,56 @@ test("clicking the picture on a beat rings a bell and starts a run", async () =>
   assert.match(page.elements.score.textContent, /^1 in a row/, "the run was not counted on screen");
 });
 
+test("a note's shaping reaches its pipes", () => {
+  // Two identical notes, one of them shaped twice as loud. The levels the pipes are
+  // given have to say so, or all of src/dynamics.js is a rule written down and
+  // never played.
+  const page = openPage();
+  const organ = page.window.Bach.createOrgan();
+  organ.open();
+  const prepared = organ.prepare(
+    {
+      format: ["voice", "pitch", "time", "duration", "velocity"],
+      duration: 12,
+      notes: [
+        [1, 60, 0, 1, 0.7],
+        [1, 60, 4, 1, 0.7],
+      ],
+    },
+    { 1: "melody" }
+  );
+  const before = prepared.notes[0].shade;
+  prepared.notes[1].shade = before * 2;
+
+  organ.play(prepared, 0);
+  organ.pump();
+  const soft = pipeLevels(page);
+  page.audio.context.currentTime = 4;
+  organ.pump();
+  const loud = pipeLevels(page).slice(soft.length);
+
+  assert.ok(soft.length >= 4 && loud.length === soft.length, "the two notes did not open the same pipes");
+  for (let i = 0; i < soft.length; i++) {
+    assert.ok(
+      Math.abs(loud[i] - soft[i] * 2) < 1e-12,
+      "pipe " + i + " was given " + loud[i] + " where the plain note was given " + soft[i]
+    );
+  }
+});
+
+/** The level each pipe was brought up to, in the order they spoke. */
+function pipeLevels(page) {
+  const levels = [];
+  for (const gain of page.audio.gainNodes) {
+    const events = gain.gain.events;
+    if (!events || events.length < 5) continue; // not a pipe: the master, the bell, the wind
+    let top = 0;
+    for (const one of events) if (one.kind === "linear") top = Math.max(top, one.value);
+    levels.push(top);
+  }
+  return levels;
+}
+
 test("a bell that is handed a sizing which is not one falls back on the plain bell", () => {
   const page = openPage();
   const organ = page.window.Bach.createOrgan();

@@ -1,5 +1,38 @@
 # Releases
 
+## 0.4.0 — 2026-10-11
+
+The organ breathes now. Every piece is shaped phrase by phrase, thin moments are played
+fuller than full ones, and a line is brought out when it comes back.
+
+- **The music was flat, and it was not our fault.** These editions carry no dynamics at
+  all: every key of the Passacaglia was struck at 127, every key of the Toccata at 90, so
+  until now the organ played a whole chorale at one level from first note to last. The
+  shaping is read out of the notes instead, and nothing about it is typed in per piece.
+- **A phrase is an arch.** It begins held back, grows to two thirds along, and settles a
+  little at its cadence - about 2 dB of swell, over four bars in three of these pieces and
+  over the eight bars of one turn of the Passacaglia's ground. This is what a phrase sounds
+  like when a person plays it and not a player piano.
+- **A thin moment is played fuller than a full one.** In the bare middle of the Toccata's
+  fugue exactly one note sounds at a time for a minute and a half, and the organ - which
+  sets its whole volume by the loudest chord in the piece - was playing it as if nine were
+  going. Now a single line comes up about 2 dB and a crowded ending is held back,
+  against how many notes *this* piece usually has going.
+- **A line taken up again is brought out**, most on the note that starts it and easing off
+  over the second after: the pedal of the Toccata coming back after waiting a hundred and
+  fifteen seconds, the chorale of "Wachet auf" coming home after twenty-nine seconds of
+  waiting for it. A whole ensemble arriving together out of a silence is not an entry -
+  that is a chord, and the Toccata is nothing but those.
+- **Nothing got louder.** The organ weighs its loudest chord after the shaping, so the
+  top of a piece still lands exactly on the ceiling it sets itself; what changed is
+  everything underneath it. Measured, the shaping swings a phrase 1.1 to 1.4 dB above its
+  own opening, narrows the gap between the thinnest and fullest bars by half a dB, and
+  touches 330 of the Toccata's 3651 notes with an entry. `node tools/dynamics.mjs` prints
+  all of it, bar by bar, with and without.
+- **Found on the way:** the measuring harness had been counting how hard a key was struck
+  twice over, so every rendered peak was reading 6 to 23 per cent too high. Fixed; the
+  numbers quoted from now on are the ones the instrument really reaches.
+
 ## 0.3.5 — 2026-10-11
 
 "Ich ruf zu dir" keeps its own beat now: a ruler of ticks along the top and the bottom

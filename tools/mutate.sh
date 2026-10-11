@@ -4,12 +4,17 @@
 set -u
 cd "$(dirname "$0")/.."
 mkdir -p /tmp/mut
-for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js src/look-vigil.js src/look-braid.js tools/bars.mjs; do
+for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/dynamics.js src/visual.js src/look-round.js src/look-vigil.js src/look-braid.js tools/bars.mjs; do
   cp "$f" "/tmp/mut/$(basename "$f")"
 done
 
+# ONLY=braid tools/mutate.sh runs the mutations whose label mentions braid, which is
+# worth knowing when one file is being worked on and a full run costs half an hour.
+only="${ONLY:-}"
+
 run() {
   label="$1"; file="$2"; expr="$3"
+  if [ -n "$only" ] && [ "${label#*$only}" = "$label" ]; then return; fi
   cp "/tmp/mut/$(basename "$file")" "$file"
   perl -0pi -e "$expr" "$file"
   if cmp -s "$file" "/tmp/mut/$(basename "$file")"; then
@@ -115,8 +120,31 @@ run "braid: a struck beat lays no light on the line of sound" src/look-braid.js 
 run "braid: a struck beat is lit gold, which is the chorale's colour" src/look-braid.js 's|ring\(ruler\.lineX, ruler\.crown - CLEAR, reach, MARK,|ring(ruler.lineX, ruler.crown - CLEAR, reach, "#ffd47a",|'
 run "braid: a click that caught nothing is silent" src/look-braid.js 's/          ctx\.globalAlpha = 0\.05 \* faded;/          ctx.globalAlpha = 0;/'
 run "braid: the ruler does not brighten for a long run" src/look-braid.js 's/      if \(shot\.run > 0\.02\) \{/      if (false) {/'
+# How a piece is played, note by note: the arch of a phrase, a thin moment played
+# fuller than a full one, and a line brought out when it is taken up again.
+run "dynamics: a phrase is played flat" src/dynamics.js 's/  function arch\(place\) \{/  function arch(place) { if (place >= 0) return 1;/'
+run "dynamics: a phrase never grows, only begins held back" src/dynamics.js 's/    return ARCH.start \+ \(ARCH.peak - ARCH.start\) \* \(p \/ ARCH.peakAt\);/    return ARCH.start;/'
+run "dynamics: a cadence is played as loud as the middle of a phrase" src/dynamics.js 's/      return ARCH.peak \+ \(ARCH.end - ARCH.peak\) \* \(\(p - ARCH.peakAt\) \/ \(1 - ARCH.peakAt\)\);/      return ARCH.peak;/'
+run "dynamics: nothing is ever played up or down for its thinness" src/dynamics.js 's/  function body\(count, reference\) \{/  function body(count, reference) { if (count >= 0) return 1;/'
+run "dynamics: a single line is played up as far as it likes" src/dynamics.js 's/    if \(lift > THINNEST\) return THINNEST;\n//'
+run "dynamics: a tutti is never held back" src/dynamics.js 's/    if \(lift < FULLEST\) return FULLEST;\n//'
+run "dynamics: the usual fullness is the loudest moment, not the middle" src/dynamics.js 's/    var reference = middle\(counts\);/    var reference = Math.max.apply(null, counts);/'
+run "dynamics: a whole ensemble out of a silence counts as an entry" src/dynamics.js 's/>= RETURN && going\[i\] > 0\)/>= RETURN)/'
+run "dynamics: any break in a line is a homecoming" src/dynamics.js 's/\] >= RETURN && going\[i\] > 0\)/] > 0 && going[i] > 0)/'
+run "dynamics: an entry keeps its lift for ever" src/dynamics.js 's/        if \(since >= ENTRY_EASE\) \{/        if (false) {/'
+run "dynamics: nothing caps what the three rules say together" src/dynamics.js 's/      if \(shade > LARGEST\) shade = LARGEST;\n//'
+run "dynamics: nothing floors them either" src/dynamics.js 's/      if \(shade < SMALLEST\) shade = SMALLEST;\n//'
+run "dynamics: a piece with no bar grid is given an arch anyway" src/dynamics.js 's/    if \(!bars \|\| bars.length < 2 \|\| !\(phrase > 0\)\) return null;\n//'
+run "audio: the organ never asks how a piece should be played" src/audio.js 's/var shades = Bach\.dynamics
+/var shades = Bach.nothingshade
+/'
+run "audio: the shaping never reaches the pipes" src/audio.js 's/      var base = playing\.gain \* struck\(note\.velocity\) \* shadeOf\(note\);/      var base = playing.gain * struck(note.velocity);/'
+run "audio: the shaping is left out of the weight the ceiling is planned from" src/audio.js 's/    return total \* struck\(note\.velocity\) \* shadeOf\(note\);/    return total * struck(note.velocity);/'
+run "audio: the bar grid is not handed to the shaping" src/audio.js 's/bars: data\.bars, duration: data\.duration/bars: null, duration: data.duration/'
+
+
 echo "--- restoring ---"
-for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js src/look-vigil.js src/look-braid.js tools/bars.mjs; do
+for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/dynamics.js src/visual.js src/look-round.js src/look-vigil.js src/look-braid.js tools/bars.mjs; do
   cp "/tmp/mut/$(basename "$f")" "$f"
 done
 node --test 2>&1 | grep -E "^ℹ (tests|pass|fail)"

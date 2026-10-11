@@ -274,9 +274,15 @@ window.Bach = window.Bach || {};
   }
 
   // These files carry no dynamics at all - every key was struck the same - so
-  // velocity only nudges the level.
+  // velocity only nudges the level. The shaping of a piece is src/dynamics.js's
+  // business, and it arrives on each note as its `shade`.
   function struck(velocity) {
     return 0.85 + 0.3 * velocity;
+  }
+
+  /** The shaping of one note: how loud it is played within its piece. */
+  function shadeOf(note) {
+    return note && typeof note.shade === "number" && note.shade > 0 ? note.shade : 1;
   }
 
   /**
@@ -289,7 +295,7 @@ window.Bach = window.Bach || {};
     var stops = pipesFor(drawn.stops, note.pitch);
     var total = drawn.breath;
     for (var i = 0; i < stops.length; i++) total += stops[i].level;
-    return total * struck(note.velocity);
+    return total * struck(note.velocity) * shadeOf(note);
   }
 
   /**
@@ -545,7 +551,7 @@ window.Bach = window.Bach || {};
      */
     function speak(note, index, when, left) {
       var drawn = stopsFor(playing.registration, note.role);
-      var base = playing.gain * struck(note.velocity);
+      var base = playing.gain * struck(note.velocity) * shadeOf(note);
       var stops = pipesFor(drawn.stops, note.pitch);
       for (var i = 0; i < stops.length; i++) {
         var stop = stops[i];
@@ -665,11 +671,17 @@ window.Bach = window.Bach || {};
 
       /**
        * Read a piece of note data over: put the notes in order, work out which
-       * stops each line draws (`roles`), and how loud one pipe may be so that the
-       * heaviest chord in the whole piece still fits.
+       * stops each line draws (`roles`), how each of its notes is played
+       * (`src/dynamics.js`, which needs to know how many bars make a phrase there),
+       * and how loud one pipe may be so that the heaviest chord in the whole piece
+       * still fits.
        */
-      prepare: function (data, roles) {
+      prepare: function (data, roles, phrase) {
         var notes = toObjects(data, roles);
+        var shades = Bach.dynamics
+          ? Bach.dynamics(notes, { bars: data.bars, duration: data.duration, phrase: phrase })
+          : null;
+        for (var i = 0; i < notes.length; i++) notes[i].shade = shades ? shades[i] : 1;
         var heaviest = heaviestChord(notes, REGISTRATION);
         return {
           notes: notes,
@@ -745,6 +757,7 @@ window.Bach = window.Bach || {};
     stopsFor: stopsFor,
     pipesFor: pipesFor,
     struck: struck,
+    shadeOf: shadeOf,
     noteWeight: noteWeight,
     heaviestChord: heaviestChord,
     stopsDrawn: stopsDrawn,

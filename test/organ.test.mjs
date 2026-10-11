@@ -12,8 +12,10 @@ import {
   loadPieces,
   loadData,
   rolesFor,
+  phraseFor,
   preparedNotes,
   heaviestMoment,
+  bandSharesAcross,
   render,
   renderAcross,
   peak,
@@ -38,10 +40,11 @@ const RATE = 44100;
 function prepared(piece) {
   const data = loadData(piece.slug);
   const roles = rolesFor(piece);
+  const phrase = phraseFor(piece);
   return {
     data: data,
-    notes: preparedNotes(data, roles),
-    ready: page.createOrgan().prepare(data, roles),
+    notes: preparedNotes(data, roles, phrase),
+    ready: page.createOrgan().prepare(data, roles, phrase),
   };
 }
 
@@ -267,8 +270,10 @@ test("the sound sits low, the way an organ in a room sits", () => {
   // Most of the energy of an organ in a room is in the pedals and the 8 foot
   // pipes, with the presence above that and hardly any fizz at the very top. If a
   // change ever makes this bright and thin, or dark and muddy, it shows up here.
+  // It asks the middle of a chord every ten seconds, not one chord: how the stops
+  // are drawn is a claim about a piece, and about the whole of a piece at that.
   for (const one of loud) {
-    const bands = bandShares(partialsOfChord(one.heaviest.notes, spec, one.context.ready.gain));
+    const bands = bandSharesAcross(one.context.notes, spec, one.context.ready.gain, 10);
     const said = bands.map((band) => (band.share * 100).toFixed(0) + "%").join(" / ");
     assert.ok(bands[0].share > 0.1, one.piece.slug + " has no body - " + said);
     assert.ok(

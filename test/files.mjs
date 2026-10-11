@@ -29,15 +29,20 @@ export function pictureScripts() {
   return ["src/visual.js", "src/echoes.js", "src/theme.js", "src/landmarks.js"].concat(lookScripts());
 }
 
+/** What the instrument needs to exist: the shaping of a piece goes with it, since
+ *  the organ asks for it before it works out how loud it may play. */
+export function organScripts() {
+  return ["src/dynamics.js", "src/audio.js"];
+}
+
 /** What playing along needs: the beat grid, the finders it pays out on, and the
  *  game itself. The organ is handed in, so audio.js comes with it. */
 export function gameScripts() {
-  return [
-    "src/audio.js",
+  return organScripts().concat([
     "src/theme.js",
     "src/landmarks.js",
     "src/pulse.js",
     "src/touch.js",
     "src/game.js",
-  ];
+  ]);
 }
