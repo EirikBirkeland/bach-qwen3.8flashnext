@@ -1402,33 +1402,42 @@ test("playing along draws its ladder on the picture, and just watching draws non
   }
 });
 
-test("the Passacaglia's wheel takes the pulse itself, and the ladder stays away", async () => {
-  // The wheel of BWV 582 marks its beats on its own rim, so the game's ladder of
-  // falling bars must not be laid over it as well. This is the wiring in main.js:
-  // the picture is asked, and it says yes for this piece only.
-  const page = openPage();
-  const listed = [...page.window.Bach.pieces];
-  page.elements.pieces.children[listed.findIndex((one) => one.slug === "bwv582-passacaglia-c-minor")].click();
-  await settled();
-  const data = page.window.BachData["bwv582-passacaglia-c-minor"];
-  page.elements.seek.click({ clientX: (120 / data.duration) * page.window.innerWidth });
-  page.nextFrame(1 / 60);
+test("a picture that takes the pulse keeps the ladder away from the piece", async () => {
+  // Two of these worlds mark their beats in their own picture - the wheel on its
+  // rim, the long view on its verges - so the game's ladder of falling bars must
+  // not be laid over them as well. This is the wiring in main.js: the picture is
+  // asked, and it says yes for those two only.
+  const asked = [
+    { slug: "bwv582-passacaglia-c-minor", at: 120 },
+    { slug: "bwv645-wachet-auf", at: 40 },
+  ];
+  for (const one of asked) {
+    const page = openPage();
+    const listed = [...page.window.Bach.pieces];
+    page.elements.pieces.children[listed.findIndex((piece) => piece.slug === one.slug)].click();
+    await settled();
+    const data = page.window.BachData[one.slug];
+    page.elements.seek.click({ clientX: (one.at / data.duration) * page.window.innerWidth });
+    page.nextFrame(1 / 60);
 
-  const before = page.canvas.drawn.fillRects;
-  page.nextFrame(1 / 60);
-  const watching = page.canvas.drawn.fillRects - before;
+    const before = page.canvas.drawn.fillRects;
+    page.nextFrame(1 / 60);
+    const watching = page.canvas.drawn.fillRects - before;
 
-  page.elements.play.click();
-  const since = page.canvas.drawn.rects.length;
-  const marks = page.canvas.drawn.fillRects;
-  page.nextFrame(1 / 60);
-  const playing = page.canvas.drawn.fillRects - marks;
-  assert.ok(playing > 0, "playing along drew nothing on the wheel");
+    page.elements.play.click();
+    const since = page.canvas.drawn.rects.length;
+    const marks = page.canvas.drawn.fillRects;
+    page.nextFrame(1 / 60);
+    const playing = page.canvas.drawn.fillRects - marks;
+    assert.ok(playing > 0, one.slug + ": playing along drew nothing on its own picture");
 
-  const frame = page.canvas.drawn.rects.slice(since);
-  const beams = frame.filter((box) => box[2] > 60 && box[3] <= 2);
-  assert.strictEqual(beams.length, 0, "the ladder was laid over the wheel: " + beams.length + " wide flat bars");
-  assert.ok(watching > 0, "the wheel drew nothing to compare against");
+    const frame = page.canvas.drawn.rects.slice(since);
+    // A beam of the ladder is a short wide bar. Nothing that wide and flat belongs
+    // to either picture: their own lines are as wide as the screen, or a few px.
+    const beams = frame.filter((box) => box[2] > 60 && box[2] < 600 && box[3] <= 2);
+    assert.strictEqual(beams.length, 0, one.slug + ": the ladder was laid over the picture: " + beams.length + " wide flat bars");
+    assert.ok(watching > 0, one.slug + " drew nothing to compare against");
+  }
 });
 
 test("a player who is there for every beat catches every beat", async () => {

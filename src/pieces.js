@@ -65,7 +65,7 @@ window.Bach = window.Bach || {};
       look: {
         name: "vigil",
         phrase: 4,
-        hint: "the piece recedes to a horizon · gold is the chorale · a warm bar line says it again",
+        hint: "recedes to a horizon · gold is the chorale · warm is a repeat · the lamps mark the beat",
       },
       voices: {
         1: { name: "Right hand", colour: "#79e2ff", role: "inner" },

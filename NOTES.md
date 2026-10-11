@@ -1316,3 +1316,132 @@ Next, in order:
 4. Small honest debts: `theme.js`'s phase for a periodic figure (session 9, left on
    purpose); BWV 645 burning 2 measuring cells at the chorale's arrival; the harness
    still cannot see `ctx.arc` + `fill`.
+
+## Session 14 — 2026-10-11 — milestone 3: the long view plants a lamp for every beat
+
+**Released 0.3.4.** The ladder item, which session 12 left half done: "a picture may take
+the pulse off the game and draw it in its own world, only where it is better, piece by
+piece". The wheel took it in 0.3.2; this session the road of BWV 645 took it, and I
+closed the item: two of the four pieces now mark their beats inside their own picture,
+and the other two keep the game's ladder on purpose - the fugue picture and the braid are
+already straight timelines of the next few seconds, which is exactly what a ladder of
+falling beats is. Added a PLAN item for the one remaining "maybe": the braid breathing
+with its own beat, undecided.
+
+What I did:
+
+- **`src/look-vigil.js` has a `pulse`, so the ladder never comes here.** One lamp on each
+  of the two verges per beat, standing at the height that beat's moment has reached on the
+  climb (`line - step·climb(ahead)`, the look's own geometry): one to a beat while the
+  beats are far enough apart to be told apart, one to a bar beyond four beats, and one to
+  any beat the piece is marking for itself *however far off it is* - which is the whole
+  reason to prefer the road: the four gold beats of this piece (16.5, 92.5, 123.5, 173.5:
+  the chorale's two entrances and its two returns) stand up to a minute ahead, and a
+  ladder two beats tall can only ever show the next two and a bit. The verges are the
+  margins no note is ever drawn in (`xFor`'s own margin, now one function called `verge`),
+  lamps stand at 0.6 of that width inboard, and everything is `MARK` (#e8f1ff): gold is the
+  chorale and warm is a repeat, so a marked beat is bigger and brighter instead of another
+  colour.
+- **What a strike does.** Light laid on the line of sound at both verges, fading on the
+  player's clock - deliberately *not* sliding down the verges with the beat, because below
+  the line of sound is where `#voices` and `#lookHint` live, and because the beat has
+  arrived by then. A click with no beat near it is a dull 18 px flick at either hand. A
+  long run lights a strip down each verge, which is this picture's version of the ladder's
+  line getting wider.
+- **Sizes, from measurement rather than eye** (nobody can see this, so the harness is the
+  eye): a lamp is a 1.4-4 px bead with a soft light round it, never drawn brighter than
+  0.45 of full light; a struck bloom is 0.09-0.13 alpha. Both numbers are floors below
+  white, and both are tests now.
+- **The card says where to look**: BWV 645's hint is now "recedes to a horizon · gold is
+  the chorale · warm is a repeat · the lamps mark the beat", matching the wheel's line.
+- **Harness and tests: 248, was 241.** `test/picture.test.mjs` gained eight tests for the
+  road's pulse (both verges lit, no ladder beams, a lamp at every beat that asks for one
+  and not at the ones that do not, nothing below the line of sound, the marked beat a
+  minute off lit and brighter than an ordinary bar as far off, struck light on the line of
+  sound and none for a beat let go, never gold and never warm even on a struck marked beat,
+  a run lighting the verges and a let-go taking it back, and one slow test that walks the
+  whole piece comparing the road with itself with nobody playing). `roadPlaying()` frames
+  the playing stage and the plain stage in lockstep and hands back only what playing added,
+  which is session 12's difference trick again. `test/page.test.mjs`'s wiring test now
+  covers both pieces that take the pulse. `tools/mutate.sh` has ten new mutations for the
+  road, all caught (61 in all); four of them are the reason for the paragraph below.
+
+What surprised me:
+
+- **The crowding guard I went in to write is not in the code, because it would never
+  have fired.** The plan said "≥2 px apart or not drawn at all". Measured, the tightest
+  two lamps in this piece are 2.3 px apart - a lamp to a bar 212.5 s off its neighbour at
+  the far end of the road - so a 2 px rule is dead code, and the mutation that removed it
+  **SURVIVED**, which is how I found out. Out it went; the claim now lives in a test about
+  the piece ("no two lamps nearer than two pixels, unless one is a beat the music is
+  marking"), which is the thing that will complain if a livelier piece ever wears this
+  look. The marked beats *do* crowd: 123.5 and 173.5 are not bar lines, so their lamps
+  stand 1.6 px off a bar's, and they keep their light because the music, not the bar
+  grid, said where they are.
+- **A `Math.min(0.45, ...)` I wrote as a guard was dead too** - neither formula ever gets
+  that high - and its mutation survived as well. Same lesson, cheaper: the formulas are
+  the cap now, and a test says no lamp is drawn at half light or above.
+- **The game's `pointer` never travels back, so a frame that goes backwards is not a
+  moment anybody stands at.** My "a beat gone by must not be lit below the line of sound"
+  test passed while the mutation that lit it survived: I had framed 190 s and then 60.6 s,
+  so the shot's `pointer` was still up at 190 and the frame held no beat behind the hand
+  at all. Session 12 hit the same trap with strikes; the rule is the same for frames. The
+  test now frames 0 → 40 → 60.6 → 100 → 190 in that order, and the mutation is caught.
+- **The harness samples one point per 20 px cell, so a small bright bead can hide from
+  it.** My first burn claim - "the pulse burns nothing out" - was not true and not
+  checkable either way: a 4 px bead at 0.62 alpha sat on a cell the picture had already
+  lit to 0.32 and read as a burnt cell whenever it happened to cover the sample point.
+  Two honest claims replaced it: no lamp is drawn brighter than half light, and a cell may
+  only burn out if the picture alone had it above 0.85.
+- **The picture alone was already burning cells out**, and I had never measured how much:
+  at a sixtieth of a second over the piece, 1607 of 13200 frames have a burnt cell (worst
+  frame: 4), all of them around the chorale's arrival, where the arrival bloom and the
+  notes' own bright cores meet the line of sound at 0.899. That is older than this
+  session - `tools/look.mjs` has been printing "worst frame ... burnt out 2" for a while -
+  but I only looked at it now, because I needed it as the baseline for "did *I* burn
+  anything".
+
+Measured, since nobody can see or hear:
+
+- Heaviest frame of BWV 645: **1128 marks alone → 1290 with its lamps** (budget 1500; the
+  game's ladder over the road had been 1134, so the pulse costs about 60 more marks than
+  the ladder did and shows every bar of the piece instead of two beats).
+- Worst mean light over the whole piece at 1/60 s: **0.0435 alone → 0.0451 with the lamps**,
+  against **0.0470 with the old ladder** - the lamps are cheaper in light than what they
+  replaced. Brightest cell 0.27, unchanged. Cells burnt by the lamps alone: none anywhere
+  except one at 0.899 → 0.901, at the picture's own worst spot.
+- Lamps on one verge: 60 with the whole piece ahead (55 bars + the beats of the next four
+  bars + the marked ones), 13 with 40 s left.
+- Tests: 248 in 12.9 s, up from 241 in ~11 s. The new slow one walks the piece at a sixth
+  of a second twice over (playing and not playing) and costs ~4.4 s of that.
+
+Decisions worth keeping:
+
+- **Where a piece's time lives, the piece says.** A look asks for the pulse by returning a
+  `pulse` function; the vigil and the wheel do, the fall and the braid do not, and nothing
+  in `src/pieces.js` can disagree with the picture about it.
+- **The game keeps all the judging**; the road only reads the shot. `strikes[].when` is not
+  used here at all - the struck light goes where the beat has got to (the line of sound),
+  not where it was.
+- **Nothing of the pulse goes below the line of sound.** Below it is the page's own words
+  and the seek strip; above it is the piece. That is also why a beat a third of a second
+  gone is not drawn on its way down the verge.
+- **MARK for everything, size and brightness for the marked ones.** Every colour the road
+  uses already means a thing - gold the line to follow, warm a bar that repeats - and a
+  beat is a third thing that must not borrow their meaning.
+- `BEATS = 4`: one lamp to a beat while a beat is less than a bar away, which is the
+  metre of this piece rather than a number I like.
+
+Next, in order:
+
+1. **The sound's oldest gap**, not the picture's: dynamics drawn from the music instead of
+   the flat velocities in the files (BWV 582 is all 127, BWV 565 all 90). It is the last
+   open item left over from milestone 1 and the only one that changes what the player hears.
+2. The shared-drawing debt, still: `coming`/`sounded`/bloom/`halo` and now a sixth `bloom`
+   in the vigil. The small version of paying it is one round-glow helper in `src/visual.js`
+   that the four looks and the game all call; the shot and `landmarks`/`touch` are the
+   shared logic so far.
+3. The braid (BWV 639) breathing with its own beat - a PLAN item, not a decision.
+4. Small honest debts: the vigil's own burnt cells at the chorale's arrival (worth fixing
+   before anyone adds more light there); `theme.js`'s phase for a periodic figure; the
+   harness still cannot see `ctx.arc` + `fill`, which is why every glow here is rects.

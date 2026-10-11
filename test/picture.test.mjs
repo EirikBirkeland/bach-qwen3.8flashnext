@@ -1049,9 +1049,10 @@ function onTheRim(boxes) {
 }
 
 test("only a picture that has a way to draw the pulse is given it", async () => {
-  // src/main.js asks the picture whether it wants the player's pulse. Three of
-  // these worlds are happy with the game's ladder; the wheel is not, because a
-  // wheel of time has its own place to put a beat.
+  // src/main.js asks the picture whether it wants the player's pulse. Two of
+  // these worlds are happy with the game's ladder; the wheel and the long view are
+  // not, because a wheel of time and a road of it each have their own place to
+  // put a beat.
   const seen = [];
   for (const slug of [
     "bwv565-toccata-and-fugue-d-minor",
@@ -1064,7 +1065,7 @@ test("only a picture that has a way to draw the pulse is given it", async () => 
   assert.deepStrictEqual(seen, [
     ["bwv565-toccata-and-fugue-d-minor", false],
     ["bwv639-ich-ruf-zu-dir", false],
-    ["bwv645-wachet-auf", false],
+    ["bwv645-wachet-auf", true],
     ["bwv582-passacaglia-c-minor", true],
   ]);
 });
@@ -1275,4 +1276,337 @@ test("BWV 582: a run brightens the rim, and letting a beat go takes it back", ()
   play.see(next.time + 0.4);
   assert.strictEqual(play.score().chain, 0, "letting the beat go did not end the run");
   assert.strictEqual(ring(play.see(next.time + 0.45).added).length, 0, "the rim kept its ring after the run ended");
+});
+
+// --- playing along: the long view plants its own lamps ----------------------
+//
+// BWV 645 is a road you can see the end of, so it has no more need of the game's
+// ladder of two falling beats than the wheel had: it can put a lamp on its verge
+// for every beat of the piece and show them all at once. These are the numbers
+// for that, measured with the game wired to the picture the way index.html wires
+// them - and against the same picture with nobody playing, which is the only way
+// to point at a lamp when the road's own lines are drawn so near it.
+
+const VIGIL_MARK = "#e8f1ff"; // src/look-vigil.js: a beat planted on the verge
+const VIGIL_EDGE = 0.6; // ... and where a lamp stands within it
+const VIGIL_MARGIN = Math.min(120, STAGE_WIDTH * 0.12);
+const VIGIL_LEFT = VIGIL_MARGIN * VIGIL_EDGE;
+const VIGIL_RIGHT = STAGE_WIDTH - VIGIL_LEFT;
+const VIGIL_STEP = 2.5; // src/look-vigil.js: seconds the climb is measured in
+const VIGIL_CLIMB = (seconds) => (seconds <= 0 ? 0 : Math.log(1 + seconds / VIGIL_STEP));
+
+/** Where a second of the piece stands on the road, the way the look draws it. */
+function roadY(scene, at, now) {
+  const step = (SOUND_Y - HORIZON_Y) / VIGIL_CLIMB(scene.data.duration);
+  return at - now >= 0 ? SOUND_Y - step * VIGIL_CLIMB(at - now) : SOUND_Y + step * VIGIL_CLIMB(now - at) * 1.7;
+}
+
+/** The long view with a player striking its beats, kept beside the road on its
+ *  own: `see(seconds)` frames both at the same second and hands back what
+ *  playing along added, which is the lamps, their blooms, and nothing else. */
+function roadPlaying() {
+  const scene = sceneOf("bwv645-wachet-auf");
+  const picture = createStage(scene);
+  const stage = createStage(scene, { play: true });
+  return {
+    scene: scene,
+    painted: () => stage.painted(),
+    beats: () => [...stage.beats()],
+    hit: (at) => stage.hit(at),
+    score: () => stage.score(),
+    see: function (seconds) {
+      picture.frame(seconds);
+      const count = picture.drawn.length;
+      const seen = stage.frame(seconds);
+      return { frame: seen, added: stage.drawn.slice(count), marks: stage.drawn.length };
+    },
+    /** The same pair, framed in lockstep, so a burnt cell can be blamed. */
+    alone: picture,
+    air: stage.air,
+  };
+}
+
+/** A lamp on either verge: the look's own light, small, and no part of the road. */
+function onTheVerge(boxes) {
+  return boxes.filter((box) => {
+    const middle = box.x + box.w / 2;
+    const atALamp = Math.abs(middle - VIGIL_LEFT) < 6 || Math.abs(middle - VIGIL_RIGHT) < 6;
+    return atALamp && box.colour === VIGIL_MARK && box.h <= 40;
+  });
+}
+
+/** The light a struck beat lays: a round bloom, and the only one the pulse draws. */
+function struckLight(boxes) {
+  return boxes.filter((box) => box.colour === "(gradient)");
+}
+
+test("BWV 645: the road takes the pulse itself, and lays no ladder over it", () => {
+  const play = roadPlaying();
+  assert.strictEqual(play.painted(), true, "the long view did not take the pulse off the game");
+
+  const seen = play.see(40);
+  assert.ok(seen.added.length > 40, "playing along drew only " + seen.added.length + " marks");
+  const beams = seen.added.filter((box) => box.w > 60 && box.h <= 3);
+  assert.strictEqual(beams.length, 0, "a wide thin bar of the ladder was drawn over the road");
+
+  const lamps = onTheVerge(seen.added);
+  const left = lamps.filter((box) => Math.abs(box.x + box.w / 2 - VIGIL_LEFT) < 6);
+  const right = lamps.filter((box) => Math.abs(box.x + box.w / 2 - VIGIL_RIGHT) < 6);
+  assert.ok(left.length > 8, "only " + left.length + " lamps on the left verge");
+  assert.ok(right.length > 8, "only " + right.length + " lamps on the right verge");
+  assert.strictEqual(
+    left.length,
+    right.length,
+    "the verges do not match: " + left.length + " lamps against " + right.length
+  );
+});
+
+test("BWV 645: a lamp to a beat near at hand, one to a bar beyond, and none too near", () => {
+  const play = roadPlaying();
+  const at = 40;
+  const gap = play.beats()[0].gap;
+  const gone = play.beats().find((one) => one.time > 60);
+
+  // The moments to look at, framed in the order the music goes. The game's hand
+  // never travels back - a beat the player has passed is nobody's to strike again -
+  // so a frame has to come after any frame further back, or it is not a moment
+  // anybody could stand at. One of them has a beat a third of a second behind it,
+  // which no whole second of this piece is: its beats all fall half a beat past.
+  const frames = [
+    [0, play.see(0)],
+    [at, play.see(at)],
+    [gone.time + 0.1, play.see(gone.time + 0.1)],
+    [100, play.see(100)],
+    [190, play.see(190)],
+  ];
+
+  // Nothing of the pulse creeps below the line of sound: what has gone by is not
+  // there to strike, and the bottom of the screen belongs to the page's own words.
+  for (const one of frames) {
+    for (const box of onTheVerge(one[1].added)) {
+      assert.ok(
+        box.y + box.h / 2 <= SOUND_Y + 2,
+        "a lamp was drawn below the line of sound at " + one[0].toFixed(1) + " s: " + JSON.stringify(box)
+      );
+    }
+  }
+
+  // Every beat of the next four bars stands on the verge, and so does every bar
+  // beyond them - which is what makes the road read as a road, lit all the way
+  // to where its beats are too near together to tell one from another.
+  const lamps = onTheVerge(frames[1][1].added);
+  const rows = lamps.map((box) => box.y + box.h / 2);
+  const coming = play.beats().filter((beat) => beat.time >= at && beat.time < at + 90);
+  const wanted = coming.filter((beat) => beat.time - at <= 4 * gap || beat.bar);
+  assert.ok(wanted.length > 15, "only " + wanted.length + " beats of the next minute and a half ask for a lamp");
+  for (const beat of wanted) {
+    const y = roadY(play.scene, beat.time, at);
+    assert.ok(
+      lamps.filter((box) => Math.abs(box.y + box.h / 2 - y) < 2).length >= 2,
+      "no lamp at the beat " + (beat.time - at).toFixed(1) + " s off (" + beat.time + " s)"
+    );
+  }
+
+  // A beat that is neither a bar's opening nor near at hand is nobody's lamp.
+  const plain = coming.filter((beat) => !beat.bar && !beat.bright && beat.time - at > 8 && beat.time - at < 14);
+  assert.ok(plain.length >= 2, "the harness wanted a mid-distance beat to rule out");
+  for (const beat of plain) {
+    const y = roadY(play.scene, beat.time, at);
+    assert.strictEqual(
+      rows.filter((row) => Math.abs(row - y) < 1.5).length,
+      0,
+      "a beat " + (beat.time - at).toFixed(1) + " s off was given a lamp, though nobody could pick it out"
+    );
+  }
+
+  // And no two lamps are nearer than two pixels - nearer than that and they are one
+  // light, not two. The one exception is a beat the music is marking for itself,
+  // which stands where the music says it stands, bar line or none. Mostly this is a
+  // claim about the piece rather than the picture: the tightest the road ever gets
+  // is one lamp to a bar 2.3 px off the next, which is why the picture needs no
+  // rule of its own to keep them apart. Should a livelier piece ever wear this look,
+  // this is the test that would notice first.
+  for (const one of frames) {
+    const lines = onTheVerge(one[1].added).map((box) => Math.round((box.y + box.h / 2) * 10) / 10);
+    const marked = play
+      .beats()
+      .filter((beat) => beat.bright)
+      .map((beat) => roadY(play.scene, beat.time, one[0]));
+    const apart = Array.from(new Set(lines)).sort((first, other) => first - other);
+    for (let i = 1; i < apart.length; i++) {
+      if (apart[i] - apart[i - 1] >= 1.9) continue;
+      const excused = marked.some((y) => Math.abs(y - apart[i]) < 2 || Math.abs(y - apart[i - 1]) < 2);
+      assert.ok(
+        excused,
+        "at " + one[0].toFixed(1) + " s two lamps " + (apart[i] - apart[i - 1]).toFixed(1) + " px apart are one light, not two, and neither is a marked beat"
+      );
+    }
+  }
+});
+
+test("BWV 645: the chorale keeps its lamp a minute off, which no ladder could show", () => {
+  const play = roadPlaying();
+  const at = 100;
+  const worth = play.beats().filter((beat) => beat.bright && beat.time > at + 60);
+  assert.ok(worth.length > 0, "the pulse should have a marked beat the best part of a minute off");
+  const seen = play.see(at);
+  const lamps = onTheVerge(seen.added);
+  const gap = play.beats()[0].gap;
+  for (const beat of worth) {
+    const y = roadY(play.scene, beat.time, at);
+    assert.ok(y > HORIZON_Y, "this marked beat has already gone past the horizon");
+    const here = lamps.filter((box) => Math.abs(box.y + box.h / 2 - y) < 2);
+    assert.ok(here.length >= 2, "the beat the music is marking at " + beat.time + " s has no lamp " + (beat.time - at).toFixed(0) + " s off");
+
+    // ... and it stands out from an ordinary bar a like distance off.
+    const ordinary = play
+      .beats()
+      .filter((one) => one.bar && !one.bright && Math.abs(one.time - beat.time) > 2 && Math.abs(one.time - beat.time) < 6 * gap)[0];
+    assert.ok(ordinary, "there should be an ordinary bar about as far off to compare it with");
+    const there = lamps.filter((box) => Math.abs(box.y + box.h / 2 - roadY(play.scene, ordinary.time, at)) < 2);
+    assert.ok(there.length >= 2, "nothing was drawn for the ordinary bar at " + ordinary.time + " s");
+    const brightest = (boxes) => Math.max.apply(null, boxes.map((box) => box.alpha));
+    assert.ok(
+      brightest(here) > brightest(there) + 0.05,
+      "a marked beat a minute off is no brighter than an ordinary one: " +
+        brightest(here).toFixed(2) + " against " + brightest(there).toFixed(2)
+    );
+    assert.ok(
+      Math.max.apply(null, here.map((box) => box.w)) > Math.max.apply(null, there.map((box) => box.w)),
+      "a marked beat a minute off is no bigger than an ordinary one"
+    );
+  }
+  // ... and the ladder shows two beats and a bit, for comparison.
+  assert.ok(worth[0].time - at > 20, "a beat within twenty seconds is nothing a ladder could not show");
+});
+
+test("BWV 645: a struck beat lights the line of sound at the verges, and a let-go one does not", () => {
+  const play = roadPlaying();
+  const caught = play.beats().find((one) => one.time > 30);
+  const letGo = play.beats().find((one) => one.time > caught.time + 6);
+
+  play.see(caught.time - 0.4);
+  assert.strictEqual(struckLight(play.see(caught.time - 0.05).added).length, 0, "the road lit up before the beat was struck");
+
+  play.hit(caught.time);
+  const struck = play.see(caught.time + 0.15);
+  const blooms = struckLight(struck.added);
+  assert.ok(blooms.length >= 2, "the beat was struck and " + blooms.length + " blooms were laid");
+  for (const bloom of blooms) {
+    assert.ok(
+      Math.abs(bloom.y + bloom.h / 2 - SOUND_Y) < bloom.h / 2 + 4,
+      "a struck beat was not lit on the line of sound: " + JSON.stringify(bloom)
+    );
+    assert.ok(
+      bloom.x <= 4 || bloom.x + bloom.w >= STAGE_WIDTH - 4,
+      "a struck beat was lit away from the verges: " + JSON.stringify(bloom)
+    );
+  }
+
+  // A beat nobody struck, and the light has gone out on its own by now.
+  const gone = play.see(letGo.time + 1.2);
+  assert.strictEqual(struckLight(gone.added).length, 0, "a beat nobody struck lit the road anyway");
+
+  // A click with no beat near it: a dull flick at either hand, and no bloom.
+  const far = play.beats().find((one) => one.time > letGo.time + 8);
+  play.hit(far.time + 0.6);
+  const missed = play.see(far.time + 0.65);
+  assert.strictEqual(struckLight(missed.added).length, 0, "a click that caught nothing rang a bloom anyway");
+  const atTheLine = missed.added.filter((box) => Math.abs(box.y + box.h / 2 - SOUND_Y) < 4);
+  assert.ok(atTheLine.length > 0, "a missed click drew nothing on the line of sound");
+  assert.ok(
+    atTheLine.some((box) => box.alpha > 0.02),
+    "a missed click drew nothing at all: " + JSON.stringify(atTheLine)
+  );
+  assert.ok(
+    atTheLine.every((box) => box.w <= 20),
+    "a missed click drew something wider than a flick: " + JSON.stringify(atTheLine)
+  );
+});
+
+test("BWV 645: the pulse is never gold, because the chorale is, and never warm, because a repeat is", () => {
+  const play = roadPlaying();
+  const gold = play.scene.look.colours["2"]; // the line to follow wears gold on this piece
+  assert.strictEqual(gold, "#ffd47a", "the chorale's gold has changed; the test should say so");
+  const worth = play.beats().find((beat) => beat.bright && beat.time > 80);
+  assert.ok(worth, "the chorale should mark a beat to strike");
+
+  // The goldiest moment there is for a player: a beat the music is marking, struck.
+  play.see(worth.time - 0.2);
+  play.hit(worth.time);
+  const frames = [play.see(worth.time + 0.1), play.see(worth.time + 0.5), play.see(120), play.see(40)];
+  const isWarm = (box) => String(box.colour).indexOf(gold) >= 0 || String(box.fill).indexOf(gold) >= 0;
+  const isRepeat = (box) => String(box.colour).indexOf(WARM_LINE) >= 0 || String(box.fill).indexOf(WARM_LINE) >= 0;
+  for (const seen of frames) {
+    assert.ok(seen.added.length > 0, "playing along drew nothing to check the colour of");
+    assert.strictEqual(seen.added.filter(isWarm).length, 0, "gold light was drawn by playing along at " + seen.frame.mean);
+    assert.strictEqual(seen.added.filter(isRepeat).length, 0, "warm light was drawn by playing along");
+  }
+});
+
+test("BWV 645: the lamps along the road are cheap to draw, and burn nothing out on their own", () => {
+  const play = roadPlaying();
+  const scene = play.scene;
+  const beats = play.beats();
+  const luma = (spot) => 0.2126 * spot[0] + 0.7152 * spot[1] + 0.0722 * spot[2];
+  let index = 0;
+  let most = 0;
+  let mean = 0;
+  let tipped = 0;
+  let rung = 0;
+  let brightest = 0;
+  for (let at = 1; at < scene.data.duration; at += 1 / 6) {
+    while (index < beats.length && beats[index].time < at) {
+      if (at - beats[index].time < 0.3) play.hit(beats[index].time);
+      index++;
+    }
+    play.alone.frame(at);
+    const plain = play.alone.air.map(luma);
+    const seen = play.see(at);
+    most = Math.max(most, seen.marks);
+    mean = Math.max(mean, seen.frame.mean);
+    rung = play.score().caught;
+    // No lamp is ever struck bright: a dozen of them stand within a hair of one
+    // another down the road, and that is how a heap of lights becomes one smear.
+    for (const box of onTheVerge(seen.added)) brightest = Math.max(brightest, box.alpha);
+    // A cell may only burn out if the picture had all but burned it out already.
+    play.air.forEach((spot, k) => {
+      if (luma(spot) > 0.9 && plain[k] < 0.85) tipped++;
+    });
+  }
+  assert.ok(brightest < 0.5, "a lamp is drawn at " + brightest.toFixed(2) + " of full light: the road would burn out white");
+  assert.ok(most > 400, "one frame draws only " + most + " marks with the pulse on: is the picture missing?");
+  assert.ok(most < 1500, "one frame draws " + most + " boxes with the pulse on: that will not keep up");
+  assert.ok(mean < 0.06, "the road is washed out with the pulse on: worst mean light " + mean.toFixed(4));
+  assert.strictEqual(tipped, 0, tipped + " cells burned out white because of the pulse alone");
+  assert.ok(rung > 20, "the player struck " + rung + " bells in " + Math.round(scene.data.duration) + " s: the harness is not striking");
+});
+
+test("BWV 645: a run lights the verges, and letting a beat go takes it back", () => {
+  const play = roadPlaying();
+  // The road's own version of the ladder's line getting wider: the verges of it
+  // take up a light while the player stays with the piece.
+  const edge = (added) =>
+    added.filter((box) => box.colour === VIGIL_MARK && box.h > 300 && Math.abs(box.x + box.w / 2 - VIGIL_LEFT) < 20);
+  const from = play.beats().find((one) => one.time > 60);
+  const four = play.beats().slice(play.beats().indexOf(from), play.beats().indexOf(from) + 4);
+  assert.strictEqual(four.length, 4, "the harness wanted four beats in a row and found " + four.length);
+
+  play.see(from.time - 0.5);
+  assert.strictEqual(edge(play.see(from.time - 0.05).added).length, 0, "the verges were lit before anything was struck");
+
+  for (const beat of four) {
+    play.hit(beat.time);
+    play.see(beat.time + 0.05);
+  }
+  assert.strictEqual(play.score().chain, 4, "the four beats did not make a run");
+  assert.ok(edge(play.see(four[3].time + 0.1).added).length > 0, "four beats in a row and the verges did not light");
+
+  // Let one go, and it is back to plain.
+  const next = play.beats().find((one) => one.time > four[3].time + 0.2);
+  play.see(next.time - 0.2);
+  play.see(next.time + 0.1);
+  play.see(next.time + 0.4);
+  assert.strictEqual(play.score().chain, 0, "letting the beat go did not end the run");
+  assert.strictEqual(edge(play.see(next.time + 0.45).added).length, 0, "the verges kept their light after the run ended");
 });

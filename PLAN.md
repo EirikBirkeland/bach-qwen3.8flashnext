@@ -68,9 +68,15 @@ Do these quickly and roughly, in the first session if you can, and release as so
         worth marking, `organ.chime` for the bell, `src/game.js` for the run and the ladder and the words,
         and the page wired to them - "Play along" beside Pause, or the `P` key, or a click on the picture,
         or Enter. Just watching is what it was before, and one press away.
-  - [ ] The ladder is laid *over* the picture, not part of it. Each piece's world could take its pulse in
+  - [x] The ladder is laid *over* the picture, not part of it. Each piece's world could take its pulse in
         its own way - the wheel ticking one tooth of the rim to a beat, the long view planting a lamp on the
         road, the braid breathing with it. Only do it where it is better, piece by piece.
+        Done, and the deciding is done too: the wheel takes it on its rim (`0.3.2`) and the long view plants
+        lamps on its verges (`0.3.4`), where a beat of the piece has a place of its own in the picture. The
+        fugue picture and the braid keep the game's ladder on purpose - both are already a straight timeline
+        of the next few seconds, which is exactly what a ladder of falling beats is.
+  - [ ] The braid of BWV 639 could still breathe with its own beat, if a look at it says that reads better
+        than the ladder. Not decided; the ladder is not in anyone's way there.
   - [x] The wheel of BWV 582 has taken the pulse into its own world (`0.3.2`): a tooth per beat just inside
         the rim, at the bearing that beat falls on within the turn, so the hand crossing a tooth *is* the
         beat arriving; a struck beat lights the rim where its tooth stood, and a long run brightens the whole

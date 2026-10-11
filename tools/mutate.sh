@@ -4,7 +4,7 @@
 set -u
 cd "$(dirname "$0")/.."
 mkdir -p /tmp/mut
-for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js tools/bars.mjs; do
+for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js src/look-vigil.js tools/bars.mjs; do
   cp "$f" "/tmp/mut/$(basename "$f")"
 done
 
@@ -84,8 +84,23 @@ run "bars: judged by the last bar, not the middle one" tools/bars.mjs 's/gaps\[M
 run "bars: any short last bar is taken for a pickup" tools/bars.mjs 's/short \* 2 < bar/short < bar/'
 run "bars: two bar lines are enough to judge by" tools/bars.mjs 's/if \(starts.length < 3\) return 0;//'
 
+# The long view of BWV 645 plants a lamp on its verge for every beat, and keeps the
+# marked ones lit however far off they are - the one thing a ladder two beats tall
+# could never do. It draws no rule about lamps standing too near one another: the
+# piece keeps its own lamps 2.3 px apart at the tightest, and a test says so.
+run "road: it keeps the game's ladder after all" src/look-vigil.js 's/return \{ reset: reset, frame: frame, pulse: pulse \};/return { reset: reset, frame: frame };/'
+run "road: no lamps at all" src/look-vigil.js 's/        lamp\(left, y, size, MARK, strength\);\n        lamp\(right, y, size, MARK, strength\);\n//'
+run "road: a lamp is burned bright enough to whiten the road" src/look-vigil.js 's/0\.1 \+ 0\.35 \* close \* close/0.1 + 1.4 * close * close/'
+run "road: a lamp at every beat, however far off to pick out" src/look-vigil.js 's/        if \(away > BEATS \* gap && !beat\.bar && !beat\.bright\) continue;\n//'
+run "road: a marked beat far off loses its lamp unless it opens a bar" src/look-vigil.js 's/&& !beat\.bar && !beat\.bright\)/&& !beat\.bar\)/'
+run "road: a beat that has gone by keeps its lamp down the verge" src/look-vigil.js 's/        if \(away < 0\) continue;.*\n//'
+run "road: a struck beat lays no light on the line of sound" src/look-vigil.js 's/\(one\.truest \? 0\.13 : 0\.09\) \* faded/0.001 * faded/'
+run "road: a struck beat lights gold, which is the chorale's colour" src/look-vigil.js 's/bloom\(left, view\.line, reach, MARK,/bloom(left, view.line, reach, "#ffd47a",/'
+run "road: a click that caught nothing is silent" src/look-vigil.js 's/          ctx\.globalAlpha = 0\.05 \* faded;/          ctx.globalAlpha = 0;/'
+run "road: the verges do not light up for a long run" src/look-vigil.js 's/      if \(shot\.run > 0\.02\) \{/      if (false) {/'
+
 echo "--- restoring ---"
-for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js tools/bars.mjs; do
+for f in src/game.js src/pulse.js src/landmarks.js src/main.js src/audio.js src/theme.js src/touch.js src/visual.js src/look-round.js src/look-vigil.js tools/bars.mjs; do
   cp "/tmp/mut/$(basename "$f")" "$f"
 done
 node --test 2>&1 | grep -E "^ℹ (tests|pass|fail)"

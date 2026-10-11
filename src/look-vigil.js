@@ -23,6 +23,9 @@
 //    works that out from the notes, and here you can see it coming.
 //  - an arrival. The line to follow comes in after a rest, so each of its
 //    entrances is marked while it is still far off and blooms when it is struck.
+//  - the pulse, when someone is playing along. The game would otherwise lay its
+//    ladder of falling beats over this picture; the road takes it instead, as a
+//    lamp on each of its verges - see `pulse` below.
 
 window.Bach = window.Bach || {};
 
@@ -37,6 +40,11 @@ window.Bach = window.Bach || {};
   var TRAIL = 0.3; // how fast the last frame is veiled: less = a longer trail
   var COOL = "#bcd0f0"; // bar lines and the line of sound
   var WARM = "#ffb066"; // a bar line that begins something already heard
+  var MARK = "#e8f1ff"; // a beat of the player's pulse, planted on the verge.
+  // Never gold, which is the line to follow, and never warm, which is a repeat.
+  var BEATS = 4; // while a beat is this many beats off it gets a lamp to itself
+  var EDGE = 0.6; // where a lamp stands within the verge, as a share of its width
+  var VERGE = 26; // how wide a strip of the verge the run can light
 
   function createVigilLook(canvas) {
     var screen = Bach.createScreen(canvas);
@@ -110,9 +118,14 @@ window.Bach = window.Bach || {};
       return found;
     }
 
+    /** How wide a verge is: the strip at either side no note is ever drawn in. */
+    function verge() {
+      return Math.min(120, screen.width() * 0.12);
+    }
+
     function xFor(pitch) {
       var width = screen.width();
-      var margin = Math.min(120, width * 0.12);
+      var margin = verge();
       var span = Math.max(1, pitchHigh - pitchLow);
       return margin + ((pitch - pitchLow) / span) * (width - margin * 2);
     }
@@ -171,6 +184,127 @@ window.Bach = window.Bach || {};
       ctx.fillRect(x - weight * 0.4, top, weight * 0.8, bottom - top);
       ctx.globalAlpha = Math.min(1, 0.9 * strength);
       ctx.fillRect(x - 0.9, top, 1.8, bottom - top);
+    }
+
+    /** A round light laid on the screen, only the part of it that is on it. */
+    function bloom(x, y, size, colour, strength) {
+      if (size <= 0 || strength <= 0.01) return;
+      var round = ctx.createRadialGradient(x, y, 0, x, y, size);
+      round.addColorStop(0, colour);
+      round.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.globalAlpha = strength;
+      ctx.fillStyle = round;
+      var left = Math.max(0, x - size);
+      var top = Math.max(0, y - size);
+      var width = screen.width();
+      var height = screen.height();
+      ctx.fillRect(left, top, Math.min(width, x + size) - left, Math.min(height, y + size) - top);
+    }
+
+    /**
+     * A lamp by the road: a bead of light with a soft light round it, bigger and
+     * brighter the nearer its beat is. Far off it is a speck, and no more.
+     */
+    function lamp(x, y, size, colour, strength) {
+      if (size <= 0 || strength <= 0.01) return;
+      ctx.fillStyle = colour;
+      if (size > 5) {
+        ctx.globalAlpha = strength * 0.12;
+        ctx.fillRect(x - size, y - size * 0.6, size * 2, size * 1.2);
+      }
+      var bead = 1.4 + size * 0.18;
+      ctx.globalAlpha = strength;
+      ctx.fillRect(x - bead / 2, y - bead / 2, bead, bead);
+    }
+
+    /**
+     * The player's pulse, planted along the road.
+     *
+     * The game could lay its ladder of falling beats over this picture, and does
+     * for the pieces that have nowhere else to put a beat. The road has: a ladder
+     * two beats tall is a worse version of what is already here, since this is a
+     * picture of the whole piece at once. So every beat becomes a lamp on the two
+     * verges, standing at the height its moment has reached on the climb. Near at
+     * hand there is one to a beat; further off, one to a bar, since past a few
+     * beats the beats themselves are a few pixels apart. A beat the piece is
+     * marking for itself keeps its lamp however far off it is - which is the thing
+     * a ladder could not do: the chorale coming in a minute from now is already on
+     * this screen.
+     *
+     * What the player strikes does not walk back down the verges - that part of
+     * the screen belongs to the words the page writes - it lands on the line of
+     * sound, where the beat has got to, at the two verges. The verges themselves
+     * brighten as a run grows, which is this picture's version of the ladder's
+     * line getting wider.
+     *
+     * The shot comes from src/game.js and is only read here: this draws the pulse,
+     * it does not judge it.
+     */
+    function pulse(shot) {
+      var width = screen.width();
+      var margin = verge();
+      var left = margin * EDGE;
+      var right = width - left;
+      var gap = shot.gap > 0 ? shot.gap : 1;
+
+      ctx.globalCompositeOperation = "lighter";
+
+      // A long run lights the edges of the road itself.
+      if (shot.run > 0.02) {
+        var top = view.horizon;
+        var drop = view.line - view.horizon;
+        ctx.fillStyle = MARK;
+        ctx.globalAlpha = 0.008 + 0.02 * shot.run;
+        ctx.fillRect(left - VERGE / 2, top, VERGE, drop);
+        ctx.fillRect(right - VERGE / 2, top, VERGE, drop);
+        ctx.globalAlpha = 0.04 + 0.16 * shot.run;
+        ctx.fillRect(left - 1, top, 2, drop);
+        ctx.fillRect(right - 1, top, 2, drop);
+      }
+
+      // The lamps, from the beat being struck now up to the last the road holds.
+      for (var i = shot.pointer; i < shot.beats.length; i++) {
+        var beat = shot.beats[i];
+        if (beat.taken) continue; // that one is light on the line of sound now
+        var away = beat.time - shot.now;
+        if (away < 0) continue; // gone by, and nobody's to strike any more
+        var y = yFor(beat.time, shot.now);
+        if (y < view.horizon - 2) break; // past the far end of the road
+        // One to a beat while the beats can be told apart, one to a bar beyond
+        // that, and one to any beat the piece is marking for itself however far
+        // off it is - the chorale coming in a minute from now is already on this
+        // screen, which is the one thing a ladder two beats tall could never say.
+        if (away > BEATS * gap && !beat.bar && !beat.bright) continue;
+        var close = near(beat.time, shot.now);
+        var size = (beat.bright ? 2 : 1) * (2 + 11 * close);
+        // Faint by numbers, and never bright: a lamp stands within a couple of
+        // pixels of the next one up the road, and a heap of bright lights on one
+        // strip of screen is one white smear - the one thing a road may not be.
+        var strength = beat.bright ? 0.22 + 0.23 * close : 0.1 + 0.35 * close * close;
+        lamp(left, y, size, MARK, strength);
+        lamp(right, y, size, MARK, strength);
+      }
+
+      // What the player struck, on the line of sound at each verge, and fading.
+      for (var s = 0; s < shot.strikes.length; s++) {
+        var one = shot.strikes[s];
+        var faded = Math.max(0, 1 - (shot.now - one.at) / shot.fade);
+        if (faded <= 0.01) continue;
+        if (one.when === null || one.when === undefined) {
+          // A click with no beat near it: a dull flick at either hand.
+          ctx.fillStyle = MARK;
+          ctx.globalAlpha = 0.05 * faded;
+          ctx.fillRect(left - 9, view.line - 1, 18, 2);
+          ctx.fillRect(right - 9, view.line - 1, 18, 2);
+          continue;
+        }
+        var reach = (one.truest ? 34 : 22) + 80 * faded * faded + 30 * shot.run;
+        bloom(left, view.line, reach, MARK, (one.truest ? 0.13 : 0.09) * faded);
+        bloom(right, view.line, reach, MARK, (one.truest ? 0.13 : 0.09) * faded);
+      }
+
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1;
     }
 
     function frame(now) {
@@ -290,20 +424,20 @@ window.Bach = window.Bach || {};
         if (away > 0) {
           var close = near(arrival.time, now);
           var size = 5 + 34 * close;
-          var lamp = ctx.createRadialGradient(ax, ay, 0, ax, ay, size);
-          lamp.addColorStop(0, wear);
-          lamp.addColorStop(1, "rgba(0,0,0,0)");
+          var marker = ctx.createRadialGradient(ax, ay, 0, ax, ay, size);
+          marker.addColorStop(0, wear);
+          marker.addColorStop(1, "rgba(0,0,0,0)");
           ctx.globalAlpha = 0.07 + 0.3 * close;
-          ctx.fillStyle = lamp;
+          ctx.fillStyle = marker;
           ctx.fillRect(ax - size, ay - size, size * 2, size * 2);
         } else if (now - arrival.time < BLOOM) {
           var faded = 1 - (now - arrival.time) / BLOOM;
           var wide = 24 + 130 * faded * faded;
-          var bloom = ctx.createRadialGradient(ax, view.line, 0, ax, view.line, wide);
-          bloom.addColorStop(0, wear);
-          bloom.addColorStop(1, "rgba(0,0,0,0)");
+          var glow = ctx.createRadialGradient(ax, view.line, 0, ax, view.line, wide);
+          glow.addColorStop(0, wear);
+          glow.addColorStop(1, "rgba(0,0,0,0)");
           ctx.globalAlpha = 0.4 * faded;
-          ctx.fillStyle = bloom;
+          ctx.fillStyle = glow;
           ctx.fillRect(ax - wide, view.line - wide, wide * 2, wide * 2);
         }
       }
@@ -324,7 +458,7 @@ window.Bach = window.Bach || {};
       ctx.globalAlpha = 1;
     }
 
-    return { reset: reset, frame: frame };
+    return { reset: reset, frame: frame, pulse: pulse };
   }
 
   Bach.looks.vigil = createVigilLook;
