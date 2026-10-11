@@ -23,8 +23,8 @@ export function lookScripts() {
     .map((name) => "src/" + name);
 }
 
-/** What a picture needs to exist: the drawing it shares, the repeat finder, and
- *  every picture there is. */
+/** What a picture needs to exist: the drawing it shares, the two finders it can
+ *  ask about the music, and every picture there is. */
 export function pictureScripts() {
-  return ["src/visual.js", "src/echoes.js"].concat(lookScripts());
+  return ["src/visual.js", "src/echoes.js", "src/theme.js"].concat(lookScripts());
 }

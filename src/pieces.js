@@ -8,10 +8,9 @@
 //
 // `look` says what the piece is drawn as: "fall" for anything moving along at
 // walking pace, and something else when the music has a shape of its own that
-// deserves a picture of its own (src/look-fall.js, src/look-braid.js,
-// src/look-vigil.js). `phrase`
-// is how many bars a phrase takes there, and `hint` is the one line on screen
-// that says how to read it.
+// deserves a picture of its own — src/look-fall.js, src/look-braid.js,
+// src/look-vigil.js, src/look-subject.js. `phrase` is how many bars a phrase takes
+// there, and `hint` is the one line on screen that says how to read it.
 
 window.Bach = window.Bach || {};
 
@@ -22,10 +21,17 @@ window.Bach = window.Bach || {};
       file: "data/bwv565-toccata-and-fugue-d-minor.js",
       title: "Toccata and Fugue",
       subtitle: "in D minor, BWV 565",
-      look: { name: "fall" },
+      // The fugue is one subject heard eight times, handed between the hands, so
+      // here it is the tune that is gold and not any one voice - see
+      // src/look-subject.js. That means no voice may wear gold itself.
+      look: {
+        name: "subject",
+        phrase: 4,
+        hint: "gold is the fugue subject: it comes back eight times · a wide flare is a whole chord",
+      },
       voices: {
-        1: { name: "Right hand", colour: "#ffd47a", role: "melody" },
-        2: { name: "Left hand", colour: "#79e2ff", role: "inner" },
+        1: { name: "Right hand", colour: "#79e2ff", role: "melody" },
+        2: { name: "Left hand", colour: "#ff9bb0", role: "inner" },
         3: { name: "Pedal", colour: "#c39bff", role: "pedal" },
       },
     },

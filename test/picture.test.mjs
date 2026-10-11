@@ -329,3 +329,251 @@ test("BWV 645: a frame of the long view is cheap enough to draw sixty times a se
   assert.ok(most > 300, "one frame only draws " + most + " marks: is the picture missing?");
   assert.ok(most < 1500, "one frame draws " + most + " boxes: that will not keep up with the music");
 });
+
+// BWV 565 wears the fugue picture. Four things about that piece are what it is
+// made of: a subject that comes back eight times in different voices, a toccata
+// and an end built of chords struck together, a pedal that stays silent for a
+// minute and a half at a time, and a middle so bare that one note sounds at a
+// time. These are the numbers that stand for looking at it.
+
+const SUBJECT_LINE = Math.round(STAGE_HEIGHT * 0.78); // src/look-subject.js: SOUND
+const SUBJECT_GOLD = "#ffd47a"; // ... and GOLD: the tune, whoever sings it
+const STRIKE = "#eef3ff"; // ... and STRIKE: where a whole chord was struck
+
+/** Where across the screen a note's bar is drawn. */
+const centre = (box) => box.x + box.w / 2;
+
+/** Is this box a glow of that colour? A note is drawn in flat colour; only a glow
+ *  is a gradient that starts from the colour and fades out of it. */
+function glowing(box, colour) {
+  return box.colour === "(gradient)" && String(box.fill).indexOf(colour) === 0;
+}
+
+/** The notes sounding at a moment. */
+function soundingAt(scene, at) {
+  return scene.notes.filter((note) => note.time <= at && note.time + note.length > at);
+}
+
+test("BWV 565: gold marks the tune that comes back, not the voice singing it", () => {
+  const scene = sceneOf("bwv565-toccata-and-fugue-d-minor");
+  // Gold has to belong to the tune alone, or it would say nothing.
+  for (const voice in scene.look.colours) {
+    assert.notStrictEqual(
+      scene.look.colours[voice],
+      SUBJECT_GOLD,
+      "a voice wears gold as well, so gold cannot mark the subject"
+    );
+  }
+
+  const stage = createStage(scene);
+  const tune = stage.bach.theme(scene.notes, { bars: scene.look.bars });
+  assert.strictEqual(tune.heard.length, 8, "the eight tellings are what this picture is built on");
+  const sings = [];
+  for (const one of tune.heard) sings.push(...one.notes);
+
+  stage.frame(40); // the toccata, two minutes before the subject is heard
+  assert.strictEqual(
+    stage.drawn.filter((box) => box.colour === SUBJECT_GOLD).length,
+    0,
+    "something was gold in the toccata, where the subject has not been heard yet"
+  );
+
+  const at = 370; // the left hand has the subject while the other two go on with theirs
+  stage.frame(at);
+  const sounding = soundingAt(scene, at);
+  const withIt = sounding.filter((note) => sings.indexOf(note) >= 0);
+  const without = sounding.filter((note) => sings.indexOf(note) < 0);
+  assert.ok(withIt.length > 0, "the subject should be sounding at " + at + " s");
+  assert.ok(without.length > 0, "and it should be accompanied, or this proves nothing");
+
+  const gold = stage.drawn.filter((box) => box.colour === SUBJECT_GOLD);
+  // Only the light that is crossing the line of sound counts, so a subject note
+  // still on its way down cannot answer for a chord note on the same pitch, and a
+  // note that has not been struck yet cannot be mistaken for one that has.
+  const crossing = (list) => list.filter((box) => box.y <= SUBJECT_LINE && box.y + box.h >= SUBJECT_LINE);
+  const crossingGold = crossing(gold);
+  for (const note of withIt) {
+    const x = across(scene, note.pitch);
+    assert.ok(
+      crossingGold.some((box) => Math.abs(centre(box) - x) < 3),
+      "the subject's own note at " + note.pitch + " was not drawn gold"
+    );
+  }
+  for (const note of without) {
+    const x = across(scene, note.pitch);
+    if (withIt.some((one) => Math.abs(across(scene, one.pitch) - x) < 12)) continue; // too near to tell apart
+    assert.ok(
+      crossingGold.every((box) => Math.abs(centre(box) - x) > 3),
+      "an ordinary accompanying note (" + note.voice + " at " + note.pitch + ") was drawn gold"
+    );
+  }
+});
+
+test("BWV 565: the next telling of the subject can be seen coming, and blooms when it arrives", () => {
+  const scene = sceneOf("bwv565-toccata-and-fugue-d-minor");
+  const stage = createStage(scene);
+  const tune = stage.bach.theme(scene.notes, { bars: scene.look.bars });
+  const entry = tune.heard.find((one) => one.time > 200); // the pedal's, at 3:24
+  assert.ok(entry.voice === 3, "this test is about the pedal coming in after its long rest");
+  const x = across(scene, entry.pitch);
+
+  stage.frame(entry.time - 4);
+  const lamps = stage.drawn.filter((box) => glowing(box, SUBJECT_GOLD) && box.w < 120 && Math.abs(centre(box) - x) < 20);
+  assert.ok(lamps.length > 0, "nothing marked the subject four seconds before it was struck");
+  assert.ok(
+    lamps.every((box) => box.y + box.h < SUBJECT_LINE),
+    "the lamp is not up above the line of sound, where the music is still to come: " + JSON.stringify(lamps[0])
+  );
+  assert.strictEqual(
+    stage.drawn.filter((box) => glowing(box, SUBJECT_GOLD) && box.w > 150 && Math.abs(box.y + box.h / 2 - SUBJECT_LINE) < 40).length,
+    0,
+    "the subject bloomed four seconds before it arrived"
+  );
+
+  stage.frame(entry.time + 0.1);
+  assert.ok(
+    stage.drawn.some(
+      (box) => glowing(box, SUBJECT_GOLD) && box.w > 150 && Math.abs(centre(box) - x) < 40 && Math.abs(box.y + box.h / 2 - SUBJECT_LINE) < 40
+    ),
+    "no gold bloom at the line of sound when the subject came in"
+  );
+
+  // And it grows as it comes: bigger and stronger one second off than six.
+  stage.frame(entry.time - 6);
+  const far = stage.drawn.filter((box) => glowing(box, SUBJECT_GOLD) && box.w < 120 && Math.abs(centre(box) - x) < 20);
+  stage.frame(entry.time - 1);
+  const near = stage.drawn.filter((box) => glowing(box, SUBJECT_GOLD) && box.w < 120 && Math.abs(centre(box) - x) < 20);
+  assert.ok(far.length > 0 && near.length > 0, "no lamp to compare");
+  assert.ok(
+    Math.max.apply(null, near.map((box) => box.w)) > Math.max.apply(null, far.map((box) => box.w)),
+    "the lamp is no bigger close up than it was far off: it does not grow"
+  );
+  assert.ok(
+    Math.max.apply(null, near.map((box) => box.alpha)) > Math.max.apply(null, far.map((box) => box.alpha)),
+    "the lamp is no brighter close up than it was far off"
+  );
+});
+
+test("BWV 565: a voice coming back after a long silence blooms in its own colour", () => {
+  const scene = sceneOf("bwv565-toccata-and-fugue-d-minor");
+  const stage = createStage(scene);
+  const back = 226.25; // where the left hand starts again after twenty seconds on its own
+  const voice = 2;
+  const before = scene.notes.filter((note) => note.voice === voice && note.time + note.length <= back);
+  const silent = back - Math.max.apply(null, before.map((note) => note.time + note.length));
+  assert.ok(silent >= 10, "this test wants a real absence: the left hand was gone " + silent.toFixed(1) + " s");
+  const note = scene.notes.find((one) => one.voice === voice && one.time === back);
+  assert.ok(note, "nothing was struck at " + back + " s");
+  const worn = scene.look.colours[String(voice)];
+
+  const isBloom = (list) => list.filter((box) => glowing(box, worn) && box.w > 60).length;
+  stage.frame(back - 0.5);
+  assert.strictEqual(isBloom(stage.drawn), 0, "it bloomed before the voice came back");
+  stage.frame(back + 0.2);
+  const blooms = stage.drawn.filter((box) => glowing(box, worn) && box.w > 60);
+  assert.ok(blooms.length > 0, "the left hand came back after " + silent.toFixed(0) + " s and nothing was made of it");
+  assert.ok(
+    blooms.some((box) => Math.abs(box.y + box.h / 2 - SUBJECT_LINE) < 40 && Math.abs(centre(box) - across(scene, note.pitch)) < 40),
+    "the bloom was not at the line of sound where the voice came in: " + JSON.stringify(blooms[0])
+  );
+
+  // A breath inside a phrase is not a homecoming. The right hand stops for a
+  // quarter of a second here and starts again: nobody should make a scene about it.
+  const breath = 313; // the right hand, gone 1.25 s
+  const goneBefore = scene.notes.filter((note) => note.voice === 1 && note.time + note.length <= breath);
+  const gone = breath - Math.max.apply(null, goneBefore.map((note) => note.time + note.length));
+  assert.ok(gone > 0.5 && gone < 3, "this test wants a short breath, not " + gone);
+  const worn1 = scene.look.colours["1"];
+  stage.frame(breath + 0.2);
+  assert.strictEqual(
+    stage.drawn.filter((box) => glowing(box, worn1) && box.w > 60).length,
+    0,
+    "a voice was made a scene of after only " + gone + " s"
+  );
+});
+
+test("BWV 565: a chord struck together flares across the screen, and the fugue never strikes one", () => {
+  const scene = sceneOf("bwv565-toccata-and-fugue-d-minor");
+  const stage = createStage(scene);
+
+  stage.frame(39.1); // the widest moment of the piece: eight notes at once, at 0:39
+  const flares = stage.drawn.filter((box) => box.colour === STRIKE && box.w > 200);
+  assert.ok(flares.length > 0, "no flare for a chord of eight struck together");
+  assert.ok(
+    flares.every((box) => Math.abs(box.y + box.h / 2 - SUBJECT_LINE) < 10),
+    "the chord's flare is not on the line of sound: " + JSON.stringify(flares[0])
+  );
+
+  // In the fugue nothing reaches five notes together, so nothing flares there. That
+  // is a fact about the notes, not about the picture, so it is checked as one.
+  const fugue = scene.notes.filter((note) => note.time > 130 && note.time < 500);
+  let widest = 0;
+  for (const note of fugue) {
+    const together = fugue.filter((one) => Math.abs(one.time - note.time) < 0.02).length;
+    if (together > widest) widest = together;
+  }
+  assert.ok(widest < 5, "the fugue does strike chords of " + widest + ", so the flare would not mean the toccata");
+  // The fugue's accompaniment strikes four notes together on almost every beat
+  // here, so this is where a flare would be wrongly painted if the picture asked
+  // for fewer than five notes together.
+  for (let at = 206; at < 214; at += 0.25) {
+    stage.frame(at);
+    assert.strictEqual(
+      stage.drawn.filter((box) => box.colour === STRIKE).length,
+      0,
+      "a chord flared in the fugue, at " + at.toFixed(2) + " s: the flare would say nothing there"
+    );
+  }
+  stage.frame(300);
+  assert.strictEqual(stage.drawn.filter((box) => box.colour === STRIKE).length, 0, "a chord flared in the bare middle");
+});
+
+test("BWV 565: where one note sounds alone it is drawn as if it were the whole piece", () => {
+  const scene = sceneOf("bwv565-toccata-and-fugue-d-minor");
+  const stage = createStage(scene);
+
+  // A moment in the bare middle with one melody note sounding alone - struck a
+  // moment ago, and not at the very second another lets go, since the picture
+  // lights a note until it has let go.
+  const litAt = (at) => scene.notes.filter((note) => note.time < at && note.time + note.length > at);
+  const lettingGoAt = (at) => scene.notes.filter((note) => Math.abs(note.time + note.length - at) < 1e-6).length;
+  let alone = 0;
+  for (let step = 0; step < 2000 && alone === 0; step++) {
+    const at = 240 + step * 0.05;
+    const sounding = litAt(at);
+    if (sounding.length === 1 && sounding[0].role === "melody" && lettingGoAt(at) === 0) alone = at;
+  }
+  assert.ok(alone > 0, "no moment in the middle with one melody note sounding on its own");
+  const busy = busiestSecond(scene.data);
+  assert.ok(soundingAt(scene, busy).length >= 8, "the fullest second at " + busy + " s is not crowded");
+
+  const quiet = stage.frame(alone);
+  const bodiesAlone = stage.drawn.filter((box) => Math.abs(box.alpha - 0.45) < 0.001);
+  assert.strictEqual(bodiesAlone.length, 1, "one note sounds, so one body should be lit: " + bodiesAlone.length);
+  // A tenth of a second after the fullest second: a note has to have been struck
+  // for a moment before it is a bar of light at all.
+  const loud = stage.frame(busy + 0.1);
+  const bodiesCrowded = stage.drawn.filter((box) => Math.abs(box.alpha - 0.45) < 0.001);
+  assert.ok(bodiesCrowded.length > 6, "at " + busy + " s only " + bodiesCrowded.length + " notes are lit");
+
+  assert.ok(
+    quiet.mean < loud.mean,
+    "the bare moment (" + quiet.mean.toFixed(4) + ") is no darker than the crowded one (" + loud.mean.toFixed(4) + ")"
+  );
+  assert.ok(
+    Math.max.apply(null, bodiesAlone.map((box) => box.w)) > Math.max.apply(null, bodiesCrowded.map((box) => box.w)),
+    "a note on its own is drawn no stouter than a note in a crowd"
+  );
+});
+
+test("BWV 565: a frame of the fugue picture is cheap enough to keep up", () => {
+  const scene = sceneOf("bwv565-toccata-and-fugue-d-minor");
+  const stage = createStage(scene);
+  let most = 0;
+  for (let at = 0; at < scene.data.duration; at += 2) {
+    stage.frame(at);
+    if (stage.drawn.length > most) most = stage.drawn.length;
+  }
+  assert.ok(most > 100, "one frame draws only " + most + " marks: is the picture missing?");
+  assert.ok(most < 800, "one frame draws " + most + " boxes: that will not keep up with the music");
+});

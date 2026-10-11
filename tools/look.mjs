@@ -1,7 +1,9 @@
 // The picture, in plain numbers. Nobody can see the screen from here, so this
 // measures light instead: what each piece's look is made of, how bright it gets
 // at its busiest, how dark it goes at its quietest, whether any of it is burnt
-// out white, and whether a repeat shows up as warmer light.
+// out white, and whether a repeat shows up as warmer light. It ends with what the
+// piece keeps coming back to - the tune the page's own finder hears - since that is
+// what a look gets built on.
 //
 //   node tools/look.mjs              # every piece
 //   node tools/look.mjs bwv639       # one piece
@@ -115,6 +117,7 @@ function report(slug) {
   } else {
     console.log("  nothing " + phrases + " bars or longer is played twice over");
   }
+  tellTheme(scene);
 }
 
 function echoesFor(scene, phrases) {
@@ -122,6 +125,36 @@ function echoesFor(scene, phrases) {
   const sandbox = { window: {} };
   vm.runInNewContext(source, sandbox);
   return sandbox.window.Bach.echoes(scene.notes, scene.look.bars, { minBars: phrases });
+}
+
+function themeFor(scene) {
+  const source = fs.readFileSync(at("src/theme.js"), "utf8");
+  const sandbox = { window: {} };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.window.Bach.theme(scene.notes, { bars: scene.look.bars });
+}
+
+/** What the pictures can be built on: the tune the piece keeps saying again. */
+function tellTheme(scene) {
+  const found = themeFor(scene);
+  if (!found) {
+    console.log("  nothing of eight notes or more comes back");
+    return;
+  }
+  const named = (index) => {
+    const known = scene.piece.voices[index];
+    return (known && known.name) || "voice " + index;
+  };
+  console.log(
+    "  the tune that comes back: " +
+      found.notes +
+      " notes, brought by " +
+      named(found.voice) +
+      ", heard " +
+      found.heard.length +
+      " times - " +
+      found.heard.map((one) => named(one.voice) + " " + clock(one.time)).join(", ")
+  );
 }
 
 function clock(seconds) {

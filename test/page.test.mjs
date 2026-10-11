@@ -547,7 +547,7 @@ test("the picture stays on the screen", async () => {
   const height = page.canvas.height / 2;
   const off = page.canvas.drawn.rects.filter((r) => r[0] < -40 || r[0] > width + 40 || r[1] > height + 60);
   assert.strictEqual(off.length, 0, off.length + " bars were drawn off the screen, first at " + JSON.stringify(off[0]));
-  const horizon = Math.round(height * 0.72);
+  const horizon = Math.round(height * 0.78); // BWV 565 wears src/look-subject.js
   const nearLine = page.canvas.drawn.rects.filter((r) => Math.abs(r[1] - horizon) < 400);
   assert.ok(nearLine.length > 20, "nothing is being drawn around the line of sound");
 });
@@ -997,12 +997,15 @@ test("every note sounding now has a bar of light at its pitch", async () => {
 
   const width = page.canvas.width / 2; // the fake canvas is drawn at two ratio
   const height = page.canvas.height / 2;
-  const horizon = Math.round(height * 0.72);
+  // Where BWV 565's picture puts its line of sound, and how wide the bright core
+  // of a note is: see src/look-subject.js (SOUND, and the core in sounded()).
+  const horizon = Math.round(height * 0.78);
+  const CORE = 2;
   const margin = Math.min(120, width * 0.12);
   const low = data.pitchRange[0];
   const span = data.pitchRange[1] - low;
   const xFor = (pitch) => margin + ((pitch - low) / span) * (width - margin * 2);
-  const spines = drawn.filter((r) => Math.abs(r[2] - 2.2) < 0.01); // the bright core of a bar
+  const spines = drawn.filter((r) => Math.abs(r[2] - CORE) < 0.01); // the bright core of a bar
 
   const due = [];
   for (const row of data.notes) {
@@ -1020,7 +1023,7 @@ test("every note sounding now has a bar of light at its pitch", async () => {
 
   const heights = [];
   for (const note of due) {
-    const x = xFor(note.pitch) - 1.1;
+    const x = xFor(note.pitch) - CORE / 2;
     const crossing = spines.filter((r) => Math.abs(r[0] - x) < 0.01 && r[1] <= horizon && r[1] + r[3] >= horizon);
     assert.ok(
       crossing.length > 0,

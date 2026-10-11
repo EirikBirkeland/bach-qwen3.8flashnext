@@ -1,5 +1,34 @@
 # Releases
 
+## 0.2.3 — 2026-10-11
+
+BWV 565 gets a picture of its own, and in it the fugue subject is gold.
+
+- **The page now finds the tune a piece keeps coming back to, by itself.** It writes
+  each line down as the steps between its notes, so a tune counts as itself at any
+  pitch, and looks for the figure that comes back most often. In BWV 565 that is the
+  32-note fugue subject, and it is heard eight times: 1:58, 2:06, 2:34, 3:24, 5:42,
+  6:08, 6:58 and 7:14. The same finder hears the ground bass of BWV 582 (15 notes,
+  13 times, always in the pedal) and the two tellings of the repeats in the two
+  chorale pieces, so the next pictures can be built on it.
+- **The Toccata and Fugue is no longer drawn as falling notes.** Every note of the
+  subject is gold, whoever is playing it — left hand, right hand, pedal — because
+  in this piece it is the tune that is followed and not one pair of hands. A lamp
+  grows where the next telling is going to land, while it is still above the line of
+  sound, and it blooms when it is struck.
+- **A chord flares across the screen.** Where five notes or more are struck together
+  a hot line is drawn over all the ground the chord covers. That is the toccata and
+  the last two minutes; nothing in the fugue reaches five at once, so the flares
+  mark the chordal worlds and nothing else.
+- **A voice coming back after a long silence is a scene.** The pedal stops for 86
+  seconds, then 115, then 49, and each time it returns it blooms in its own colour.
+  A breath of a second inside a phrase is still nothing.
+- **The picture breathes with the music.** Where eleven bars have one note sounding
+  at a time the trails stretch and that note is drawn a third bigger; where the
+  whole organ is going the trails are short and the notes thin.
+- The other three pieces look exactly as they did. BWV 582 still wears the falling
+  picture — that comes next.
+
 ## 0.2.2 — 2026-10-11
 
 One line about the chorale's arrivals in BWV 645.

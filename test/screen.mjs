@@ -27,8 +27,12 @@ function colourOf(value) {
 function gradient(kind, args) {
   const stops = [];
   return {
+    // The colours it was handed, in order, so a test can tell a gold bloom from a
+    // blue one: a gradient fill is otherwise just "a gradient" to the harness.
+    stops: [],
     addColorStop(at, colour) {
       stops.push([at, colourOf(colour)]);
+      this.stops.push(String(colour));
     },
     /** The colour this gradient has at one point of the screen. */
     at(x, y) {
@@ -105,6 +109,9 @@ export function createStage(piece) {
           // and its blue look the same in numbers of light, and a test that cannot
           // tell them apart cannot check a thing is warm.
           colour: plain ? context.fillStyle : "(gradient)",
+          // ... and what it was filled with when it was a gradient: its own
+          // colours, which is how a bloom can be checked for being gold.
+          fill: plain ? context.fillStyle : context.fillStyle.stops.join(" "),
         });
       const left = Math.max(0, x);
       const right = Math.min(width, x + w);
@@ -161,6 +168,10 @@ export function createStage(piece) {
   return {
     air: air,
     drawn: drawn,
+    // The same Bach the picture is reading its looks out of, so a test can ask the
+    // page's own finders about the notes it is drawing - about the very note
+    // objects the picture was handed, which is what lets it mark them.
+    bach: window.Bach,
     /** One frame, measured: how bright the screen was all over, at its brightest
      *  spot, how much of it was gold rather than blue, and how much was burnt out. */
     frame: function (now) {
