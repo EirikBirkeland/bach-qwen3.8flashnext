@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.3.0",
+    "date": "2026-10-11",
+    "released": "2026-10-11T13:16:33.107Z",
+    "summary": "Play along: click on the pulse of the piece, and the room rings",
+    "added": 1726,
+    "removed": 64,
+    "logBytes": 3222801
+  },
+  {
     "version": "0.2.4",
     "date": "2026-10-11",
     "released": "2026-10-11T11:53:13.942Z",
