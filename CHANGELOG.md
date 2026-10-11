@@ -1,5 +1,36 @@
 # Releases
 
+## 0.3.2 — 2026-10-11
+
+The Passacaglia's wheel takes its pulse into its own world: no ladder over it.
+
+- **BWV 582 marks its beats on its own rim.** A tooth per beat, just inside the marks
+  that count the turns, at the bearing that beat falls on within the turn - and since
+  the hand *is* the line of sound and goes once round a turn, the hand crossing a
+  tooth is the same event as the beat arriving. Eight bars of 3/4 to a turn means
+  twenty-four teeth, three to a bar, so the metre is written on the wheel.
+- **Striking is what lights it.** A caught beat lays a ring of light round the bearing
+  its tooth stood at; a long run brightens the whole rim. A click with no beat near it
+  is a dull mark where the hand has got to. A beat the music is marking - a fresh
+  telling of the ground - is drawn in a whiter light, and nothing on the wheel is ever
+  gold but the ground itself. When the ground stops and the wheel unwinds for the
+  fugue, the teeth go back on the rack with everything else that was ahead.
+- **A picture is now asked whether it wants the pulse.** `src/visual.js` asks the look,
+  `src/main.js` hands it over, and `src/game.js` keeps all the judging and hands the
+  picture a plain shot of the frame instead: the beats, which are still in play, how
+  long the run is, and what the player struck and on which beat. The other three
+  pieces say no and keep the ladder - notes falling (BWV 565), a phrase laid sideways
+  (BWV 639), a road receding to a horizon (BWV 645) are all straight timelines
+  already, and a ladder belongs on one.
+- **Measured, since nobody can see:** the wheel's heaviest frame goes from 668 marks
+  to 720 with the pulse on, against a budget of 1500; the brightest second of the
+  whole twelve minutes goes from mean light 0.0340 to 0.0348; and striking every
+  beat all the way through burns out no cell at all, same as before.
+- **The test canvases now refuse nonsense**: a box or a glow drawn with a number that
+  is not one is invisible rather than wrong, and that is how a device gets lost without
+  any test noticing. Both the page's stand-in canvas and the measuring canvas now say
+  so. 230 tests pass, and `tools/mutate.sh` can break the wheel's pulse thirteen ways.
+
 ## 0.3.1 — 2026-10-11
 
 The bell you strike when you play along is now the piece's own, instead of one

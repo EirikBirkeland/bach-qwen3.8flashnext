@@ -71,6 +71,13 @@ Do these quickly and roughly, in the first session if you can, and release as so
   - [ ] The ladder is laid *over* the picture, not part of it. Each piece's world could take its pulse in
         its own way - the wheel ticking one tooth of the rim to a beat, the long view planting a lamp on the
         road, the braid breathing with it. Only do it where it is better, piece by piece.
+  - [x] The wheel of BWV 582 has taken the pulse into its own world (`0.3.2`): a tooth per beat just inside
+        the rim, at the bearing that beat falls on within the turn, so the hand crossing a tooth *is* the
+        beat arriving; a struck beat lights the rim where its tooth stood, and a long run brightens the whole
+        rim. The other three pieces keep the ladder - their pictures already run on a straight timeline.
+        A picture that wants the pulse is now asked for it: `src/visual.js` asks, `src/main.js` hands it over,
+        and `src/game.js` keeps all the judging and hands the picture a plain shot of the beats, the run,
+        and what the player struck.
   - [x] The bell is no longer one struck sound for all four pieces. `src/touch.js` sizes each piece's bell
         from the piece: how loud, from how full the music is where the bells land, and how long it hangs,
         from the piece's own beat. `node tools/touch.mjs` prints the measuring of it - the spread of
