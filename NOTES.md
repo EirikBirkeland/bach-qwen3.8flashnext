@@ -1076,3 +1076,127 @@ Next, in order:
    `test/screen.mjs` cannot see `ctx.arc` + `fill`; `test/page.test.mjs`'s harness does
    not insist drawn numbers are finite (game.test's does); `theme.js`'s phase for a
    periodic figure (session 9, deliberately left).
+
+## Session 12 — 2026-10-11 — milestone 3: the wheel takes its own pulse
+
+**Released 0.3.2.** The open item was "the ladder is laid *over* the picture, not part
+of it - only where it is better, piece by piece". It is better for one piece so far,
+the wheel, and that is what shipped.
+
+What I did:
+
+- **The plumbing.** `src/game.js` gained `paint(what)`: hand it a function and the
+  piece's own world draws the pulse instead of the ladder; hand it nothing and the
+  ladder comes back. Every frame the game now builds a *shot* - `now`, the beats, the
+  `pointer` (first beat a strike can still be judged against), the beat's length, how
+  much of them is worth showing, how long a strike's light lasts, the run as 0..1, and
+  what the player struck lately - and hands it either to the painter or to its own
+  ladder. `src/visual.js` gained `pulse()`, which says whether the active look wants
+  it, and `src/main.js` asks once per piece: `game.paint(visual.pulse())`.
+- **`src/look-round.js` draws its pulse on its own rim.** One tooth per beat, just
+  inside the marks that count the turns, at the bearing that beat falls on within the
+  turn. Eight bars of 3/4 to a turn means **twenty-four teeth, three to a bar**: the
+  metre written on the wheel. A tooth grows and brightens as the hand comes round to
+  it (over three beats' worth of time); a beat the music is marking is drawn in a
+  whiter light; a caught beat lays a *ring* round the bearing its tooth stood at (a
+  ring, not a glow - the tooth is going in the same place and session 9's lesson is
+  that two full lights on one spot are white, not loud); a long run brightens the
+  whole rim through `ring()`; a click with no beat near it is one dull mark at the
+  hand. The teeth stop where the wheel's shown window stops, so when the fugue unwinds
+  the wheel the teeth go back on the rack with everything else that was ahead.
+- **Harness: `createStage(scene, { play: true })`** loads the game's scripts too and
+  wires game and picture together exactly as index.html does, so the light of the
+  picture *and* its pulse is measured together. `stage.hit(at)`, `stage.painted()`,
+  `stage.beats()`, `stage.score()`, `stage.rung` are there for it.
+- **`notesFor` in `test/screen.mjs` now carries the loadness** as well as the role,
+  read off the data's own `format`. Session 11's trap again, in a different file: a
+  harness handing notes with no velocity gives `Bach.touch` a NaN, which its floor
+  guard swallows, and every bell comes out the smallest one, quietly.
+- **Session 10's debt paid: both stand-in canvases refuse nonsense.** `test/screen.mjs`
+  and `test/page.test.mjs` now assert every `fillRect` and gradient argument is a
+  finite number, and a box that covers the whole canvas is allowed to be a wipe (the
+  wheel and the vigil open by wiping, and their wipes are honest). A device drawn at
+  NaN is invisible, which is how one gets lost for a whole release.
+- 230 tests pass (was 219): 2 in `game.test.mjs` about the shot, 8 in
+  `picture.test.mjs` about the rim, 1 in `page.test.mjs` that the Passacaglia's piece
+  really is painted by its own picture. `tools/mutate.sh` has thirteen new mutations,
+  all caught.
+
+Decisions worth keeping:
+
+- **A picture is asked, not configured.** A look declares itself by returning a
+  `pulse` function; nothing in `src/pieces.js` says who takes the pulse, so a look and
+  its entry on the card cannot disagree.
+- **The game keeps all the judging.** "A picture that draws the pulse draws it; it
+  judges nothing." The shot is read-only in spirit; `beats[].taken` is the game's work.
+- **The shot says *which beat* a strike caught** (`strike.when`, the beat's own second),
+  not only when the player clicked. That is what lets a world put its light where the
+  beat was rather than where the hand is now. The wheel folds `when` back into a
+  bearing, so the light lands on the tooth you hit.
+- **Travelling back leaves your struck lights behind you; travelling on does not.**
+  `frame` now clears `lit` only on a backwards jump. A forward skip bigger than half a
+  second is a seek, not a missed beat, and a strike should still be fading on its own
+  clock - which the harness needs too, since it frames a sixth of a second apart.
+- **MARK (`#e8f1ff`) is the pulse's colour on the wheel, and never gold.** Gold is the
+  ground bass and nothing else there, and a beat cannot take that meaning away. The
+  first version of the gold test let a mutation that lit struck beats gold survive -
+  it only looked at frames with no strikes in - so the test now strikes a telling of
+  the ground and checks the light it lays is not gold either.
+- **The other three keep the ladder, on purpose.** BWV 565 falls, BWV 639 lays a
+  phrase sideways, BWV 645 recedes to a horizon: all straight timelines already, so a
+  ladder of falling beats is not a foreign object on them. The wheel was the only
+  picture with no straight line anywhere. The vigil's road could still take lamps and
+  the braid could breathe; the PLAN item stays open until someone decides that is
+  better rather than merely possible.
+
+What surprised me:
+
+- **The wheel's turn divides exactly into beats** - 8 bars × 3 beats - so "a tooth per
+  beat" lands on a whole number of bearings and the three-to-a-bar grouping shows the
+  metre for free. Checked, not assumed: the test counts the bearings covered and the
+  gap halfway between two beats, where there must be nothing drawn.
+- **The hand kept getting into my measurements.** It is drawn in the same cool as the
+  teeth, it reaches the same radius, and its tip bloom passes within ~40 px of a beat's
+  tooth: my first "nothing lit before the strike" claim was really measuring the hand.
+  Two fixes: identify the pulse's boxes by *difference* against the same picture drawn
+  with nobody playing, and compare before against after at one place instead of
+  asserting absolute geometry.
+- **That difference is only honest if both stages are framed identically.** Framing one
+  and not the other puts the look's own boxes into the "pulse" list, because the slice
+  offset is the picture's box count. `wheelPlaying().see(seconds)` frames both, always,
+  in the same order.
+- **Eight of my thirteen new mutations were never tried the first time**: my perl
+  patterns had a `/` inside a pattern, a missing trailing `/`, and an unescaped `)`.
+  `tools/mutate.sh` reported them as `NO PATTERN`, which is the failure mode session 10
+  added it for. Fixed, re-run: 13 of 13 caught, including "the wheel keeps the game's
+  ladder after all" (17 tests fail) and "a struck beat is lit gold" (3 fail).
+- **A beat already let go is nobody's to strike again**: the game's `pointer` only ever
+  moves forward, so a test that frames past a beat and then tries to hit it gets a
+  stray. Three of my new tests had to be reordered so the strikes happen ahead of any
+  frame that passes their beat.
+
+Measured, since nobody can see or hear:
+
+- Wheel, worst second over the whole piece (one frame a second): mean light **0.0340**
+  with nobody playing, **0.0348** with every beat struck; brightest spot 0.48 in both;
+  **0 cells burnt out** in both, over all twelve minutes.
+- Heaviest frame: **668 marks** alone, **720** with the pulse on, against a budget of
+  1500; gradients 149 → 150 (the run's ring is the only gradient the pulse adds).
+- Tests: 230 in ~10.5 s, up from 219 in 6.7 s. The new ones build playing stages, and
+  each one makes the page find the ground bass again (~0.2 s); `Bach.theme`'s cache is
+  per sandbox, so a stage that has both a picture and a game pays it twice.
+
+Next, in order:
+
+1. The rest of the ladder item, if it is wanted: the vigil (BWV 645) planting lamps
+   along the road for its beats, or the braid (BWV 639) breathing with them. Do it
+   only if it reads better than the ladder, and `createStage(scene, { play: true })`
+   now makes the light measurable either way.
+2. The shared-drawing debt, again, and now bigger: `pulse` is a sixth place that draws
+   a glow or a ring. `landmarks.js`, `touch.js` and the shot are the shared logic so
+   far; `coming`/`sounded`/`bloom`/`halo` are still copied into every look.
+3. Still open from milestone 1: dynamics drawn from the music instead of the flat
+   velocities (582 is all 127, 565 all 90).
+4. Small honest debts: `theme.js`'s phase for a periodic figure (session 9, left on
+   purpose); BWV 645 burning 2 measuring cells at the chorale's arrival (session 9's
+   number, not re-measured here); the harness still cannot see `ctx.arc` + `fill`.
