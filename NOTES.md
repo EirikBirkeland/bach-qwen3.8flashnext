@@ -635,3 +635,94 @@ Next, in order:
 4. Small thing I noticed and did not do: at its fullest the Passacaglia in the fall
    look burns 6 of 2560 measuring cells white (peak 1.00 at 7:00). Worth a session
    of its own — every other piece and picture stays under 0.86.
+
+## Session 8 — 2026-10-11 — milestone 2: BWV 565 is a fugue, and the subject is gold
+
+**Released 0.2.3.**
+
+What I did:
+
+- **`src/theme.js` — the page can now hear what a piece keeps coming back to.** It
+  writes each voice as the steps between its notes (so a tune is itself at any
+  pitch: a fugue answer on the dominant, a ground bass an octave down), counts every
+  window of 8–40 notes, takes the one that comes back most — or the longest one that
+  comes back nearly as often, since a theme returns whole — and then looks for it in
+  every voice. A copy must wait two bars, or it is a sequence. This is a port of what
+  `tools/shape.mjs` does; both were checked against the same four pieces and they
+  agree: **565** a 32-note subject heard 8 times (LH 1:58, RH 2:06, RH 2:34, pedal
+  3:24, pedal 5:42, LH 6:08, LH 6:58, pedal 7:14), **582** a 15-note ground heard 13
+  times, all in the pedal, **639** the chorale's opening phrase twice (0:00, 0:25),
+  **645** the opening ritornello twice (0:16, 1:32). A hearing hands back the note
+  objects themselves, so a picture marks them by identity.
+- **`src/look-subject.js`, and BWV 565 wears it.** Notes fall as before, at 58 px a
+  second toward a line of sound at 78%, with a bar line every four seconds and a
+  faint line at every C. On top of that: every note of the subject is **gold**
+  whoever is playing it; a **lamp** grows where the next telling will land and a
+  **bloom** marks it struck; a chord of **five or more struck together** flares
+  across all the ground it covers; a voice back after **ten seconds** gone blooms in
+  its own colour; and the veil, the halo, the line of sound and the weight of a note
+  all scale with how much of the organ is going, so the bare middle stretches out.
+- `src/pieces.js`: 565's voices changed colour (RH blue, LH rose, pedal violet) so
+  that **gold belongs to the tune alone**. That is the first time a look changed a
+  piece's colours, and a test insists on it.
+- `tools/look.mjs` now prints what comes back for each piece, so the next look can be
+  planned from the same numbers the page uses.
+- Tests: 139 pass (was 120). New `test/theme.test.mjs` (13) — hand-built tunes, the
+  sequence rule, the two-bar rule, and the four real pieces' claims. Six more in
+  `test/picture.test.mjs` for the new look. `test/screen.mjs` records the colours a
+  gradient was built from (`fill`), and hands back the sandbox's `Bach`, so a test
+  can ask the page's own finder about the very notes the picture was given.
+
+What I fixed after checking, rather than after looking:
+
+- **The lamp and wake-bloom tests were not testing the blooms.** The harness records
+  `fill` for a plain box as its colour, and a plain gold note bar matched
+  "starts with gold" just as well as the gold lamp did — deleting the lamp from the
+  look changed nothing. Caught by mutation, not by the test. A glow is now recognised
+  as a *gradient* that starts from the colour.
+- Two measurement moments fought me. A note struck at exactly `now` has nothing
+  below the line yet, so it draws no body; and at a hand-over second the look lights
+  both the note letting go and the one arriving (its rule is `time <= now <= end`).
+  "One note sounding alone" therefore has to be picked with the look's own rule, not
+  the organ's, and a moment chosen a few frames after the strike.
+- The fugue's chords are four at the most (measured: nothing between 130 and 500 s
+  reaches five together), which is what makes the flare mean the toccata and the
+  finale. That claim is pinned as a claim about the notes, and the picture is made to
+  draw no flare across 206–214 s, where four notes ring out on almost every beat.
+
+Things that surprised me:
+
+- The finder is cheap enough to run when a piece is clicked: 70 ms for BWV 565,
+  ~210 ms for the Passacaglia, and the look only does it once per note list.
+- The subject's entries do not land on bar lines (the first is 118.25 s, mid-bar), so
+  bar lines could not have marked them; the finder had to come from the notes.
+- The three looks now each carry their own `coming` / `sounded` / `bloom`. A fourth
+  will copy them a third time: worth pulling those three into one shared file when
+  BWV 582's look is written.
+
+Measured, since nobody can see or hear:
+
+- BWV 565 in the new picture: fullest second (0:39, nine notes) mean light 0.0364,
+  brightest 0.56, nothing burnt; quietest (about 0:18) 0.0261; worst frame of the
+  piece 0.0370 at 5:42; a crowded frame 373 boxes (the test allows 800). Gold marks:
+  none at 0:40, 109 at 2:00, 65 at 3:24. At 0:39 the chord's flare is a 515 px line
+  on the line of sound; across 206–214 s there is none.
+- Mutation-checked, all caught: the finder ignoring the two-bar wait, the finder never
+  preferring the longer telling, subject notes not gold, no lamp, a lamp that does not
+  grow, no bloom on arrival, a voice not marked when it returns, `WAKE` at one second
+  instead of ten, `CHORD` at three instead of five, no thin-music weighting, a flare
+  that never fades, and a harness that forgets gradient colours.
+
+Next, in order:
+
+1. **BWV 582's own look** — the last piece still wearing the falling picture. Its
+   shape is a 20-second round of a 15-note ground, 21 of them, then the Fugue from
+   7:01 which is another world entirely (the ground is gone: the finder finds nothing
+   4 bars or longer). The gold-subject machinery is most of what it needs; what it
+   needs on top is the 20-second pulse and a hinge at the Fugue. While it is being
+   redone: in `fall` it burns 6 measuring cells white at 7:00 (peak 1.00), the only
+   piece that does.
+2. Pull the shared drawing (a note coming, a note sounded, a round glow, a voice
+   returning) out of the looks into one file before a fourth copy of it is written.
+3. Still open from milestone 1: dynamics drawn from the music instead of the flat
+   velocities (582 is all 127, 565 all 90).
