@@ -92,3 +92,77 @@ How this was verified (no browser here, so nothing was listened to):
 - `test/page.test.mjs` (see above) checks pipe start times against the note times.
 - Released as `0.0.1`; `releases/v0.0.1/` holds the playable copy, and the menu
   page lists it first.
+
+## Session 2 — 2026-10-11 — milestone 1: all four pieces
+
+What I did:
+
+- Converted the other three pieces, so the card now offers four. BWV 639: 553
+  notes, 1m59s. BWV 645: 863 notes, 3m41s. BWV 582: 9546 notes, 12m18s, ten
+  tempo marks (the editor slows down twice before the Fugue and again at the end).
+- **Solved the BWV 582 doubling, and found the same thing in BWV 639.** Two rules
+  in `tools/midi2json.mjs`, both recorded in the JSON so nothing goes missing
+  quietly (`sourceNoteCount`, `copies.octaveTracks`, `copies.unisonNotes`):
+  1. *a whole track that repeats another track at a fixed octave is an octave
+     coupler, keep the lowest copy.* In 582 tracks 5, 6 and 7 were the same line at
+     C2/C3/C4 (856 notes each): kept 6 (C1-C3, which fits a 32-note pedalboard;
+     track 5 reaches C4, above any pedalboard, and hits the manuals in unison 111
+     times). Track 4 was track 3 an octave up, dropped. In 639 tracks 2 and 4 were
+     exact octave copies of 1 and 3 - the whole file was doubled - dropped.
+  2. *a note that repeats an already-kept note at the same pitch, same moment, same
+     length is one struck key,* dropped (31 in 582, 2 each in 639 and 645).
+  A track of fewer than 8 notes is never called a copy: a couple of notes an octave
+  above a line are music, not a coupler.
+- What made me sure about the octaves: keeping the lowest copies, the Passacaglia
+  ends on Pedal C1+G2, manuals C3-G3-C4-G4 / E4-C5-E5 / C6 - a huge C major from
+  the floor up - and 639 opens on F2 / Ab3 / C5, an F minor chord, which is the
+  key of that piece. `node tools/inspect.mjs <slug> 0 end` prints those chords.
+- The 582 file really is a keyboard arrangement written in octaves everywhere (the
+  right hand alone has 1421 octave pairs inside its own track), so its top note is
+  C7. Left as the file says; not my business to re-bar it.
+- `src/pieces.js` now names the voices as a player would say them and colours gold
+  = the line to follow (the chorale melody where there is one): 639 chorale in the
+  right hand, 645 chorale in the left ("lower"), 582 has a fourth voice, the
+  octave above the right hand. Order on the card: 565, then the two short ones,
+  then the Passacaglia last.
+- **Bug found and fixed:** note end times are `time + duration`, which lands off
+  the four-decimal grid, so a note ending exactly as another starts looked like it
+  was still sounding. The organ's `busiestMoment` was 16 for 582 (true 12), 5 for
+  639 (true 3), and every pipe was made quieter than needed. Now ends are put back
+  on the grid (`onTheGrid` in src/audio.js) and the pieces play about a third
+  louder. Peak of a full chord is unchanged at about 0.65 before the limiter.
+- New `tools/inspect.mjs`: notes per second, widest chord and where, voices with
+  their real names and ranges, and the notes sounding at any second you name.
+  Use it before believing anything about a piece.
+- Tests: 30 pass. `test/data.test.mjs` now also proves nothing was invented (every
+  row must be found in its MIDI track), that each recorded octave copy really is
+  one (checked against the MIDI, not with the converter's own code), that the
+  counts add up, that no note is struck twice, and that every piece on the card has
+  data, names and colours for all its voices. `test/page.test.mjs` clicks every
+  piece, checks its notes reached the organ at the right seconds, its voice lines,
+  and that nothing was drawn off screen.
+
+Things that surprised me:
+
+- Three of the four files were not three-voice textures at all: BWV 639's 967
+  notes were really 555, BWV 582's 11687 were really 9577. Playing every track as
+  it stands would have sounded like an octave-coupled drone.
+- The octave-doubled `t2` of 582 is not a pure copy: 73 of its notes have no
+  partner in `t1`. So it stays, and is called "Octave above" on screen.
+- `node:vm` sandboxes make their own `Array`, so `assert.deepStrictEqual` on an
+  array produced inside the sandbox fails even when the contents match. Spread it
+  into this realm first (`[...piecesListed()]`).
+
+Next, in order:
+
+1. Pause, restart, and clicking the progress line to move into the piece
+   (`organ.play(prepared, from)` already takes a start point).
+2. Milestone 1's organ item: more pipes per note, and dynamics drawn from the
+   music (these files carry no dynamics at all: 582 is all velocity 127, 565 all
+   90). Register changes per section would suit the Passacaglia especially.
+3. Before building milestone 2 on it: check the picture's cost for 582 - it has a
+   peak of 310 notes on screen at once against 156 for 565, and each note makes a
+   gradient every frame. If it stutters, cheapen the bar for far-off notes.
+4. Then milestone 2, one piece per session, starting with BWV 639 (2 minutes, 3
+   voices, easiest to judge) or 582 (the most obvious shape: theme, 20 variations,
+   Fugue).
