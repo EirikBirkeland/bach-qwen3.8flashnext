@@ -1200,3 +1200,119 @@ Next, in order:
 4. Small honest debts: `theme.js`'s phase for a periodic figure (session 9, left on
    purpose); BWV 645 burning 2 measuring cells at the chorale's arrival (session 9's
    number, not re-measured here); the harness still cannot see `ctx.arc` + `fill`.
+
+## Session 13 — 2026-10-11 — milestone 3: BWV 645's beat was half a beat early
+
+**Released 0.3.3.** A bug, found while measuring for the next look item, and it was a
+bug with teeth: the whole of one piece's pulse was being asked for half a second
+before the music got there.
+
+What I went in to do was the vigil's own pulse (BWV 645 planting lamps along its road
+instead of wearing the game's ladder). First step was to ask which of its beats the
+music marks, and the answer was **none**. That was the thread I pulled.
+
+What I did:
+
+- **Found it.** `Bach.landmarks` gives BWV 645 four moments: 16.5, 92.5 (the opening
+  ritornello, told twice) and 123.5, 173.5 (the chorale coming home twice). Every one
+  of them is at a half second, and the beat grid was at whole seconds, so not one was
+  within `min(0.2, gap/3)` of a beat — the piece could never have a gold beat. From
+  there: the notes themselves are struck at 0.5, 1.5, 2.5 … (430 onsets on the half
+  second against 268 on the whole second), the pedal's quarter notes walk 0.5 apart
+  all the way through, and the chord that **ends the piece starts at 216.5 and holds
+  exactly four seconds to its last sound** — one whole bar. The edition bars the music
+  from 0.5; the MIDI file cannot say so, and `tools/bars.mjs` was drawing bars by
+  arithmetic from tick 0. The piece opens with an eighth-note pickup, and every bar
+  line in it was half a beat early.
+- **The rule now, in `tools/bars.mjs`.** These editions end exactly on a bar line —
+  which is what already lets a bar line with no music after it be dropped — so
+  whatever the last bar is short by is the pickup the piece opened with, and the whole
+  grid is lifted by that much. BWV 645: 56 bars of 0, 4, 8 … became 55 whole bars from
+  0.5. Two guards, both tested:
+  - the yardstick is the **middle** bar of the piece, not the last gap. BWV 582 slows
+    five times in its last two minutes, so its last-but-one bar is 5.24 s and its last
+    is 1.875 s: read the last gap and the Passacaglia looks like it opened with three
+    fifths of a bar missing. Judge by the middle (2.5 s) and nothing is lifted.
+  - the shortfall has to be under half a bar, and there have to be three bar lines to
+    judge by. BWV 639 ends by slowing to a stop, so its last bar is *longer* than one.
+- **What it buys.** BWV 645 has four gold beats now, and they are exactly the four
+  moments the vigil already marks with its lamps and its warm bar line. The beat grid
+  starts at 0.5 (the pickup is not a beat: nobody could strike an eighth note). The
+  long view's bar lines and its phrase lines fell into step with the music's own
+  phrasing, and `tools/shape.mjs`'s sections now break at the ritornello's return to
+  the half second.
+- **New tests, 241 in all (was 230).** `test/data.test.mjs` gained five tests for the
+  rule (a piece ending on the line, a piece with a pickup, a stretched last bar, a
+  piece too short to judge, and BWV 645's final chord filling its last bar), and its
+  three pickup-blind claims are gone: `bars[0] === 0` became "the first bar line is
+  under a bar in, and the last bar is at least half a bar". `test/pulse.test.mjs`
+  gained the claim that should have been there from the start — **the beat is where the
+  music is struck** — measured as the share of a piece's own note-length struck within
+  a twentieth of a second of a beat, which every piece must now get above 0.4 on. And
+  one that says each of BWV 645's four moments is exactly one beat. `tools/mutate.sh`
+  now mutates `tools/bars.mjs` too: four ways to break the rule, all caught (7, 5, 5
+  and 3 failing tests).
+- Re-measured what the shift could have disturbed: the long view of 645 is fullest
+  second mean 0.0427, brightest 0.42, 0 cells burnt, worst frame 0.0417 at 0:50 with
+  the same 2 burnt cells it has had since session 9 (the chorale's first arrival,
+  still an open debt). Its bell is the same size (level 0.052); what changed is where
+  the bells land — the piece's own level under its beats 0.204 → 0.218, and the bell's
+  share of it 0.33 → 0.38, both for the better since the bells now land on notes.
+
+Decisions worth keeping:
+
+- **The share of note-length on the beat, for the four pieces:** 565 0.49, 639 0.48,
+  582 0.56, 645 0.64 (it was 0.26 before the fix). About half is what a bar of four
+  with eighths and sixteenths in it looks like; a fifth means the grid is half a beat
+  off the music. That is the honest general guard, and it is a test now.
+- **I did not derive the bar grid from the notes.** The onsets in 639 and 582 sit about
+  a fiftieth of a beat (17–35 ms) *before* the grid — a hair flat, most likely the
+  editor's tempo mark rounded. Fixing that would mean letting the notes re-barrow the
+  edition for all four pieces, for a gain no ear could hear, and it would move the
+  wheel's whole geometry in BWV 582 for nothing. The bar lines are the editor's; the
+  pickup was a fact the file could not write, which is different.
+- A pickup note belongs to no bar in `tools/shape.mjs`'s table — correct, since an
+  anacrusis is written as its own partial bar. Nothing in the page reads that table.
+- Two whole bars' worth of the "beat sits at a rate a hand can keep" test moved to
+  `beats[0].time === data.bars[0]`: the first beat is wherever the edition's first bar
+  line is, and that is now allowed to be a pickup in.
+
+What surprised me:
+
+- **My own third test was wrong, and the code was right.** I wrote a synthetic "639"
+  — a constant-tempo piece of 119.23 s with 6.4865 s bars — expecting no lift, and it
+  lifted. Of course it did: 639's long last bar comes from a real ritardando, which a
+  one-tempo fake cannot make, so my fake really did end on a stump of a bar. The test
+  now reads the real BWV 639 file and says why a real one is needed to make the point.
+- The half-second was hiding in plain sight in these notes: session 5 wrote that the
+  ritornello's figure is heard "at 0:16 (bars 5–10)", and after the fix it starts on
+  bar 5 to the half second, and shape.mjs's sections break on the returns. Two tools
+  had been quietly reporting a grid that did not fit.
+- `grep`-ing my own NOTES for "0.5" would not have found this. What found it was
+  asking a question I had not asked before — *which beats are gold in this piece* —
+  and getting an answer that was too tidy to be true.
+
+Next, in order:
+
+1. **The vigil (BWV 645) taking its own pulse**, as planned before the bug turned up.
+   The geometry is worked out: the road's climb is `line - step·climb(ahead)` with a
+   beat's worth of lamps in the last 90 px, so lamps go on the two verges (x under the
+   margins the notes never enter: 120 px at 1280 wide), a lamp per beat while it is
+   near and one per bar beyond about four beats, `≥2 px` apart or not drawn at all,
+   struck light laid on the line of sound at the verges (not sliding down them: that is
+   where `#voices` and `#lookHint` live), the verge itself brightening with the run,
+   and `MARK` (#e8f1ff) for its colour — never gold, which is the chorale, never WARM
+   (#ffb066), which is a repeat. Two arguments the ladder had to answer: the ladder's
+   pace is linear and the road's is logarithmic, so they disagree about how far off a
+   second is; and the ladder shows 2.2 beats while the road can show the bar lines all
+   the way to the horizon. Now that 645 has four gold beats, a pulse drawn on the road
+   can show them from a minute off, which the ladder cannot do at all.
+   Cost to keep an eye on: the vigil's heaviest frame is 1126 marks of a 1500 budget.
+2. The shared-drawing debt, still: `coming`/`sounded`/`bloom`/`halo` are copied into
+   every look, and `pulse` is now a fifth place. The light numbers in these notes are
+   the safety net.
+3. Still open from milestone 1: dynamics drawn from the music instead of the flat
+   velocities (582 is all 127, 565 all 90).
+4. Small honest debts: `theme.js`'s phase for a periodic figure (session 9, left on
+   purpose); BWV 645 burning 2 measuring cells at the chorale's arrival; the harness
+   still cannot see `ctx.arc` + `fill`.
