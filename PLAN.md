@@ -33,13 +33,13 @@ The owner has given four pieces so far. They are in `music/` as MIDI files:
 
 Do these quickly and roughly, in the first session if you can, and release as soon as it plays. Polish comes after.
 
-- [ ] A small tool of your own that turns a MIDI file into plain note data (JSON): for each note its voice or
+- [x] A small tool of your own that turns a MIDI file into plain note data (JSON): for each note its voice or
       track, pitch, start and length in seconds. Convert BWV 565 first. Commit the JSON.
-- [ ] `index.html` with a start button (browsers only allow sound after a click) that plays BWV 565 from the
+- [x] `index.html` with a start button (browsers only allow sound after a click) that plays BWV 565 from the
       note data with a simple organ-like voice.
-- [ ] One simple visual driven by the notes while it plays, for example a light per note, placed by pitch and
+- [x] One simple visual driven by the notes while it plays, for example a light per note, placed by pitch and
       coloured by voice.
-- [ ] Release `0.0.1`.
+- [x] Release `0.0.1`.
 
 ### Milestone 1: all four pieces, played properly
 

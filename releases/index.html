@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bach — every version</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #06070d;
+        color: #e9edf6;
+        font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      }
+      .wrap {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 64px 24px 80px;
+      }
+      h1 {
+        font-size: 34px;
+        font-weight: 400;
+        letter-spacing: 0.2em;
+        text-indent: 0.2em;
+        margin: 0 0 6px;
+      }
+      .lead {
+        color: #8b9ab6;
+        font-size: 14px;
+        margin: 0 0 40px;
+      }
+      .release {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        border: 1px solid rgba(178, 196, 230, 0.22);
+        padding: 16px 18px;
+        margin-bottom: 12px;
+        transition: border-color 0.3s, background 0.3s;
+      }
+      .release:hover {
+        border-color: rgba(255, 212, 122, 0.8);
+        background: rgba(255, 212, 122, 0.05);
+      }
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+      .version {
+        font-size: 19px;
+      }
+      .date {
+        color: #74839d;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+      }
+      .summary {
+        margin: 6px 0 0;
+        font-size: 15px;
+        color: #cdd8ee;
+      }
+      .size {
+        margin: 8px 0 0;
+        color: #5f6c85;
+        font-size: 12px;
+      }
+      .empty {
+        color: #8b9ab6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>BACH</h1>
+      <p class="lead">Every version of this page. The newest is first.</p>
+      <div id="list"><p class="empty">Loading…</p></div>
+    </div>
+
+    <!-- A generated file, not a fetch: this page must also work opened from disk. -->
+    <script src="releases.js"></script>
+    <script>
+      (function () {
+        var list = document.getElementById("list");
+        var releases = window.BachReleases || [];
+        list.innerHTML = "";
+        if (releases.length === 0) {
+          var none = document.createElement("p");
+          none.className = "empty";
+          none.textContent = "Nothing has been released yet.";
+          list.appendChild(none);
+          return;
+        }
+        releases.forEach(function (release) {
+          var card = document.createElement("a");
+          card.className = "release";
+          card.href = "v" + release.version + "/index.html";
+
+          var top = document.createElement("div");
+          top.className = "top";
+          var version = document.createElement("span");
+          version.className = "version";
+          version.textContent = release.version;
+          var date = document.createElement("span");
+          date.className = "date";
+          date.textContent = release.date;
+          top.appendChild(version);
+          top.appendChild(date);
+
+          var summary = document.createElement("p");
+          summary.className = "summary";
+          summary.textContent = release.summary;
+
+          var size = document.createElement("p");
+          size.className = "size";
+          size.textContent = "+" + release.added + " −" + release.removed + " lines";
+
+          card.appendChild(top);
+          card.appendChild(summary);
+          card.appendChild(size);
+          list.appendChild(card);
+        });
+      })();
+    </script>
+  </body>
+</html>
