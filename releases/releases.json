@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.3.2",
+    "date": "2026-10-11",
+    "released": "2026-10-11T15:40:26.033Z",
+    "summary": "The Passacaglia's wheel takes its own pulse: a tooth per beat on the rim",
+    "added": 723,
+    "removed": 42,
+    "logBytes": 3888181
+  },
+  {
     "version": "0.3.1",
     "date": "2026-10-11",
     "released": "2026-10-11T14:18:59.112Z",
