@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.4.1",
+    "date": "2026-10-11",
+    "released": "2026-10-11T21:45:47.648Z",
+    "summary": "The Passacaglia's picture no longer burns out white when you strike a beat",
+    "added": 198,
+    "removed": 30,
+    "logBytes": 5282920
+  },
+  {
     "version": "0.4.0",
     "date": "2026-10-11",
     "released": "2026-10-11T20:45:01.145Z",
