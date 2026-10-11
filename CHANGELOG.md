@@ -1,5 +1,45 @@
 # Releases
 
+## 0.3.0 — 2026-10-11
+
+There is something to do now: play along with the pulse of the piece. Just
+watching is still there, one button away.
+
+- **Play along.** Click anywhere on the picture, or press Enter, in time with the
+  piece's pulse. Every beat of the piece is a chance and you take the ones you
+  like. The beats come from the piece's own bar lines and its metre, so nobody
+  typed in a tempo: BWV 639 asks for 37 a minute and BWV 582 for seventy-two, and
+  where the Passacaglia slows down five times before it ends the beats slow too,
+  so a run there means slowing down with the organ.
+- **A catch rings a bell.** Its note is the lowest note sounding at that moment,
+  two octaves up, so whatever you strike is a note of the harmony that is actually
+  being played, and a run of them shimmers over the organ and picks out the
+  chords. The organ plays every note of the piece either way: nothing in the music
+  depends on you, which is the whole point of a tribute.
+- **Some beats are worth more.** One that the music itself is marking - the tune
+  coming back, a line taken up again after ten seconds gone, five notes struck
+  together - is gold on the ladder and rings for more.
+- **A run** is beats caught one after another. Letting a beat go ends it, and so
+  does a click with no beat near it, which is what stops drumming on the mouse.
+  Nothing fails and nothing stops. When the piece ends it says how many of the
+  beats you were there for, your longest run, and how many were struck true.
+- **What it draws** is one thing: a short ladder of bars low in the middle of the
+  screen, the next couple of beats arriving on a line that grows wider and brighter
+  as the run grows. The piece's own picture is untouched. "Play along" beside
+  Pause, or the `P` key, switches it on and off at any moment, and the count
+  starts afresh either way.
+- The bell is small by numbers: the loudest chord of any piece, with the heaviest
+  bell anyone can ask for struck on top of it, still stays under where the limiter
+  starts - 0.49 against 0.708 in `node tools/loudness.mjs`.
+- New in the code: `src/pulse.js` for the beat grid, `src/landmarks.js` for the
+  moments worth marking (the fugue picture had private copies of two of those
+  finders, now shared), `organ.chime` for a struck bell sounding through the same
+  room as the pipes, and `src/game.js`. `src/theme.js` now answers the same
+  question about the same notes once, since a picture and the game both ask it.
+- 206 tests pass, and `tools/mutate.sh` breaks each new rule in turn - a caught
+  beat that is not marked, a beat let go that does not end the run, a beat grid
+  that ignores the metre - and insists a test notices every one.
+
 ## 0.2.4 — 2026-10-11
 
 BWV 582 is a wheel now. That is the last of the four pieces wearing a picture of
