@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.1.1",
+    "date": "2026-10-11",
+    "summary": "Pause, restart and moving anywhere into the piece — and the notes are really drawn",
+    "added": 1494,
+    "removed": 43,
+    "logBytes": 638172
+  },
+  {
     "version": "0.1.0",
     "date": "2026-10-11",
     "summary": "All four pieces play, each line once and at the right octave",
