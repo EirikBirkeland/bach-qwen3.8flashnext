@@ -1,5 +1,36 @@
 # Releases
 
+## 0.2.4 — 2026-10-11
+
+BWV 582 is a wheel now. That is the last of the four pieces wearing a picture of
+its own.
+
+- **The Passacaglia and Fugue no longer falls; it turns.** Its first seven minutes
+  are one 15-note ground bass in the pedal, said again every eight bars while
+  everything above it is written new, so time goes round: one turn of the wheel is
+  one telling of the ground, and the ground is traced in the same place every time
+  it is played. How long a turn is was not typed in - the page measures it from the
+  gaps between the tellings it hears, which say eight bars.
+- **Gold is the ground bass**, and no voice wears it: the right hand is blue now,
+  the left hand green. The wheel is high-pitched outwards and low-pitched near the
+  middle, so the pedal's ground sits in the middle of the shape it keeps returning
+  to.
+- **A hand goes once round a turn** and is the line of sound: what it has passed is
+  lit, and the whole turn ahead is there as a faint shape, so you see the variation
+  coming before you hear it.
+- **The rim keeps count.** One mark per turn taken, gold for the twenty turns that
+  carried the ground and cool for the ones since, so the rim says both how far into
+  twelve minutes you are and where the ground stopped.
+- **Then the ground stops.** The wheel unwinds over ten seconds, the fugue's first
+  note flashes, and the last five minutes are a hand sweeping a dark disc with a
+  few seconds of light on it - because with no ground there is nothing ahead of you
+  to see. A voice coming back after ten seconds gone still blooms in its own colour.
+- Nothing burns out white anywhere in this piece now; the falling picture used to.
+- The measuring canvas had been reading every round glow in the wrong place (it took
+  the wrong number for the middle of the circle), so glows away from the top-left
+  corner counted as invisible. Fixed: the numbers for all four pieces moved a
+  little, and the pictures themselves did not.
+
 ## 0.2.3 — 2026-10-11
 
 BWV 565 gets a picture of its own, and in it the fugue subject is gold.
