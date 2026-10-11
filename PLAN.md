@@ -43,9 +43,9 @@ Do these quickly and roughly, in the first session if you can, and release as so
 
 ### Milestone 1: all four pieces, played properly
 
-- [ ] Convert the other three pieces. A test that every converted piece matches its MIDI file note for note.
-- [ ] A way to choose the piece.
-- [ ] Timing that follows the tempo changes in the MIDI file.
+- [x] Convert the other three pieces. A test that every converted piece matches its MIDI file note for note.
+- [x] A way to choose the piece.
+- [x] Timing that follows the tempo changes in the MIDI file.
 - [ ] A better organ: several pipes per note, so it sounds full and not like a beep. Check the loudness by numbers
       so chords do not distort.
 - [ ] Pause, restart, and a way to move to any point in the piece.

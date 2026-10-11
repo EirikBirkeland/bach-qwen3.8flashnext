@@ -40,12 +40,12 @@ window.Bach = window.Bach || {};
   }
 
   // The most notes sounding at once anywhere in the piece. This sets how loud a
-  // single pipe may be, so a full chords never clips.
+  // single pipe may be, so a full chord never clips.
   function busiestMoment(notes) {
     var marks = [];
     for (var i = 0; i < notes.length; i++) {
       marks.push([notes[i].time, 1]);
-      marks.push([notes[i].time + notes[i].length, -1]);
+      marks.push([onTheGrid(notes[i].time + notes[i].length), -1]);
     }
     marks.sort(function (a, b) {
       return a[0] - b[0] || a[1] - b[1];
@@ -57,6 +57,15 @@ window.Bach = window.Bach || {};
       if (now > peak) peak = now;
     }
     return Math.max(1, peak);
+  }
+
+  // Note times come in rounded to four decimals, but adding a length can give a
+  // fifth one, and then a note that ends at the very moment another starts looks
+  // like it ends a hair later. That counts one note too many, so an end is put
+  // back on the same grid as the starts - to four decimals a note that hands
+  // over exactly is not sounding any more.
+  function onTheGrid(seconds) {
+    return Math.round(seconds * 10000) / 10000;
   }
 
   function frequency(pitch) {

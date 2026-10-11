@@ -346,9 +346,10 @@ function settled() {
 
 test("the page lists the pieces and starts the organ on a click", async () => {
   const page = openPage();
-  assert.strictEqual(page.window.Bach.pieces.length, 1);
+  const listed = [...page.window.Bach.pieces];
+  assert.ok(listed.length >= 4, "the owner gave four pieces, the page offers " + listed.length);
   assert.strictEqual(page.elements.card.classList.contains("shown"), true, "the card is what you see first");
-  assert.strictEqual(page.elements.pieces.children.length, 1, "each piece should offer a button");
+  assert.strictEqual(page.elements.pieces.children.length, listed.length, "each piece should offer a button");
 
   page.elements.pieces.children[0].click();
   await settled();
@@ -379,6 +380,52 @@ test("the page lists the pieces and starts the organ on a click", async () => {
   assert.ok(page.audio.bufferData[0].some((sample) => sample !== 0), "the room is silent: its impulse is all zeros");
 });
 
+test("every piece on the list plays, and names its voices", async () => {
+  const page = openPage();
+  const pieces = [...page.window.Bach.pieces];
+
+  for (const piece of pieces) {
+    const before = page.audio.started;
+    const beforeStarts = page.audio.startTimes.length;
+    const atStart = page.audio.context.currentTime;
+    page.elements.pieces.children[pieces.indexOf(piece)].click();
+    await settled();
+    for (let frame = 0; frame < 120; frame++) page.nextFrame(1 / 60); // two seconds
+
+    assert.ok(page.audio.started > before, piece.slug + " handed nothing to the organ");
+    assert.match(page.elements.nowTitle.textContent, new RegExp(piece.title), piece.slug + " did not say its name");
+    assert.ok(page.window.BachData[piece.slug], piece.slug + " never loaded its notes");
+
+    // The voice lines on screen are the voices of this piece, by their real names.
+    const data = page.window.BachData[piece.slug];
+    const lines = page.elements.voices.children.map((line) => line.children.map((part) => part.textContent).join(""));
+    assert.strictEqual(lines.length, data.voices.length, piece.slug + " shows the wrong number of voices");
+    for (const voice of data.voices) {
+      const named = piece.voices[voice.index] && piece.voices[voice.index].name;
+      assert.ok(lines.includes(named), piece.slug + " voice " + voice.index + " is not named on screen");
+    }
+
+    // Nothing was drawn outside the picture, and the notes were handed over on time.
+    const width = page.canvas.width / 2;
+    const height = page.canvas.height / 2;
+    const off = page.canvas.drawn.rects.filter((r) => r[0] < -40 || r[0] > width + 40 || r[1] > height + 60);
+    assert.strictEqual(off.length, 0, piece.slug + " drew " + off.length + " bars off the screen");
+
+    const starts = page.audio.startTimes.slice(beforeStarts).sort((a, b) => a - b);
+    for (const row of data.notes) {
+      if (row[2] > 2) break;
+      const wanted = atStart + 0.06 + row[2];
+      assert.ok(
+        starts.some((at) => at >= wanted - 0.002 && at <= wanted + 0.008),
+        piece.slug + " forgot the note at " + row[2] + " s"
+      );
+    }
+
+    page.elements.stop.click();
+    assert.strictEqual(page.elements.card.classList.contains("shown"), true, piece.slug + " would not let go");
+  }
+});
+
 test("every note that is due gets a pipe, and the envelopes are in order", async () => {
   const page = openPage();
   page.elements.pieces.children[0].click();
@@ -397,6 +444,23 @@ test("every note that is due gets a pipe, and the envelopes are in order", async
       );
     }
   }
+});
+
+test("a note that ends as another starts counts as one, not two", () => {
+  const organ = openPage().window.Bach.createOrgan();
+  // 0.1 + 0.2 is not quite 0.3 in a computer, which would make the first note look
+  // like it is still sounding when the other two begin, and so make the organ
+  // think three notes sound at once when only two do.
+  const data = {
+    format: ["voice", "pitch", "time", "duration", "velocity"],
+    duration: 1,
+    notes: [
+      [1, 60, 0.1, 0.2, 0.7],
+      [1, 64, 0.3, 0.4, 0.7],
+      [2, 67, 0.3, 0.4, 0.7],
+    ],
+  };
+  assert.strictEqual(organ.prepare(data).busiest, 2, "a hand-over between notes was counted twice");
 });
 
 test("the picture stays on the screen", async () => {

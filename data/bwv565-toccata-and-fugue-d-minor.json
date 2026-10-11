@@ -10,6 +10,11 @@
   ],
   "duration": 572,
   "noteCount": 3651,
+  "sourceNoteCount": 3651,
+  "copies": {
+    "octaveTracks": [],
+    "unisonNotes": 0
+  },
   "pitchRange": [
     36,
     84
