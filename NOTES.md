@@ -952,3 +952,126 @@ Next, in order:
    `ctx.arc` + `fill`; `theme.js`'s phase for a periodic figure (session 9, deliberately left); and
    `test/page.test.mjs`'s harness does not yet insist drawn numbers are finite - `test/game.test.mjs` does
    and it caught a real bug in minutes.
+
+## Session 11 — 2026-10-11 — milestone 3: every piece gets a bell of its own
+
+**Released 0.3.1.** The open PLAN item was "the bell is one struck sound for all four
+pieces; decide heavier or lighter by the numbers". So: measured, then a rule, then the
+rule wired in, then the numbers checked again.
+
+What I did:
+
+- **`tools/touch.mjs`** — measures a bell against the music it is struck over, per
+  piece. It asks the page's own code (not a copy) for the beats, their length and the
+  note each would ring; renders the whole piece at 16 kHz and keeps, for every beat,
+  the loudest sample within a twelfth of a second either side (`peaksAt`, new in
+  `test/render.mjs`). Prints three tables — what the bells land on, what one fixed
+  bell makes of that, what each piece's own bell makes — and then the rule that was
+  refused, beside the one chosen.
+- **The measuring, first.** With the one fixed bell (level 0.07, decay 1.2 s) the
+  ratio "bell beside its own music, over the beats" was **0.30 / 0.93 / 0.54 / 0.50**
+  for 639 / 565 / 645 / 582: nine tenths under a bare line of BWV 565's fugue, a
+  third under BWV 639's chorale. Ten dB of difference between pieces, which is the
+  whole complaint, quantified. The piece's own level where the bells land (median of
+  those rendered peaks): **0.119 / 0.374 / 0.204 / 0.220**.
+- **`src/touch.js`** — the rule, nothing typed in per piece:
+  `level = 0.078 × sqrt(fullness)`, clamped to [0.03, 0.09];
+  `decay = 1.2 × the piece's beat`, clamped to [0.9 s, 2.2 s];
+  where `fullness` is the **middle of the pipe-weight sounding at each beat, over the
+  loudest the piece ever gets** (`max(3, heaviestChord)` — see the surprise below).
+  Result: **0.037 / 0.069 / 0.052 / 0.054** and **1.2 / 1.95 / 1.2 / 1.0 s**. The
+  spread of "bell beside its music" fell from 3.1 to **1.7** (−10.6…−0.6 dB before,
+  −10.7…−6.0 now), and every bell now fills about **60% of a beat** — in BWV 639 it
+  carries right across the bar, in BWV 582 it is gone before the next beat lands.
+  Because the audible part of a bell (within 40 dB of its top) is about half the
+  decay, **no two bells are audible at once in any piece** — pinned as a test.
+- `organ.chime(pitch, when, how hard, touch)` takes the sizing with the strike;
+  `bellLevel` / `bellDecay` fall back on the plain bell for anything that is not a
+  number, or shorter than the attack, and both are in `Bach.organSpec` so
+  `test/render.mjs` measures with the engine's own rule instead of copying it.
+  `src/game.js` works the touch out once in `open()` and hands it with every strike.
+- `MIN_CHORD = 3` came out of `prepare()`'s inline `Math.max(3, heaviest)` into a
+  named constant, in `organSpec` as `minChord`, because the rule needs the same floor.
+- `test/render.mjs` grew `loadPage()` (the page's playing-along scripts in a bare
+  window, from `test/files.mjs`), so `tools/loudness.mjs` and the tests ask the page
+  rather than reimplementing it. `tools/loudness.mjs` now shows each piece's bell and
+  its own headroom: chord+bell 0.353 / 0.414 / 0.474 / 0.466 against a limiter at 0.708.
+- 219 tests pass (was 206). New `test/touch.test.mjs` (10), one game test, two page
+  tests. `tools/mutate.sh` has eleven new mutations and all are caught.
+
+Decisions worth keeping:
+
+- **The tidy rule was refused, on headroom.** "A bell always at the same share of its
+  own music" makes the four ratios equal — and hands the biggest bell to BWV 639, the
+  one piece whose level never drops (its thin figure is 0.362 against a median of
+  0.374: it never thins out). That bell would be level 0.095, and its widest chord
+  with the heaviest strike on it, the room counted after, would sit at **0.83 of full
+  scale against 0.77 now**. The sqrt rule is "half as much, in decibels, as the music
+  moves", which buys most of the evenness and none of the crowding. `tools/touch.mjs`
+  prints both columns so nobody has to take that on trust.
+- **Fullness is measured against `max(3, heaviestChord)`, not the piece's own
+  heaviest chord.** The organ sets its gain as `ceiling / max(3, heaviest)`, so a
+  piece that never has more than two notes going is played as if three were — that is
+  how loud it actually is, and it is what a bell has to sit under. BWV 639 is the one
+  real piece where this bites: its heaviest chord weighs 2.35, under the floor of 3,
+  so its fullness is 0.78 and not 1.0, and its bell came out 0.069 instead of 0.078.
+  A hand-built "one line at a time" piece scores 0.22, not 1.
+- `sqrt`, clamps and floors aside, the bell is deliberately never *louder* than about
+  half the music it is struck over: this is a tribute, and the tap is a comment on the
+  music, not a second soloist.
+- **Left out on purpose: sizing a bell per moment instead of per piece.** BWV 565's
+  own level over its beats runs from 0.070 (quarter of the way up) to 0.119 (middle)
+  to about 0.4 in the toccata — a 20 dB range no per-piece number can sit well in
+  twice over. A per-moment trim would fix that, but the bell grows exactly where the
+  chord is widest, which is the one place the headroom is already spoken for. Numbers
+  are here if a later session wants it; it is not the item PLAN asked for.
+
+What surprised me:
+
+- **"Decay 1.2 s" was really a 0.6 s bell.** The decay is an exponential ramp to
+  0.0001, so it is 40 dB down halfway through and 60 dB down three quarters along.
+  Worth knowing before touching a bell again: the number on the tin is four times what
+  an ear keeps.
+- **My own harness was feeding the rule NaN.** `test/game.test.mjs`'s `notesOf` built
+  notes with no `role` and no `velocity`, so `noteWeight` → `struck(undefined)` → NaN,
+  and `Bach.touch`'s floor guard (`if (!(level >= SMALLEST))`) swallowed it silently
+  and returned the smallest bell. It passed by luck. Now the harness gives roles and
+  velocities like the page does — session 6's lesson, in a different file.
+- Two of the guard clamps in the rule are doing real work on hand-built pieces and none
+  on the four real ones: the smallest bell (a piece that is mostly silence) and the
+  longest bell (a piece with a 4-second beat). Both now have tests, because "the clamp
+  is not exercised" is how a rule silently stops being one.
+- The mutation "the smallest bell is not a floor" **would have survived**: the thinnest
+  hand-built piece I had was at 0.036, just above the floor of 0.03. Adding a piece
+  that is mostly silence made the floor observable (23 failures).
+
+Measured, since nobody can see or hear:
+
+- Full table: `node tools/touch.mjs` (takes ~7 s; it renders all four pieces).
+- Levels 0.037 / 0.069 / 0.052 / 0.054; decays 1.2 / 1.95 / 1.2 / 1.0 s; ratios to
+  each piece's own beat-level 0.47 / 0.25 / 0.33 / 0.33 (worst-case bounds, the
+  organ's own units). Bell alone: 0.089 / 0.164 / 0.124 / 0.129 of full scale at the
+  heaviest strike.
+- Mutation-caught: same size for all four, same length for all four, a let-go-on-the-
+  beat note still counted, a thin piece credited with a tutti, no floor under the
+  smallest bell, no ceiling over the longest, `chime` ignoring the touch's level,
+  ignoring its decay, taking a nonsense touch at face value, and a strike not carrying
+  the touch at all.
+
+Next, in order:
+
+1. **The last open item of milestone 3: the ladder is laid over the picture instead of
+   being part of it.** Each world could take its pulse its own way — the wheel ticking
+   a rim tooth per beat, the vigil planting a lamp on the road, the braid breathing.
+   This one needs judgement I cannot get from numbers alone, so: change one piece's
+   world at a time, and keep the light measurements as the safety net.
+2. The shared-drawing debt, still: four looks each carry their own
+   `coming`/`sounded`/`bloom`/halo. `landmarks.js` and now `touch.js` are the shared
+   logic taken out of them; the light helpers are next.
+3. Still open from milestone 1: dynamics drawn from the music instead of the flat
+   velocities (582 is all 127, 565 all 90). `peaksAt` and `renderAcross` now make a
+   per-bar loudness profile cheap to compute, which is most of what that needs.
+4. Small honest debts: BWV 645 burns 2 measuring cells at the chorale's arrival;
+   `test/screen.mjs` cannot see `ctx.arc` + `fill`; `test/page.test.mjs`'s harness does
+   not insist drawn numbers are finite (game.test's does); `theme.js`'s phase for a
+   periodic figure (session 9, deliberately left).
