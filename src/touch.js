@@ -11,8 +11,8 @@
 //
 // The size follows how full the piece is where the bells land - half as much, in
 // decibels, as the music moves: a piece running 6 dB fuller gets a bell 3 dB
-// bigger, and the four pieces end up within 3.5 dB of one another instead of 10 dB
-// apart. Going the whole way - a bell always at the same share of its own music -
+// bigger, and the four pieces end up within about 5 dB of one another instead of
+// 10 dB apart. Going the whole way - a bell always at the same share of its own music -
 // was measured too, and refused: it hands the biggest bell of all to BWV 639, the
 // one piece whose level never drops, and takes that chorale's widest chord with a
 // heavy bell on it, the room counted after it, to 0.83 of full scale instead of

@@ -14,7 +14,7 @@ bell for all four pieces.
   size of the toccata's - and how long a beat is, so BWV 639's bell hangs 1.95 s,
   right across its bar, while BWV 582's is gone within a second and leaves the
   fugue clear. The spread between the four went from 3.1 to 1.7: they now sit within
-  about 3.5 dB of each other, where they were 10 dB apart.
+  about 5 dB of each other, where they were 10 dB apart.
 - **No two bells are audible at once**, in any piece. What an ear keeps hearing of a
   bell is about half its decay, and a decay is 1.2 beats, so a run of taps stays a
   run of taps instead of turning into a wash.

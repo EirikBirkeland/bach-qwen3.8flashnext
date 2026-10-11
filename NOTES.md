@@ -1049,9 +1049,10 @@ Measured, since nobody can see or hear:
 
 - Full table: `node tools/touch.mjs` (takes ~7 s; it renders all four pieces).
 - Levels 0.037 / 0.069 / 0.052 / 0.054; decays 1.2 / 1.95 / 1.2 / 1.0 s; ratios to
-  each piece's own beat-level 0.47 / 0.25 / 0.33 / 0.33 (worst-case bounds, the
-  organ's own units). Bell alone: 0.089 / 0.164 / 0.124 / 0.129 of full scale at the
-  heaviest strike.
+  each piece's own beat-level 0.46 / 0.25 / 0.33 / 0.34 — that last set in the same
+  worst-case bounds the rule itself uses (plain note weights), where the spread is
+  1.8 to 1 against the rendered one of 1.7 quoted above. Bell alone: 0.089 / 0.164 /
+  0.124 / 0.129 of full scale at the heaviest strike.
 - Mutation-caught: same size for all four, same length for all four, a let-go-on-the-
   beat note still counted, a thin piece credited with a tutti, no floor under the
   smallest bell, no ceiling over the longest, `chime` ignoring the touch's level,
