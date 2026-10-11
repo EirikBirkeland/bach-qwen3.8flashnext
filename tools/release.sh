@@ -1,0 +1,85 @@
+#!/bin/sh
+# Publishes a release: runs the checks, copies the playable project into releases/v<version>/,
+# lists it in releases/releases.json (read by the menu page), commits, and tags.
+#
+# Usage: tools/release.sh <version> "<one line summary>"
+#        tools/release.sh 0.0.1 "BWV 565 plays, one light per note"
+
+set -e
+cd "$(dirname "$0")/.."
+
+version="$1"
+summary="$2"
+tag="v$version"
+
+# Top-level things the browser loads. Add new folders here when the page starts using them.
+playable_items="index.html src assets data music"
+
+if [ -z "$version" ] || [ -z "$summary" ]; then
+  echo 'usage: tools/release.sh <version> "<one line summary>"'
+  exit 1
+fi
+
+if ! echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+  echo "The version must look like 0.1.0, got: $version"
+  exit 1
+fi
+
+if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+  echo "$tag already exists. Pick the next version."
+  exit 1
+fi
+
+if ! grep -q "$version" CHANGELOG.md 2>/dev/null; then
+  echo "Add an entry for $version to CHANGELOG.md first."
+  exit 1
+fi
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "The work tree has uncommitted changes. Commit them first."
+  exit 1
+fi
+
+echo "Checking syntax..."
+for folder in src tools test; do
+  [ -d "$folder" ] || continue
+  for file in $(find "$folder" \( -name '*.js' -o -name '*.mjs' \) -not -name '.*'); do
+    node --check "$file"
+  done
+done
+
+if [ -d test ]; then
+  echo "Running tests..."
+  node --test
+fi
+
+destination="releases/$tag"
+mkdir -p "$destination"
+for item in $playable_items; do
+  [ -e "$item" ] && cp -r "$item" "$destination/"
+done
+
+# The menu shows, per release, the lines added and removed since the previous one and how far loop.log had got.
+previous_tag="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+if [ -n "$previous_tag" ]; then
+  line_counts="$(git diff --numstat "$previous_tag" HEAD -- . ':!releases' ':!NOTES.md' | awk '{ added += $1; removed += $2 } END { print added + 0, removed + 0 }')"
+else
+  line_counts="$(git ls-files -- . ':!releases' ':!NOTES.md' ':!music/*.mid' | xargs cat 2>/dev/null | wc -l | awk '{ print $1, 0 }')"
+fi
+log_bytes="$(wc -c < loop.log 2>/dev/null || echo 0)"
+
+node --input-type=commonjs -e '
+const fs = require("fs");
+const [version, summary, added, removed, logBytes] = process.argv.slice(1);
+const manifestPath = "releases/releases.json";
+const releases = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, "utf8")) : [];
+const date = new Date().toISOString().slice(0, 10);
+releases.unshift({ version, date, summary, added: Number(added), removed: Number(removed), logBytes: Number(logBytes) });
+fs.writeFileSync(manifestPath, JSON.stringify(releases, null, 2) + "\n");
+' "$version" "$summary" $line_counts "$log_bytes"
+
+git add -A
+git commit -q -m "Release $tag: $summary"
+git tag -a "$tag" -m "$summary"
+
+echo "Released $tag. It is now in the menu."
