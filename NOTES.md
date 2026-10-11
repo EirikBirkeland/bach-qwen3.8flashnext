@@ -1705,3 +1705,108 @@ Next, in order:
    places. The light numbers in these notes remain the safety net for that refactor.
 4. Small honest debts: `theme.js`'s phase for a periodic figure (session 9, left on
    purpose); `test/screen.mjs` still cannot see `ctx.arc` + `fill`.
+
+## Session 17 — 2026-10-11 — milestone 4: the beat's tooth steps aside
+
+**Released 0.4.1.** The last open item of milestone 4 that was a bug: the wheel of BWV 582
+tipped a cell of the picture over full white when a struck beat landed on a note that was
+already blazing. Session 15 found it and left it; this session did it, and it took three
+changes rather than the one the notes predicted.
+
+What I did:
+
+- **The wheel already kept a record of where it had laid light this frame** (session 9's
+  device: two voices striking one pitch land on one spot, and two full lights on one spot
+  are white rather than loud, so the second is drawn for half). `pulse` never consulted it.
+  Now `tooth` asks before it lays a dot.
+- **The record has to cover the ground a light falls on, not its middle.** It was
+  `Math.round(x / 4)` cells keyed on a note's centre; a tooth dot stands three to six
+  pixels outside the note core it lands on, which is the next cell over, so the collision
+  that started this was invisible to the record. Now `laid(x, y, size)` writes every cell
+  the dot's own box covers and `shining(x, y)` asks one.
+- **Half was not enough; the tooth steps aside.** Measured at the cell that tipped (43,31 at
+  606.28 s): the picture alone has it at 0.767 - a note core 0.456, a hand dot 0.197, the
+  hand's tip bloom 0.117, the note's own ring 0.079 - and a struck tooth dot at *half* of
+  0.40 alpha of near-white still pushed it to 0.901. So a tooth dot is not laid at all
+  where the music is shining: a tick on a note's own flare is white on white anyway, and
+  the beat is still told by the ring of light round it and the part of the tooth standing
+  on ground of its own. Counted over the whole piece at a sixth of a second, only 426 of
+  127,457 rim marks are dropped - 0.3%. The teeth a player aims at are
+  untouched, because the record is written by notes that have been *struck*, and a coming
+  beat's tooth stands ahead of them.
+- **The grid went from two seconds to a sixth** in the committed test, and I checked the
+  whole Passacaglia at a sixtieth by hand: the coarse walk found the two frames session 15
+  named (225.8 s, 245.83 s); the fine walk found a third nobody had seen (606.28 s), and it
+  is still there after the first fix - which is how I learnt that halving was the wrong
+  verb. Both grids are clean now: at a sixth, 0 tipped cells, worst mean light 0.0388 against
+  0.0374 with nobody playing, heaviest frame 730 marks; at a sixtieth, 44,212 frames walked
+  in 85 s, 0 tipped, worst mean 0.0404 against 0.0380, and the wheel's own picture never
+  reaches 0.9 in a single cell anywhere in the piece.
+- **New `tools/burn.mjs`**: `node tools/burn.mjs` walks all four pieces with every beat
+  struck and prints, per piece, the cells the pulse alone tipped over and the frames where
+  the picture is over 0.9 by itself. `node tools/burn.mjs bwv582 0.0166666` for a sixtieth.
+  Fifteen seconds for all four at a sixth. Its numbers for the four at 1/6: tipped cells 0,
+  0, 0, 0, and frames the picture alone runs over 0.9 somewhere - 565 in 264 of 3426, 639
+  in 198 of 710, 645 in 80 of 1318, 582 in 0 of 4422.
+- **Tests: 277 (was 275), about 30 s (was 19 s).** The wheel's cost-and-burn test is now the
+  lockstep pair (picture alone, picture playing) walked at a sixth with the tipped rule,
+  like BWV 645's and BWV 639's, instead of one stage every two seconds with no baseline.
+  Two new tests: *"where the music is already shining, the beat's tooth steps aside"*, a
+  hand-built wheel with one note struck exactly on a beat beside the same wheel empty (the
+  dot is at full light in the dark and absent over the note, and the rest of the tooth is
+  still laid); and *"a frame of the wheel does not remember the frames before it"*, framing
+  400 s twice over, fresh and after six minutes of playing.
+- `tools/mutate.sh` has four new wheel mutations: a tooth laid over a shining spot, the
+  record a dot rather than the ground it covers, the record never cleared, and a note that
+  does not share its spot. All caught.
+
+What the mutation run taught me this time:
+
+- **"The record of what is lit is never cleared" survived everything that existed.** A
+  `spots` that kept the last frame's writing dims the picture steadily as the piece goes on,
+  and every existing claim about the wheel is a ceiling ("mean light under", "nothing over
+  0.9") so a picture playing itself down towards nothing passes them all. Framing 400 s
+  fresh gives peak 0.573; after six minutes of frames the mutated wheel gives 0.300. Hence
+  the memory test, and the rule it pins: the record is about this frame and no other.
+- The other three were caught both by the walk and by the hand-built A/B, which is what I
+  wanted from the A/B: it names the mechanism, where the walk only names the consequence.
+
+The limit of this, said plainly:
+
+- The measuring grid samples **one point per 20 x 20 pixel cell** - 2560 points. "No cell
+  over 0.9" is a claim about those points, not about every pixel. A 3 px dot laid one pixel
+  off a note's flare can push real pixels over full scale and the grid will never see it.
+  Everything in these notes about burn-out has that caveat; it is why the rule is "a cell may
+  only go over where the picture alone had it above 0.85" rather than a bald peak.
+- A sixtieth of a second over the Passacaglia costs about 85 s, so the committed test walks
+  at a sixth and the sixtieth is the tool's job, run by hand. Session 15's note is the
+  reason both are reported: a grid that is coarse enough is not conservative, it is blind.
+
+Decisions worth keeping:
+
+- **Music wins the spot.** Where the wheel has already laid a note's light, the player's
+  mark is not laid. That is the reverse of session 9's compromise (draw the second voice for
+  half) and it is deliberate: a note must be drawn, a tick need not.
+- **Only what has been struck writes on the record**, and a tooth's own dots neither ask nor
+  write - a tooth is one mark, and halving its dots against each other would just make it
+  dappled.
+- `CELL = 4` pixels. Two marks four pixels apart are one light to the eye; smaller cells
+  miss collisions, bigger ones start eating teeth wholesale.
+
+Next, in order:
+
+1. **Size the bell per moment, not per piece** - PLAN's last open item. `src/touch.js` gives
+   one bell to a piece; over BWV 565 it now sits about 7 dB under the music on a beat in the
+   bare middle and 3 dB under one in the toccata. Session 11 refused it because a bell grows
+   where the chord is widest, which is where the headroom is spoken for; that argument needs
+   re-making with the shaped weights. `node tools/touch.mjs` has the ground for it: the four
+   bells sit at 0.57 / 0.33 / 0.44 / 0.42 of their own music, and BWV 639 is where a bigger
+   bell costs most (widest chord + bell + room counted = 0.751 of full scale, past the
+   limiter's knee at 0.708 but well under full scale - which is what the limiter is for).
+2. The shared-drawing debt, still unpaid: `coming`/`sounded`/`bloom`/`ring`/`halo` in six
+   places, and now a `shining`/`laid` record in one of them that another look would probably
+   want too.
+3. Small honest debts: the vigil's own burnt cells at the chorale's arrival (80 of 1318
+   frames at 1/6 now have one; `tools/burn.mjs` will point at them); `theme.js`'s phase for a
+   periodic figure (session 9, left on purpose); `test/screen.mjs` still cannot see
+   `ctx.arc` + `fill`.
