@@ -41,6 +41,7 @@ run "game: the score line is never written" src/game.js 's/      if \(!on \|\| b
 run "game: it asks for a strike even while just watching" src/game.js 's/      if \(!on \|\| beats\.length === 0\) return null;/      if (beats.length === 0) return null;/'
 run "game: a catch does not lengthen the run" src/game.js 's/      chain\+\+;\n//'
 run "game: the bell is struck no harder for a gold beat" src/game.js 's/var weight = \(pick\.bright \? BRIGHT : 1\) \* \(struckTrue \? TRUEST : 0\.85\);/var weight = 1;/'
+run "game: every beat rings the piece's middle bell" src/game.js 's/organ\.chime\(pick\.pitch, null, weight, pick\.bell \|\| bell\);/organ.chime(pick.pitch, null, weight, bell);/'
 run "pulse: every bar keeps the first bar's pace" src/pulse.js 's/var step = \(stop - start\) \/ perBar;/var step = (data.bars[1] - data.bars[0]) \/ perBar;/'
 run "pulse: four to a bar, whatever the piece says" src/pulse.js 's/var perBar = \(data\.metre \&\& data\.metre\.beats\) \|\| 4;/var perBar = 4;/'
 run "pulse: beats may fall past the end of the piece" src/pulse.js 's/        if \(at >= end\) break;\n//'
@@ -61,7 +62,13 @@ run "touch: a line let go exactly on a beat still counts" src/touch.js 's/if \(n
 run "touch: a piece of one line at a time is credited with a tutti" src/touch.js 's/var loudest = Math\.max\(spec\.minChord, spec\.heaviestChord\(notes, spec\.registration\)\);/var loudest = Math.max(1, spec.heaviestChord(notes, spec.registration));/'
 run "touch: the smallest bell is not a floor" src/touch.js 's/    if \(!\(level >= SMALLEST\)\) level = SMALLEST;\n//'
 run "touch: a bell may hang as long as anything" src/touch.js 's/var decay = Math\.min\(LONGEST, Math\.max\(SHORTEST, RING \* beat\)\);/var decay = Math.max(SHORTEST, RING * beat);/'
-run "game: the strike does not carry the piece's bell" src/game.js 's/organ\.chime\(pick\.pitch, null, weight, bell\);/organ.chime(pick.pitch, null, weight);/'
+run "touch: a beat's bell ignores how full the beat is" src/touch.js 's/sizes\.push\({ level: level \* trim\(every\[i\], full\), decay: decay, fullness: every\[i\] }\);/sizes.push({ level: level, decay: decay, fullness: every[i] });/'
+run "touch: a beat's bell may grow past the piece's own" src/touch.js 's/    if \(share > 1\) return 1;\n//'
+run "touch: a beat's floor is not a floor" src/touch.js 's/    return share < LEAST \? LEAST : share;/    return share;/'
+run "touch: the exponent a moment is sized by is a guess" src/touch.js 's/var LEAN = 0\.75;/var LEAN = 1.6;/'
+run "touch: a piece is sized on its loudest beat, not its middle" src/touch.js 's/var full = Math\.max\(0, Math\.min\(1, middle\(every\)\)\);/var full = Math.max(0, Math.min(1, Math.max.apply(null, every)));/'
+run "game: the beats are never given their own bell sizes" src/game.js 's/      for \(var s = 0; s < beats\.length; s\+\+\) beats\[s\]\.bell = bell\.sizes\[s\];[^\n]*\n//'
+run "game: the strike carries no bell at all" src/game.js 's/organ\.chime\(pick\.pitch, null, weight, pick\.bell \|\| bell\);/organ.chime(pick.pitch, null, weight);/'
 run "theme: the same question is asked again" src/theme.js 's/    if \(asked \&\& asked\.notes === notes \&\& asked\.gap === gap\) return answer;\n//'
 
 # Playing along, when a piece's own world draws the pulse: src/visual.js asks the

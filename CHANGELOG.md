@@ -1,5 +1,29 @@
 # Releases
 
+## 0.4.2 — 2026-10-11
+
+The bell you strike now fits the moment it rings in, not only the piece.
+
+- **One bell per piece was still the coarsest thing left in the sound.** Sized for a whole
+  piece, it rang 10 dB *louder* than the music over the Passacaglia's opening pedal solo -
+  where one low line is barely speaking - and rang at full size in the silences between
+  sections of the Toccata.
+- **Every beat now gets its own share of the piece's bell**, by how much is sounding under
+  it: a beat half as full as the piece runs at its middle rings a bell at 0.59 of it, and a
+  beat in a silence rings the least bell the piece allows. The fullest beats still ring the
+  whole of the piece's bell, and no beat rings more than that: a piece's loudest moment is
+  precisely where there is no room left for a bigger bell, and the organ sets its own volume
+  by that loudest chord.
+- **Measured, over every beat of the four pieces:** the spread of how far the bell sits under
+  its own music came down from 9.3 dB to 5.4 dB in the Toccata, 4.2 to 3.0 in the
+  Passacaglia, and 4.7 to 3.8 in BWV 645, and the beats where the bell rang louder than
+  everything sounding went from 95 to 14 in all - the Toccata's 66 are all gone. The share
+  the rule uses (0.75) is measured too: the organ's loudness at a beat rises as the
+  three-quarters power of how much is sounding there, fitted over the 1,729 beats of the
+  four pieces where anything sounds. `node tools/touch.mjs` prints the lot.
+- BWV 639 is as it was, which is right: a chorale with four voices going on every beat has no
+  thin moments to fix.
+
 ## 0.4.1 — 2026-10-11
 
 One pixel of the Passacaglia stopped burning out white when you strike a beat.

@@ -1810,3 +1810,118 @@ Next, in order:
    frames at 1/6 now have one; `tools/burn.mjs` will point at them); `theme.js`'s phase for a
    periodic figure (session 9, left on purpose); `test/screen.mjs` still cannot see
    `ctx.arc` + `fill`.
+
+---
+
+## Session 18 — 2026-10-11 — milestone 4 closed: the bell fits the moment it rings in
+
+**Released 0.4.2.** The last open item of milestone 4: "the bell is sized per piece, not per
+moment". Milestone 4 is now closed, and milestone 5 is written.
+
+What I did:
+
+- **`src/touch.js` hands back `sizes` now, one per beat.** The piece's own bell is still
+  `level` and is still the biggest bell any beat of that piece rings; a beat gets
+  `level × (its own fullness / the piece's middle) ^ 0.75`, held above `0.4` of the piece's
+  bell. `Bach.touch(notes, beats, gap) -> { level, decay, fullness, sizes }`, and `sizes` is
+  in the order the beats were given. The old `fullness` became `fullnesses` (the whole list),
+  with `fullness` the middle of it - so the piece's number is computed exactly as before and
+  every existing claim about it still stands.
+- **`src/game.js` copies the sizes onto the beats** (`beats[s].bell`, beside `pitch` and
+  `bright`) and strikes with `pick.bell || bell`. Nothing else changed: the bell's note, its
+  length, the run, the judging are all as they were.
+- **`tools/touch.mjs` grew a fourth table** - the same piece's bell from beat to beat beside
+  every beat's own, `p10 / p90 / spread / loudest / over` for both, plus how many beats still
+  ring the whole of the piece's bell and how many have nothing sounding at all - and a line
+  with the fitted exponent beside the constant the rule uses, so the two cannot drift.
+
+What the numbers said (measured before writing any of it; `peaksAt` over every beat, single
+loudest sample within a twelfth of a second either side, silent beats counted separately):
+
+- **The plan had the direction backwards.** One fixed bell per piece sits furthest *over* its
+  music in the thin moments and furthest *under* it in the full ones - not the "7 dB under in
+  the bare middle, 3 dB under in the toccata" of the plan's note. Within-piece, bell/music:
+  BWV 565 p10 -8.8 / p90 +0.5 dB and 66 beats ringing louder than everything sounding, 5
+  beats with nothing sounding at all; BWV 639 -10.6/-8.4, nothing over; BWV 645 -10.2/-5.5,
+  nothing over; **BWV 582 -9.0/-4.8 with its worst beat at +9.9 dB** - the opening pedal solo,
+  where one low line is barely speaking and the bell was three times its loudness.
+- **After:** 565 5.4 dB of spread instead of 9.3, and no beat over its music at all;
+  645 3.8 instead of 4.7 with its worst beat 1.2 dB further under; 582 3.0 instead of 4.2 with
+  its worst beat down to +1.9 dB and 14 beats over instead of 29; **639 2.7 instead of 2.2** -
+  half a decibel worse, and said so: a chorale with four voices on every beat has nothing to
+  fix, and it pays for one rule covering four pieces.
+- **The exponent is 0.75 because it was fitted.** Rendered loudness at a beat against the note
+  weight at it, both on logs: slope 0.75 over the 1,729 beats of the four pieces where
+  anything sounds (per piece: 565 0.76, 645 0.79, 582 0.52, 639 0.28). A sweep over
+  lean {0.5, 0.75, 1} × least {0.25, 0.4, 0.55} put 0.75 best on the three pieces that have a
+  spread at all; 0.5 (matching the piece rule's square root) measured worse, 1.0 worse again
+  where the piece is even. Note weight is the page's only handle on loudness, so the exponent
+  is really "how the organ's output grows with how much is sounding", which is what it is used
+  for.
+- **A bell may not grow with the music, and the arithmetic says so rather than taste.** In the
+  currency the tests already use - the piece's widest chord plus the heaviest bell it could be
+  handed, against the limiter's knee at 0.708 - the four pieces sit at 0.644, 0.659, 0.686,
+  0.698 today. A growth cap of 1.25 puts BWV 582 at 0.732 and BWV 645 at 0.717; even 1.15 puts
+  582 at 0.718. So the ceiling is the piece's own bell, and session 11's refusal of "a bell at
+  a fixed share of its music everywhere" is the same money one level down. The reason is in
+  `audio.js`: the organ's gain is `CEILING / heaviestChord`, so *every* piece's widest chord
+  lands at about 0.56 of full scale and the room left for a bell is the same in all four, and
+  already spent.
+
+What surprised me:
+
+- **The floor had to be relative.** The obvious floor - `SMALLEST`, the "no bell so small it is
+  only felt" constant - is 0.03, and BWV 565's own bell is 0.035, so an absolute floor would
+  have stopped the piece with the widest dynamic range of the four from shrinking at all. The
+  floor is now `0.4` of the piece's own bell: proportionate by construction.
+- **A trim of zero would have been a live trap.** `audio.js`'s `bellLevel()` reads a level of
+  `0` as "nobody handed me a sizing" and rings the plain 0.07 bell - *bigger* than any piece's
+  own, in exactly the silent moments where a zero trim would happen. The floor keeps every
+  sizing positive; the test with a beat in a silence is what pins it.
+- **`tools/mutate.sh` told me one of its own patterns had died.** `game: the strike does not
+  carry the piece's bell` matched a line this session changed, and mutate.sh says `NO PATTERN`
+  rather than failing loudly. Also my own new pattern for the floor reported `NO PATTERN` at
+  first, because a bare `?` in a perl pattern is a quantifier and the source text contains a
+  literal `?` - escape it (`LEAST \? LEAST`).
+
+Tests: 281 (was 277), about 30 s. Four new: every beat has a sizing and none is bigger than the
+piece's nor under the floor; a beat at the piece's middle rings exactly the piece's bell; a
+hand-built piece with three bars of chord, a bar of a duet and a bar of silence says which of
+its beats get the whole bell, a share, and the floor; and the measured one - every piece's
+loudest-reaching bell sits better under its music than it did, the four spreads are smaller in
+all, the beats that ring over their music are down, and the loudest bell anywhere over its own
+music came down by more than 5 dB. `test/page.test.mjs` and `test/game.test.mjs` now pin the
+*beat's* sizing rather than the piece's, so a build that hands the piece bell everywhere is
+caught instead of quietly passing. Six new mutations (five in `touch.js`, two in `game.js`, one
+of the game pair replacing the stale pattern) and all are caught.
+
+The limit of this, said plainly:
+
+- The trim is built on note weights, which predict the rendered peak well over the collection
+  (0.75) and less well piece by piece - BWV 639's own slope is 0.28, so its beats are trimmed
+  harder than its own loudness would say. A per-piece slope would take a browser rendering the
+  piece to measure, which is the one thing a page cannot do before it plays.
+- Every ratio here pairs a bell's own top with a chord's own top, and they rarely fall at the
+  same sample. It is a worst case, not what is heard; the same caveat the burn-out numbers carry.
+- `tools/touch.mjs` went from 7 s to 13 s, because the moment table renders every beat of every
+  piece. That is the price of measuring rather than asserting, and 13 s is still nothing.
+
+Decisions worth keeping:
+
+- **`sizes` travels on the beats**, because `pitch`, `bar` and `bright` already do. The organ
+  takes a sizing per strike and knows nothing about pieces, which is right.
+- **A bell's length stays the piece's**, not the moment's: how long a bell hangs belongs to the
+  pulse, and a thin moment ringing a *shorter* bell would make the player's own feed-back
+  flicker in length from beat to beat.
+- **The piece's bell is a ceiling, not a target.** Every "grow the bell where the music is loud"
+  idea is refused on the same headroom arithmetic until something gives there.
+
+Next, in order - milestone 5, all of it one session:
+
+1. BWV 645's own burnt frames: 80 of its 1,318 have a cell over 0.9 with nobody playing
+   (`node tools/burn.mjs bwv645`), the picture's own brightest moment. The wheel's teeth were
+   chased the same way in 0.4.1; the lamps were never asked.
+2. Say the size of the moment with light: a struck beat is drawn the same however it sounded,
+   and now the picture can ask `beat.bell.level / game.touch().level` and agree with the ear.
+3. The shared-drawing debt: `coming`/`sounded`/`bloom`/`ring`/`halo` in three long views, plus
+   the wheel's `shining`/`laid` record - one module, no behaviour change.

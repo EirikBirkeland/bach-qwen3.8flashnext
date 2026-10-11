@@ -1306,8 +1306,9 @@ function lastBell(page) {
 }
 
 test("the bell that rings is the piece's own, not a plain one", async () => {
-  // src/touch.js sizes a bell per piece; this checks the sizing actually reaches the
-  // engine - a bell built from the defaults would look exactly the same everywhere.
+  // src/touch.js sizes a bell per piece and a share of it per beat; this checks both
+  // sizings actually reach the engine - a bell built from the defaults would look
+  // exactly the same everywhere.
   const chorale = openPage();
   chorale.elements.pieces.children[1].click(); // BWV 639
   await settled();
@@ -1322,11 +1323,13 @@ test("the bell that rings is the piece's own, not a plain one", async () => {
     Math.abs(rung.decay - wanted.decay) < 1e-6,
     "the bell did not hang the piece's own length: " + rung.decay.toFixed(2) + " against " + wanted.decay.toFixed(2)
   );
-  // How loud is the piece's level times how hard the beat was struck, and the game
-  // only ever strikes between 0.85 (caught, ordinary) and 1.5 (true, and marked).
+  // How loud is that beat's own share of the piece's bell, times how hard the beat
+  // was struck, and the game only ever strikes between 0.85 (caught, ordinary) and
+  // 1.5 (true, and marked).
+  const size = wanted.sizes[4];
   assert.ok(
-    rung.level >= wanted.level * 0.85 - 1e-9 && rung.level <= wanted.level * 1.5 + 1e-9,
-    "the bell was not the piece's size: " + rung.level.toFixed(4) + " against " + wanted.level.toFixed(4)
+    rung.level >= size.level * 0.85 - 1e-9 && rung.level <= size.level * 1.5 + 1e-9,
+    "the bell was not that beat's size: " + rung.level.toFixed(4) + " against " + size.level.toFixed(4)
   );
 
   const toccata = openPage();

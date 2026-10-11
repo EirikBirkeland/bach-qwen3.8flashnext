@@ -9,9 +9,10 @@
 // that moment, two octaves up. So whatever the player strikes is a note of the
 // harmony that is actually being played - the taps shimmer over the organ and
 // pick out the chords, which is the whole reason for doing it. How big that bell
-// is, and how long it hangs, belongs to the piece rather than to the game:
-// src/touch.js measures both out of the music and the game hands them over with
-// every strike.
+// is, and how long it hangs, belongs to the music rather than to the game:
+// src/touch.js measures both out of the notes and the game hands them over with
+// every strike - the piece gets a bell of its own, and every beat of it gets a
+// share of that bell sized for how much is sounding under it.
 //
 // What is worth more: a beat the music itself is marking - the tune coming back,
 // a line taken up again after ten seconds gone, a chord of five struck together.
@@ -90,6 +91,7 @@ window.Bach = window.Bach || {};
       speed = LADDER / (AHEAD * gap);
       look = AHEAD * gap;
       bell = Bach.touch(notes, beats, gap); // how big a bell this piece can carry
+      for (var s = 0; s < beats.length; s++) beats[s].bell = bell.sizes[s]; // ... and each beat its own
       markTheLandmarks(Bach.landmarks(notes, { bars: data.bars }));
       pitchEveryBeat(notes);
       close();
@@ -205,7 +207,7 @@ window.Bach = window.Bach || {};
       var struckTrue = Math.abs(off) <= TRUE;
       if (struckTrue) truest++;
       var weight = (pick.bright ? BRIGHT : 1) * (struckTrue ? TRUEST : 0.85);
-      organ.chime(pick.pitch, null, weight, bell);
+      organ.chime(pick.pitch, null, weight, pick.bell || bell);
       lit.push({ at: now, when: pick.time, kind: pick.bright ? "gold" : "cool", truest: struckTrue });
       return { kind: struckTrue ? "true" : "near", bright: pick.bright || null, off: off };
     }

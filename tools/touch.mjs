@@ -150,6 +150,8 @@ for (const piece of pieces) {
     there: everything > 0 ? ((100 * inBand) / everything).toFixed(0) + "%" : "–",
     chord: peak(chord),
     touch: touch,
+    levels: levels,
+    sizes: touch.sizes,
   });
 }
 
@@ -216,6 +218,129 @@ console.log(
     " now)"
 );
 
+// The same question asked again inside one piece. One bell per piece was the first
+// step and it is still the biggest bell a piece rings; what it cannot answer is
+// "how much is sounding under this beat". Every beat below was rung with the piece's
+// own bell in the left group, and with a share of it in the right one, sized by how
+// full that beat is.
+//
+//   p10, p90    where the bell sits under the music at the two ends of the piece
+//   spread      how far apart those two ends are, in decibels
+//   loudest     the beat where the bell pokes furthest above its own music
+//   over        how many beats it rings louder than everything sounding
+//   full        how many beats still ring the whole of the piece's bell
+//
+// A beat with nothing at all sounding is left out of these figures - a bell ringing
+// over silence has no ratio to the music - and counted on its own instead.
+const db = (x) => (20 * Math.log10(x)).toFixed(1);
+const ring = (one, level) => plain(1) * (level / spec.chime.level); // a bell scales flatly
+const rows = facts.map((one) => {
+  const silent = one.levels.filter((music) => music <= 0).length;
+  const rate = (levels) => {
+    const list = [];
+    levels.forEach((level, i) => {
+      if (one.levels[i] > 0) list.push(ring(one, level) / one.levels[i]);
+    });
+    return {
+      p10: share(list, 0.1),
+      p90: share(list, 0.9),
+      top: Math.max(...list),
+      over: list.filter((r) => r > 1).length,
+    };
+  };
+  return {
+    one: one,
+    silent: silent,
+    before: rate(one.sizes.map(() => one.touch.level)),
+    after: rate(one.sizes.map((size) => size.level)),
+    full: one.sizes.filter((size) => size.level >= one.touch.level - 1e-12).length,
+  };
+});
+const row = (way) => [db(way.p10), db(way.p90), db(way.p90 / way.p10), db(way.top), String(way.over)];
+table(
+  "one piece's bell from beat to beat, beside every beat's own (bell / music):",
+  [
+    "piece",
+    "p10",
+    "p90",
+    "spread",
+    "loudest",
+    "over",
+    "|",
+    "p10",
+    "p90",
+    "spread",
+    "loudest",
+    "over",
+    "full",
+    "silent",
+  ],
+  rows.map((line) =>
+    [line.one.slug]
+      .concat(row(line.before))
+      .concat(["|"])
+      .concat(row(line.after))
+      .concat([((100 * line.full) / line.one.sizes.length).toFixed(0) + "%", String(line.silent)])
+  )
+);
+const widest = rows.reduce((worst, line) => {
+  const left = line.before.p90 / line.before.p10;
+  const right = line.after.p90 / line.after.p10;
+  return left / right > worst.by ? { by: left / right, slug: line.one.slug, was: db(left), now: db(right) } : worst;
+}, { by: -1, slug: "", was: "", now: "" });
+const silence = rows.reduce(
+  (most, line) => (line.silent > most.n ? { n: line.silent, slug: line.one.slug } : most),
+  { n: 0, slug: "" }
+);
+console.log(
+  "\nthe spread within a piece is what one bell per piece leaves behind; the right-hand group is what every beat's own sizing leaves. The piece it helps most is " +
+    widest.slug +
+    ": " +
+    widest.was +
+    " dB between its ends, now " +
+    widest.now +
+    " dB. `full` is how many beats still ring the whole of the piece's bell - its fullest moments, which are the ones with least room to grow. " +
+    silence.slug +
+    " has " +
+    silence.n +
+    " beats with nothing sounding at all, where the bell rings alone and even its smallest size is the only thing to hear."
+);
+
+// Why the exponent the moment rule uses is 0.75 and not a tidy half: it is the
+// organ's own growth, measured. Loudness at a beat against how much is sounding at
+// it, all four pieces' beats on one log-log graph.
+const grown = facts.reduce(
+  (fit, one) => {
+    one.sizes.forEach((size, i) => {
+      if (size.fullness > 0 && one.levels[i] > 0) {
+        const x = Math.log(size.fullness);
+        const y = Math.log(one.levels[i]);
+        fit.n++;
+        fit.sx += x;
+        fit.sy += y;
+        fit.sxx += x * x;
+        fit.sxy += x * y;
+      }
+    });
+    return fit;
+  },
+  { n: 0, sx: 0, sy: 0, sxx: 0, sxy: 0 }
+);
+const exponent = (grown.n * grown.sxy - grown.sx * grown.sy) / (grown.n * grown.sxx - grown.sx * grown.sx);
+console.log(
+  "\nthe organ's loudness at a beat grows as the " +
+    exponent.toFixed(2) +
+    " power of how much is sounding at it, fitted over " +
+    grown.n +
+    " beats of the four pieces - the rule uses " +
+    page.touchRules.lean +
+    ". A beat half as full as the piece's own middle gets a bell at " +
+    Math.pow(0.5, page.touchRules.lean).toFixed(2) +
+    " of it, and no beat gets more than the piece's own bell: " +
+    page.touchRules.least +
+    " of it is the floor, so a piece's quietest moment still rings a bell."
+);
+
 // The rule that was refused, and why. A bell always at the same share of its own
 // music is the tidy answer: it makes the four ratios equal to the decimal point.
 // It is refused on headroom and on sense: the pieces that run at full stretch on
@@ -267,5 +392,5 @@ console.log(
 console.log(
   "the limiter starts at " +
     LIMITER.toFixed(3) +
-    " and full scale is 1.000. Both rules fit; the chosen one just leaves more room where the music is already loud."
+    " and full scale is 1.000. Both rules fit; the chosen one just leaves more room where the music is already loud. And since no beat of any piece rings a bell bigger than the piece's own, every figure above still holds beat by beat."
 );

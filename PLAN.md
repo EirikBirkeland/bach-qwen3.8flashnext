@@ -162,12 +162,20 @@ Built in this order:
       the shaping, so the shaping moves the loudness about inside a piece without ever making a piece louder.
       Released `0.4.0`; `node tools/dynamics.mjs` prints the measuring, bar by bar, with and without.
 
-  - [ ] The bell is sized per piece, not per moment. `src/touch.js` gives each piece one bell from how full
-        the piece runs where its beats are, and that is now the coarsest thing left in the sound: over BWV
-        565 the bell sits 7 dB under the music on a beat in the bare middle and 3 dB under it in the toccata.
-        Session 11 left this out on purpose, because a bell grows exactly where the chord is widest, which is
-        where the headroom is already spoken for. Measured again since the shaping went in: the four pieces
-        sit within 1.7 to 1 of their own music, which is as good as a per-piece rule gets.
+  - [x] The bell is sized per piece *and* per moment now (`0.4.2`). `src/touch.js` still sizes the piece's
+        bell from how full the piece runs where its beats are, and hands back one share of it for every
+        beat, by how much is sounding under that beat: a beat half as full as the piece's own middle rings
+        a bell at 0.59 of it and a beat in a silence rings the least bell the piece allows. Measuring it
+        first said the opposite way round to the guess in the plan above: a fixed bell sits furthest *over*
+        its music in the thin moments (BWV 582's opening pedal solo: the bell rang 10 dB louder than the
+        piece) and furthest *under* it in the loud ones - so a beat's bell may only be made less than the piece's,
+        never more. That ceiling is not timidity: the organ sets its own volume by the piece's widest chord,
+        so every piece's loudest moment sits at the same share of full scale already, and a bell that grew
+        with the music would cost 0.72 of full scale in BWV 582 where the limiter starts at 0.708. Session
+        11's refusal stands, one level down. The share is 0.75, fitted to how the organ's loudness actually
+        grows with how much is sounding; `node tools/touch.mjs` prints the spread within each piece before
+        and after, and the fit.
+
   - [x] The wheel's beat tooth steps aside now (`0.4.1`). The wheel already kept a record of where it
         had laid light, for two voices striking one pitch; the pulse's teeth never asked it, and one of them
         standing on a note core did tip a cell over white. A tooth now asks - and where the music is already
@@ -177,6 +185,28 @@ Built in this order:
         picture is measured on went from one second to a sixth, and the Passacaglia is walked beat by beat
         with every beat struck - the frames where a struck beat and a struck note land together last
         hundredths of a second, and a coarse grid walks straight past them.
+
+### Milestone 5: the pictures know what the player did
+
+The player's strike sounds right in every moment now. Three things follow, and they are one session
+apiece: say it with light as well, clear the last honest debt in the long view, and stop writing the
+same drawing out six times.
+
+- [ ] The long view of BWV 645 has frames of its own that run over white where nobody is playing: 80 of
+      its 1,318 (walked at a sixth of a second, every beat struck) have a cell over 0.9 of full light, and
+      the player tips none of them over - it is the picture's own brightest moment, the chorale's arrival.
+      The wheel's beat teeth were chased down the same way in `0.4.1` and the lamps were never asked.
+      `node tools/burn.mjs bwv645` says the count.
+- [ ] Show the size of the moment in whichever picture takes the pulse. A struck beat is lit the same
+      however it sounded; now the game hands each beat its own bell size (`beat.bell`), so the wheel's
+      tooth, the lamps on the verges and the braid's ruler can ring a thin moment's strike smaller and a
+      full one brighter, and the eye agrees with the ear about how much music was sounding when you
+      struck. Nothing typed in per piece: the share is the bell's own.
+- [ ] Pay the shared-drawing debt, which this project has been carrying since the second picture: the
+      `coming`/`sounded`/`bloom`/`ring`/`halo` arithmetic is written out in three long views now, and the
+      wheel's record of where it has already laid light has a cousin in the bell's sizing. One drawing
+      module all three use, no behaviour change, and the picture tests plus `tools/mutate.sh` as the
+      safety net.
 
 ### After that
 

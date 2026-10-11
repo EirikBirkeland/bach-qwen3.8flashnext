@@ -253,11 +253,25 @@ test("each piece decides how big its own bell is, and the game hands that over",
       passacaglia.game.touch().decay.toFixed(2)
   );
 
-  chorale.game.hit(plain(chorale.game.beats())[0].time);
+  const first = plain(chorale.game.beats())[0];
+  chorale.game.hit(first.time);
+  const rung = chorale.organ.rung[chorale.organ.rung.length - 1];
   assert.strictEqual(
-    chorale.organ.rung[chorale.organ.rung.length - 1].touch,
-    chorale.game.touch(),
-    "the strike did not carry the piece's own bell with it"
+    rung.touch,
+    chorale.game.beats()[0].bell,
+    "the strike did not carry that beat's own bell with it"
+  );
+  assert.ok(
+    rung.touch.level <= chorale.game.touch().level + 1e-12,
+    "the beat rang a bell bigger than its piece's: " +
+      rung.touch.level.toFixed(4) +
+      " against " +
+      chorale.game.touch().level.toFixed(4)
+  );
+  assert.strictEqual(
+    rung.touch.decay,
+    chorale.game.touch().decay,
+    "but a bell hangs the piece's own length wherever it is struck"
   );
 });
 

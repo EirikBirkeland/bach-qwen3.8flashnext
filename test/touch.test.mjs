@@ -11,7 +11,16 @@ import assert from "node:assert";
 import fs from "node:fs";
 import vm from "node:vm";
 import { gameScripts } from "./files.mjs";
-import { loadPieces, loadData, rolesFor, phraseFor, preparedNotes, heaviestMoment, soundingAt } from "./render.mjs";
+import {
+  loadPieces,
+  loadData,
+  rolesFor,
+  phraseFor,
+  preparedNotes,
+  heaviestMoment,
+  soundingAt,
+  peaksAt,
+} from "./render.mjs";
 
 const root = new URL("..", import.meta.url);
 
@@ -80,6 +89,7 @@ function survey(piece) {
   const music = musicLevel(notes, beats, organ.gain);
   return {
     slug: piece.slug,
+    beats: beats.length,
     gap: Bach.beatGap(beats),
     gain: organ.gain,
     heaviest: heaviestMoment(notes, spec).weight,
@@ -258,4 +268,154 @@ test("the biggest bell of the four still leaves the loudest chord room", () => {
       one.slug + ": its widest chord with the heaviest bell of its own size reaches " + (chord + heaviest).toFixed(3)
     );
   }
+});
+
+// Every beat of a piece gets its own share of the piece's bell, sized by how much
+// is sounding under it. The claims below are the ones tools/touch.mjs prints: what
+// one bell per piece leaves uneven inside a piece, and how much of that a bell per
+// beat takes back.
+
+/** The share of full scale a bell of this size reaches: both strikes, in phase. */
+const rung = (level) => level * spec.volume * 2;
+
+/** p10, p90 and the loudest of the ratios, over the beats where music sounds. */
+function way(list) {
+  const heard = list.filter((one) => one.music > 0).map((one) => one.bell / one.music);
+  return {
+    p10: share(heard, 0.1),
+    p90: share(heard, 0.9),
+    top: Math.max(...heard),
+    over: heard.filter((one) => one > 1).length,
+  };
+}
+
+function share(list, part) {
+  const sorted = [...list].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * part))] || 0;
+}
+
+/**
+ * One piece, measured the way the player hears it: how loud its own music is at
+ * every beat, and how the bells it would ring stand beside that - all of them the
+ * piece's one bell, and each one its own.
+ */
+function hear(piece) {
+  const data = loadData(piece.slug);
+  const roles = rolesFor(piece);
+  const phrase = phraseFor(piece);
+  const notes = preparedNotes(data, roles, phrase);
+  const organ = Bach.createOrgan().prepare(data, roles, phrase);
+  const beats = plain(Bach.beats(data));
+  const touch = Bach.touch(notes, beats, Bach.beatGap(beats));
+  const music = peaksAt(notes, beats.map((beat) => beat.time), {
+    spec: spec,
+    gain: organ.gain,
+    seconds: data.duration,
+    sampleRate: 16000,
+  });
+  return {
+    slug: piece.slug,
+    touch: touch,
+    asOne: way(beats.map((beat, i) => ({ bell: rung(touch.level), music: music[i] }))),
+    perBeat: way(beats.map((beat, i) => ({ bell: rung(touch.sizes[i].level), music: music[i] }))),
+  };
+}
+
+const heard = loadPieces().map(hear);
+
+test("every beat has a sizing, and none of them is bigger than the piece's bell", () => {
+  for (const one of four) {
+    assert.strictEqual(one.touch.sizes.length, one.beats, one.slug + ": a beat was left without a bell");
+    const levels = one.touch.sizes.map((size) => size.level);
+    const floor = one.touch.level * rules.least;
+    for (const level of levels) {
+      assert.ok(level <= one.touch.level + 1e-12, one.slug + ": a beat rang a bell bigger than its piece's: " + level);
+      assert.ok(level >= floor - 1e-12, one.slug + ": a beat rang a bell under the floor: " + level);
+      assert.ok(level >= 0.001, one.slug + ": a beat rang a bell nobody would hear: " + level);
+    }
+    assert.ok(
+      Math.max(...levels) > one.touch.level - 1e-12,
+      one.slug + ": nothing in the piece rang the whole of its bell"
+    );
+  }
+});
+
+test("a beat at the piece's own middle rings exactly the piece's bell", () => {
+  // The piece's bell is sized from the middle of its beats, so the middle beat -
+  // half of them, to be exact - gets it entire.
+  for (const one of four) {
+    const levels = one.touch.sizes.map((size) => size.level).sort((a, b) => a - b);
+    assert.ok(
+      Math.abs(levels[Math.floor(levels.length / 2)] - one.touch.level) < 1e-12,
+      one.slug + ": the middle beat rang " + levels[Math.floor(levels.length / 2)] + " against " + one.touch.level
+    );
+  }
+});
+
+test("a thinner beat rings a smaller bell, and a fuller one the whole of it", () => {
+  // Three bars of a four-note chord, then a bar of two lines, then a bar of nothing.
+  // The chords are most of the piece, so the piece is sized on them, and the two
+  // thinner bars are made smaller - the duet a little, the silence all the way down.
+  const data = { metre: { beats: 4, beat: 4 }, bars: [0, 4, 8, 12, 16], duration: 20 };
+  const notes = [];
+  for (const pitch of [48, 55, 60, 67]) notes.push(note(pitch, 0, 12, "melody"));
+  notes.push(note(60, 12, 4, "melody"));
+  notes.push(note(64, 12, 4, "inner"));
+  const beats = plain(Bach.beats(data));
+  const one = Bach.touch(notes, beats, 1);
+  const levels = one.sizes.map((size) => size.level);
+  assert.strictEqual(levels.length, 20, "a sizing for every beat");
+  for (const level of levels.slice(0, 12)) {
+    assert.ok(Math.abs(level - one.level) < 1e-12, "a beat in the full chord rang " + level + " against " + one.level);
+  }
+  for (const level of levels.slice(12, 16)) {
+    assert.ok(level < one.level, "a beat on two lines rang as big a bell as one in a chord: " + level);
+    assert.ok(level > one.level * rules.least + 1e-12, "and still a bell, not a hint of one: " + level);
+  }
+  for (const level of levels.slice(16, 20)) {
+    assert.ok(Math.abs(level - one.level * rules.least) < 1e-12, "a beat in nothing rang " + level);
+  }
+  assert.ok(
+    levels[13] > levels[17],
+    "a duet was made as quiet a beat as a rest: " + levels[13] + " against " + levels[17]
+  );
+});
+
+test("the same bell sits about as far under the music wherever in the piece it is struck", () => {
+  // The whole point, measured on the four pieces: the bell's place under its own
+  // music, beat by beat, with one bell for the piece and with one per beat. The
+  // top end matters most - that is where a player strikes and cannot hear it - and
+  // so does the bottom, which is where a bell rings over music that is only just
+  // speaking. Both figures leave out the beats with nothing sounding at all: a bell
+  // over a rest has no ratio to anything.
+  const db = (x) => 20 * Math.log10(x);
+  let was = 0;
+  let now = 0;
+  let overBefore = 0;
+  let overNow = 0;
+  let loudestBefore = -Infinity;
+  let loudestNow = -Infinity;
+  for (const one of heard) {
+    const spreadBefore = one.asOne.p90 / one.asOne.p10;
+    const spreadNow = one.perBeat.p90 / one.perBeat.p10;
+    assert.ok(
+      db(one.perBeat.p90) < db(one.asOne.p90),
+      one.slug + ": its loudest-reaching bell sits no better under the music than it did: " +
+        db(one.asOne.p90) +
+        " against " +
+        db(one.perBeat.p90)
+    );
+    was += spreadBefore;
+    now += spreadNow;
+    overBefore += one.asOne.over;
+    overNow += one.perBeat.over;
+    loudestBefore = Math.max(loudestBefore, db(one.asOne.top));
+    loudestNow = Math.max(loudestNow, db(one.perBeat.top));
+  }
+  assert.ok(now < was, "the four pieces' spreads: " + was.toFixed(1) + " dB in all, now " + now.toFixed(1));
+  assert.ok(overNow < overBefore, overBefore + " beats rang louder than their own music, now " + overNow);
+  assert.ok(
+    loudestNow < loudestBefore - 5,
+    "the loudest a bell rang over its own music was " + loudestBefore.toFixed(1) + " dB, now " + loudestNow.toFixed(1)
+  );
 });
