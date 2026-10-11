@@ -1,5 +1,16 @@
 # Releases
 
+## 0.2.2 — 2026-10-11
+
+One line about the chorale's arrivals in BWV 645.
+
+- **The gold line now blooms three times, not six.** A bloom marked every time the
+  chorale came back after four seconds of silence, which counted breaths taken
+  inside a phrase as well. Now it has to have been gone ten seconds or more, so the
+  blooms are exactly where the chorale really leaves and comes back: 0:50, when it
+  first arrives after waiting 50 seconds, 2:03 after half a minute gone, and 2:53
+  after 23 seconds.
+
 ## 0.2.1 — 2026-10-11
 
 BWV 645 gets a picture of its own, and it is made for waiting.

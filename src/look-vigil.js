@@ -32,7 +32,7 @@ window.Bach = window.Bach || {};
   var STEP = 2.5; // seconds the climb is measured in: smaller means a faster near hand
   var SINK = 1.7; // how much faster played music drops than the same time ahead lifts
   var TAIL = 2.4; // seconds a note takes to sink away and go dark after it stops
-  var BREATH = 4; // seconds of silence that make a line's next note an arrival
+  var BREATH = 10; // seconds a line has to be gone for its next note to be an arrival
   var BLOOM = 1.8; // seconds an arrival glows for once it is struck
   var TRAIL = 0.3; // how fast the last frame is veiled: less = a longer trail
   var COOL = "#bcd0f0"; // bar lines and the line of sound
@@ -90,9 +90,11 @@ window.Bach = window.Bach || {};
     }
 
     /**
-     * The notes that begin the line to follow after a rest. In BWV 645 the
-     * chorale waits 50 seconds for its turn, then leaves for 29 and for 23: those
-     * entrances are the shape of the piece, so they get marked.
+     * The notes that begin the line to follow after it has been gone a while. In
+     * BWV 645 the chorale waits 50 seconds for its turn, then leaves for 29 and
+     * for 23: those three entrances are the shape of the piece, so they get
+     * marked. A breath inside a phrase is not an arrival - at ten seconds or
+     * more this finds exactly those three and no others.
      */
     function entrances(list) {
       var found = [];
