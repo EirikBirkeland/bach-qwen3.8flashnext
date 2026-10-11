@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.1.2",
+    "date": "2026-10-11",
+    "released": "2026-10-11T03:53:47.997Z",
+    "summary": "Every note speaks through a rank of pipes now, and the loudest moment is measured",
+    "added": 1561,
+    "removed": 132,
+    "logBytes": 961649
+  },
+  {
     "version": "0.1.1",
     "date": "2026-10-11",
     "released": "2026-10-11T02:48:55Z",
