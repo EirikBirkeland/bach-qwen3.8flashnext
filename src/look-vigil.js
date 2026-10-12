@@ -40,6 +40,7 @@ window.Bach = window.Bach || {};
   var CEILING = 0.65; // how much light a struck note's core may be, whatever it wears
   var STRONGEST = 0.8; // ... and the alpha it is laid at when its colour is dark enough
   var CORE = 0.9; // how wide that core is, on either side of the note, in pixels
+  var COLUMN = 4; // how wide a strip of the screen one core may own, in pixels
   var TRAIL = 0.3; // how fast the last frame is veiled: less = a longer trail
   var COOL = "#bcd0f0"; // bar lines and the line of sound
   var WARM = "#ffb066"; // a bar line that begins something already heard
@@ -187,9 +188,10 @@ window.Bach = window.Bach || {};
      * the note is kept and nothing is added on top of anything, and the core's alpha
      * is capped by how much light its colour already carries: a violet note and a
      * gold one are struck with the same amount of light, and both keep the colour
-     * that says which voice they are.
+     * that says which voice they are. `thread` says whether this note lays that core at
+     * all: one strip of the screen gets one, and `owners` says whose.
      */
-    function sounded(x, top, bottom, colour, weight, strength) {
+    function sounded(x, top, bottom, colour, weight, strength, thread) {
       if (bottom <= top || strength <= 0.02) return;
       var flare = 0.09 * strength;
       // The most of this colour that may be laid in one place, and what is left for
@@ -205,8 +207,43 @@ window.Bach = window.Bach || {};
         ctx.fillRect(x - half, top, half - CORE, bottom - top);
         ctx.fillRect(x + CORE, top, half - CORE, bottom - top);
       }
+      if (!thread) return; // that pitch is already a bright thread, laid by a better line
       ctx.globalAlpha = bright;
       ctx.fillRect(x - CORE, top, CORE * 2, bottom - top);
+    }
+
+    /** Which strip of the screen a note's core belongs to. */
+    function column(x) {
+      return Math.round(x / COLUMN);
+    }
+
+    /**
+     * Whose the bright thread is on each strip of the screen.
+     *
+     * Two voices can strike one pitch in the same moment - this arrangement of BWV
+     * 645 does it four times - and their bars fall on one 1.8px line, where two full
+     * lights are white rather than loud however little each of them is on its own. So
+     * one strip gets one thread, and it goes to the note shining brightest there: the
+     * stoutest line the organ plays, unless that one is on its way out. The others
+     * keep their flare and their body, so the pitch is still lit and only the thread
+     * is told once, in the colour of the line the ear is following.
+     */
+    function owners(now) {
+      var mine = {};
+      var shine = {};
+      for (var n = from; n < to; n++) {
+        var note = notes[n];
+        if (note.time > now) break; // sorted by time: nothing past this has sounded
+        var age = now - (note.time + note.length);
+        if (age > TAIL) continue; // and that one has gone dark
+        var strip = column(xFor(note.pitch));
+        var bright = weightOf(note) * (age <= 0 ? 1 : 1 - age / TAIL);
+        if (mine[strip] === undefined || bright > shine[strip]) {
+          mine[strip] = note;
+          shine[strip] = bright;
+        }
+      }
+      return mine;
     }
 
     /** A round light laid on the screen, only the part of it that is on it. */
@@ -413,7 +450,10 @@ window.Bach = window.Bach || {};
         ctx.fillRect(0, y - thick / 2, width, thick);
       }
 
-      // The notes.
+      // The notes. One bright thread per strip of the screen, and who gets it is
+      // settled before any of them is drawn, since the thread belongs to whichever
+      // note is shining most on that strip and not to whichever was written down first.
+      var lit = owners(now);
       for (var n = from; n < to; n++) {
         var note = notes[n];
         var weight = weightOf(note);
@@ -431,7 +471,7 @@ window.Bach = window.Bach || {};
           var strength = age <= 0 ? 1 : Math.max(0, 1 - age / TAIL);
           // Only what has sounded is lit, and that is the part below the line of
           // sound. The rest of the bar is still on its way and stays faint.
-          sounded(x, Math.max(top, view.line), bottom, colour, weight, strength);
+          sounded(x, Math.max(top, view.line), bottom, colour, weight, strength, lit[column(x)] === note);
           if (top < view.line) coming(x, top, view.line, colour, weight, 0.45);
         }
       }

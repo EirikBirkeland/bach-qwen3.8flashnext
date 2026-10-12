@@ -78,6 +78,9 @@ function luma(air) {
   return 0.2126 * air[0] + 0.7152 * air[1] + 0.0722 * air[2];
 }
 
+// Measuring tools outside this folder need the same two readings the grid uses.
+export { colourOf, luma };
+
 /** Warm light is what gold looks like: more red than blue. Cool is the other way. */
 function warmth(air) {
   return air[0] - air[2];

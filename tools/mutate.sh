@@ -122,6 +122,7 @@ run "road: the verges do not light up for a long run" src/look-vigil.js 's/     
 run "road: a struck note's core is laid at a flat alpha, whatever colour wears it" src/look-vigil.js 's/      var room = Math\.min\(1, CEILING \/ Bach\.lightOf\(colour\)\);/      var room = 1;/'
 run "road: the core takes the whole budget, flare and all" src/look-vigil.js 's/var bright = Math\.min\(STRONGEST \* strength, room - flare\);/var bright = Math.min(STRONGEST * strength, room);/'
 run "road: the body runs on underneath the core" src/look-vigil.js 's/      if \(half > CORE\) \{\n        ctx\.fillRect\(x - half, top, half - CORE, bottom - top\);\n        ctx\.fillRect\(x \+ CORE, top, half - CORE, bottom - top\);\n      \}/      if (half > CORE) {\n        ctx.fillRect(x - half, top, half * 2, bottom - top);\n      }/'
+run "road: every struck note lays its own thread, whatever else shines there" src/look-vigil.js 's/strength, lit\[column\(x\)\] === note\);/strength, true);/'
 run "visual: every colour is said to carry the same light" src/visual.js 's/    return 0\.2126 \* \(\(n >> 16\) & 255\) \/ 255 \+ 0\.7152 \* \(\(n >> 8\) & 255\) \/ 255 \+ 0\.0722 \* \(n & 255\) \/ 255;/    return 1;/'
 run "visual: a colour that cannot be read is taken for no light at all" src/visual.js 's/if \(typeof colour !== "string" \|\| colour\[0\] !== "#" \|\| colour\.length !== 7\) return 1;/if (typeof colour !== "string" || colour[0] !== "#" || colour.length !== 7) return 0;/'
 

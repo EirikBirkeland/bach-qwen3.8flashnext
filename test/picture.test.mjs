@@ -319,6 +319,51 @@ test("BWV 645: the chorale is marked while it is still to come, and blooms when 
   assert.ok(blooms.length > 0, "the arrival of the chorale drew no bloom at the line of sound");
 });
 
+test("BWV 645: two voices striking one pitch are told as one thread of light", () => {
+  // One 1.8px line can carry one bright thread: two notes on one pitch fall on it
+  // together, and the second one laid there too is white rather than louder - and
+  // the harness grid would never even ask, since it samples a cell at its middle and
+  // a thread can pass between two cells. So this measures where the thread is drawn.
+  const scene = sceneOf("bwv645-wachet-auf");
+  const stage = createStage(scene);
+  const CORE = 1.8; // src/look-vigil.js: twice CORE, the whole width of a struck note's core
+  const weightOf = (note) => (note.role === "melody" ? 5.5 : note.role === "pedal" ? 4.5 : 3); // src/look-vigil.js
+  const paired = {};
+  for (const note of scene.notes) {
+    const key = note.time.toFixed(3) + ":" + note.pitch;
+    (paired[key] = paired[key] || []).push(note);
+  }
+  const unisons = Object.keys(paired)
+    .map((key) => paired[key])
+    .filter((group) => group.length > 1);
+  assert.ok(unisons.length > 0, "this test is about two voices striking one pitch, and the piece has none");
+  for (const group of unisons) {
+    const at = group[0].time + 0.02;
+    stage.frame(at);
+    const x = across(scene, group[0].pitch);
+    const threads = stage.drawn.filter(
+      // at the line of sound and below it: above, the same pitch is drawn as a faint
+      // hairline for the next time it is coming, and that is not a struck thread
+      (box) => Math.abs(box.w - CORE) < 0.05 && box.alpha > 0.3 && box.y >= SOUND_Y - 0.01 && x >= box.x && x <= box.x + box.w
+    );
+    const laid = threads.reduce((sum, box) => sum + box.alpha * stage.bach.lightOf(box.colour), 0);
+    assert.strictEqual(
+      threads.length,
+      1,
+      group.length + " voices struck pitch " + group[0].pitch + " at " + at.toFixed(2) + " s and " + threads.length + " bright threads were laid there"
+    );
+    assert.ok(laid < 0.75, "pitch " + group[0].pitch + " at " + at.toFixed(2) + " s is laid with " + laid.toFixed(2) + " of full light: that is white");
+    assert.ok(laid > 0.4, "the pitch " + group[0].pitch + " at " + at.toFixed(2) + " s is barely lit: " + laid.toFixed(2));
+    // and it is the line the organ weighs most that says which colour it is
+    const stoutest = group.reduce((best, one) => (weightOf(one) > weightOf(best) ? one : best), group[0]);
+    assert.strictEqual(
+      threads[0].colour,
+      scene.look.colours[String(stoutest.voice)],
+      "pitch " + group[0].pitch + " at " + at.toFixed(2) + " s is lit in " + threads[0].colour + " and not in the colour of its stoutest line"
+    );
+  }
+});
+
 test("BWV 645: a frame of the long view is cheap enough to draw sixty times a second", () => {
   const scene = sceneOf("bwv645-wachet-auf");
   const stage = createStage(scene);

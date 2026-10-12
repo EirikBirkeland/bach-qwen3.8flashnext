@@ -188,9 +188,9 @@ Built in this order:
 
 ### Milestone 5: the pictures know what the player did
 
-The player's strike sounds right in every moment now. Three things follow, and they are one session
-apiece: say it with light as well, clear the last honest debt in the long view, and stop writing the
-same drawing out six times.
+The player's strike sounds right in every moment now. What follows from that, plus the light debts this
+session turned up on the way: say the size of a moment with light as well, stop the pictures burning out
+white wherever they still do, and stop writing the same drawing out six times.
 
 - [x] The long view of BWV 645 no longer runs over white where nobody is playing. It said 80 of its
       1,318 frames had a cell over 0.9 of full light (walked at a sixth of a second, every beat struck),
@@ -202,15 +202,38 @@ same drawing out six times.
       voice they are. Now the body gives way where the core lies (the note keeps its whole width and no
       light is laid on top of another), and the core's alpha is capped by how much light its colour
       carries, which `Bach.lightOf` says: a gold note and a violet one are struck with the same light and
-      both keep their colour. Nothing in BWV 645 passes 0.9 now, walked at a sixtieth of a second with the
-      pulse on or off - 0.846 alone, 0.869 with it, against 0.977 before. `node tools/burn.mjs bwv645`
-      says the count.
+      both keep their colour. And one strip of the screen gets one thread: two voices striking one pitch
+      in the same moment - this arrangement does it four times - fall on that same 1.8px line, where two
+      full lights are white rather than loud however little each of them is alone, so the thread goes to
+      the line the organ weighs most and the others keep their flare and their body. Nothing in BWV 645
+      passes 0.9 now, walked at a sixtieth of a second with the pulse on or off - 0.846 alone, 0.869 with
+      it, against 0.977 before - and at the pixel a note is drawn on rather than the middle of a measured
+      cell, the notes themselves lay at most 0.72 of full light on any strip of the screen. `node
+      tools/burn.mjs bwv645` and `node tools/strip.mjs bwv645` say the counts.
+- [ ] The road's hottest pixel is still over full light, and the grid cannot see it. Where a struck note
+      crosses the line of sound during the chorale's arrival, three bright things share one pixel: the
+      bloom of the arrival (0.4 of gold), the note's own core (0.68) and the line of sound's 1px rule (up
+      to 0.24 of near-white), and they add to 1.20 of full light (`node tools/strip.mjs bwv645`). One
+      pixel tall, and it is exactly where the sound arrives, so it may be a thing to keep - but then say
+      so, because it is the one place in the picture that is white on purpose. The wheel's answer is
+      written down already: its `glow` leaves the middle empty "because the note's own dot is going
+      there, and two full lights on top of one another is how a picture burns out white". Same trick
+      available here: an arrival could be a ring of light round the struck note rather than a disc over
+      it. Whatever is decided, say it about the other two pictures at the same time, since the same three
+      lights meet at the same place in all of them.
 - [ ] The same arithmetic is still in the other two pictures that burn: BWV 639 tips a cell over white in
       198 of its 710 frames and BWV 565 in 264 of its 3,426, with nobody playing at all (`node
-      tools/burn.mjs`). Same cause, same fix - `Bach.lightOf`, and one light deep - but a look at a time,
-      each with a walk of its own to pin it: a struck note in the braid and a struck subject in the fugue
-      picture stand in quite different company, and the road's brightest second turned out to be a bar
-      line crossing the line of sound.
+      tools/burn.mjs`). Measured at the pixel a note is drawn on, the fugue picture of BWV 565 lays 1.44
+      of a voice's own colour on one strip of the screen where the road now lays 0.72 (`node
+      tools/strip.mjs`) - so the same fix applies, a look at a time, each with a walk of its own to pin
+      it: a struck note in the braid and a struck subject in the fugue picture stand in quite different
+      company, and the road's brightest cell turned out to be a bar line crossing the line of sound.
+  - Two things to carry, learnt the hard way. The harness grid samples a 20px cell at its middle, so a
+    1.8px thread of light can slip between its cells and read as nothing, and `tools/burn.mjs` alone will
+    say "clean" about a spot that is white: measure at the pixel too, which is what `tools/strip.mjs` is
+    for. And each look needs its own idea of what a note is - the road and the fugue picture draw bars
+    across the line of sound and the wheel dots on a turn, which is why `tools/strip.mjs` declines the
+    wheel and the braid rather than print a number that means nothing.
 - [ ] Show the size of the moment in whichever picture takes the pulse. A struck beat is lit the same
       however it sounded; now the game hands each beat its own bell size (`beat.bell`), so the wheel's
       tooth, the lamps on the verges and the braid's ruler can ring a thin moment's strike smaller and a
