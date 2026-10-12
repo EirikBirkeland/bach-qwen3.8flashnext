@@ -37,6 +37,9 @@ window.Bach = window.Bach || {};
   var TAIL = 2.4; // seconds a note takes to sink away and go dark after it stops
   var BREATH = 10; // seconds a line has to be gone for its next note to be an arrival
   var BLOOM = 1.8; // seconds an arrival glows for once it is struck
+  var CEILING = 0.65; // how much light a struck note's core may be, whatever it wears
+  var STRONGEST = 0.8; // ... and the alpha it is laid at when its colour is dark enough
+  var CORE = 0.9; // how wide that core is, on either side of the note, in pixels
   var TRAIL = 0.3; // how fast the last frame is veiled: less = a longer trail
   var COOL = "#bcd0f0"; // bar lines and the line of sound
   var WARM = "#ffb066"; // a bar line that begins something already heard
@@ -174,16 +177,36 @@ window.Bach = window.Bach || {};
       ctx.fillRect(x - thick * 0.4, top, thick * 0.8, bottom - top);
     }
 
-    /** The part of a note that has sounded: a glow, a body, a bright core. */
+    /** The part of a note that has sounded: a glow, a body, a bright core.
+     *
+     * One light deep, never three. The body used to run on underneath the core, so
+     * the three layers laid 1.44 of the voice's own colour in one 1.8px line - over
+     * full scale on its own, which is how the brightest notes of this picture came
+     * out white instead of gold and burnt their cell out on the way (see
+     * tools/burn.mjs). So the body gives way where the core lies, the whole width of
+     * the note is kept and nothing is added on top of anything, and the core's alpha
+     * is capped by how much light its colour already carries: a violet note and a
+     * gold one are struck with the same amount of light, and both keep the colour
+     * that says which voice they are.
+     */
     function sounded(x, top, bottom, colour, weight, strength) {
       if (bottom <= top || strength <= 0.02) return;
-      ctx.globalAlpha = 0.09 * strength;
+      var flare = 0.09 * strength;
+      // The most of this colour that may be laid in one place, and what is left for
+      // the core once the flare has had its share of that place.
+      var room = Math.min(1, CEILING / Bach.lightOf(colour));
+      var bright = Math.min(STRONGEST * strength, room - flare);
+      var half = weight * 0.4;
       ctx.fillStyle = colour;
+      ctx.globalAlpha = flare;
       ctx.fillRect(x - weight * 1.6, top, weight * 3.2, bottom - top);
       ctx.globalAlpha = 0.45 * strength;
-      ctx.fillRect(x - weight * 0.4, top, weight * 0.8, bottom - top);
-      ctx.globalAlpha = Math.min(1, 0.9 * strength);
-      ctx.fillRect(x - 0.9, top, 1.8, bottom - top);
+      if (half > CORE) {
+        ctx.fillRect(x - half, top, half - CORE, bottom - top);
+        ctx.fillRect(x + CORE, top, half - CORE, bottom - top);
+      }
+      ctx.globalAlpha = bright;
+      ctx.fillRect(x - CORE, top, CORE * 2, bottom - top);
     }
 
     /** A round light laid on the screen, only the part of it that is on it. */

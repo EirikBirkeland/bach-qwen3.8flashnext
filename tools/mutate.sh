@@ -115,6 +115,16 @@ run "road: a struck beat lights gold, which is the chorale's colour" src/look-vi
 run "road: a click that caught nothing is silent" src/look-vigil.js 's/          ctx\.globalAlpha = 0\.05 \* faded;/          ctx.globalAlpha = 0;/'
 run "road: the verges do not light up for a long run" src/look-vigil.js 's/      if \(shot\.run > 0\.02\) \{/      if (false) {/'
 
+# A struck note in the long view is one light, not three: its body gives way where
+# its core lies, and the core is laid at no more light than its own colour can
+# carry. Before that it laid 1.44 of its colour in a 1.8px line and burnt its own
+# cell out, in 80 frames of the piece with nobody playing at all.
+run "road: a struck note's core is laid at a flat alpha, whatever colour wears it" src/look-vigil.js 's/      var room = Math\.min\(1, CEILING \/ Bach\.lightOf\(colour\)\);/      var room = 1;/'
+run "road: the core takes the whole budget, flare and all" src/look-vigil.js 's/var bright = Math\.min\(STRONGEST \* strength, room - flare\);/var bright = Math.min(STRONGEST * strength, room);/'
+run "road: the body runs on underneath the core" src/look-vigil.js 's/      if \(half > CORE\) \{\n        ctx\.fillRect\(x - half, top, half - CORE, bottom - top\);\n        ctx\.fillRect\(x \+ CORE, top, half - CORE, bottom - top\);\n      \}/      if (half > CORE) {\n        ctx.fillRect(x - half, top, half * 2, bottom - top);\n      }/'
+run "visual: every colour is said to carry the same light" src/visual.js 's/    return 0\.2126 \* \(\(n >> 16\) & 255\) \/ 255 \+ 0\.7152 \* \(\(n >> 8\) & 255\) \/ 255 \+ 0\.0722 \* \(n & 255\) \/ 255;/    return 1;/'
+run "visual: a colour that cannot be read is taken for no light at all" src/visual.js 's/if \(typeof colour !== "string" \|\| colour\[0\] !== "#" \|\| colour\.length !== 7\) return 1;/if (typeof colour !== "string" || colour[0] !== "#" || colour.length !== 7) return 0;/'
+
 # The braid of BWV 639 stands a beat on a ruler along the top of its music and the
 # bottom of it - the two places a note is never drawn - and keeps the beat the piece
 # marks for itself taller and brighter, however far off it is.

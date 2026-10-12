@@ -331,6 +331,90 @@ test("BWV 645: a frame of the long view is cheap enough to draw sixty times a se
   assert.ok(most < 1500, "one frame draws " + most + " boxes: that will not keep up with the music");
 });
 
+test("BWV 645: no part of the long view burns out white", () => {
+  const scene = sceneOf("bwv645-wachet-auf");
+  const stage = createStage(scene);
+  let burnt = 0;
+  let peak = 0;
+  for (let at = 1; at < scene.data.duration; at += 1 / 6) {
+    const seen = stage.frame(at);
+    burnt += seen.burnt;
+    if (seen.peak > peak) peak = seen.peak;
+  }
+  assert.strictEqual(burnt, 0, burnt + " cells of the grid burned out white somewhere in the piece");
+  assert.ok(peak < 0.9, "the brightest cell reaches " + peak.toFixed(3) + " of full light");
+});
+
+test("BWV 645: a bar crossing the line of sound still leaves the picture under white", () => {
+  // The picture's own brightest spot is where a bar line lies across the line of
+  // sound while a note is struck on it. A bar line is two pixels and the road is
+  // moving at fifty pixels a second there, so the crossing is over in half a
+  // second and the walk above only sees 0.74 of full light where this one sees
+  // 0.85 - which is the difference between a picture that burns out and one that
+  // nearly does, and the reason this walk is at a sixtieth.
+  const scene = sceneOf("bwv645-wachet-auf");
+  const stage = createStage(scene);
+  let peak = 0;
+  let where = 0;
+  for (const bar of scene.data.bars) {
+    for (let at = bar - 0.2; at < bar + 0.2; at += 1 / 60) {
+      const seen = stage.frame(at);
+      if (seen.peak > peak) {
+        peak = seen.peak;
+        where = at;
+      }
+      assert.strictEqual(seen.burnt, 0, "a cell burned out white at " + at.toFixed(2) + " s, on the bar line at " + bar.toFixed(2) + " s");
+    }
+  }
+  assert.ok(peak < 0.9, "the crossing of a bar line whitens a cell: " + peak.toFixed(3) + " at " + where.toFixed(2) + " s");
+});
+
+test("how much light a colour carries, which is what a picture budgets against", () => {
+  const stage = createStage({ notes: [], look: { pitchLow: 36, pitchHigh: 92, colours: {} } });
+  const light = stage.bach.lightOf;
+  assert.ok(
+    light("#9dff9b") > light("#c39bff"),
+    "green was read as no brighter than violet: " + light("#9dff9b").toFixed(2) + " and " + light("#c39bff").toFixed(2)
+  );
+  assert.ok(light("#9dff9b") > 0.85, "the brightest colour on the page reads as " + light("#9dff9b").toFixed(2));
+  assert.ok(light("#c39bff") < 0.7, "the darkest colour on the page reads as " + light("#c39bff").toFixed(2));
+  assert.strictEqual(light("something else"), 1, "a colour that cannot be read is taken at less than full light, and may burn out");
+});
+
+test("BWV 645: every voice is struck with the same light, and none with more than full scale", () => {
+  // A struck note is the brightest thing on the screen, and it has to stay its own
+  // colour: gold and violet are not the same brightness at the same alpha, so the
+  // thread of light down a note's middle is capped by how much light its colour
+  // already carries. Laid at a fixed alpha instead, the bright voices pass full
+  // scale and come out white - and say nothing about which voice they are.
+  const scene = sceneOf("bwv645-wachet-auf");
+  const stage = createStage(scene);
+  const CORE = 1.8; // src/look-vigil.js: twice CORE, the whole width of a struck note's core
+  const struck = [];
+  for (const voice in scene.look.colours) {
+    const note = scene.notes.find((one) => String(one.voice) === voice);
+    assert.ok(note, "voice " + voice + " has no note at all");
+    stage.frame(note.time + 0.02); // struck, and not yet let go
+    const x = across(scene, note.pitch);
+    const threads = stage.drawn
+      .filter((box) => box.colour === scene.look.colours[voice] && Math.abs(box.w - CORE) < 0.05 && box.alpha > 0.3)
+      .sort((a, b) => Math.abs(a.x + a.w / 2 - x) - Math.abs(b.x + b.w / 2 - x));
+    assert.ok(threads.length > 0, "voice " + voice + ": nothing was struck bright at " + note.time.toFixed(2) + " s");
+    const thread = threads[0];
+    struck.push({ voice: voice, light: thread.alpha * stage.bach.lightOf(thread.colour), colour: thread.colour });
+  }
+  for (const one of struck) {
+    assert.ok(one.light < 0.62, one.colour + " is struck with " + one.light.toFixed(2) + " of full light: that alone is nearly white");
+    assert.ok(one.light > 0.4, one.colour + " is struck with only " + one.light.toFixed(2) + ": a struck note should be the brightest thing on the screen");
+  }
+  const lights = struck.map((one) => one.light);
+  const spread = Math.max.apply(null, lights) - Math.min.apply(null, lights);
+  assert.ok(
+    spread < 0.1,
+    "the voices are struck with " + lights.map((one) => one.toFixed(2)).join(", ") + " of full light: the bright ones burn out and the dark ones do not"
+  );
+});
+
 // BWV 565 wears the fugue picture. Four things about that piece are what it is
 // made of: a subject that comes back eight times in different voices, a toccata
 // and an end built of chords struck together, a pedal that stays silent for a
@@ -1663,6 +1747,7 @@ test("BWV 645: the lamps along the road are cheap to draw, and burn nothing out 
   let tipped = 0;
   let rung = 0;
   let brightest = 0;
+  let peak = 0;
   for (let at = 1; at < scene.data.duration; at += 1 / 6) {
     while (index < beats.length && beats[index].time < at) {
       if (at - beats[index].time < 0.3) play.hit(beats[index].time);
@@ -1673,6 +1758,7 @@ test("BWV 645: the lamps along the road are cheap to draw, and burn nothing out 
     const seen = play.see(at);
     most = Math.max(most, seen.marks);
     mean = Math.max(mean, seen.frame.mean);
+    peak = Math.max(peak, seen.frame.peak);
     rung = play.score().caught;
     // No lamp is ever struck bright: a dozen of them stand within a hair of one
     // another down the road, and that is how a heap of lights becomes one smear.
@@ -1683,6 +1769,10 @@ test("BWV 645: the lamps along the road are cheap to draw, and burn nothing out 
     });
   }
   assert.ok(brightest < 0.5, "a lamp is drawn at " + brightest.toFixed(2) + " of full light: the road would burn out white");
+  // Not just the lamps' own doing: a struck beat lays its bloom on the line of
+  // sound, where the notes are at their brightest, and the two together may not
+  // pass white either.
+  assert.ok(peak < 0.9, "with the pulse on the brightest cell reaches " + peak.toFixed(3) + " of full light");
   assert.ok(most > 400, "one frame draws only " + most + " marks with the pulse on: is the picture missing?");
   assert.ok(most < 1500, "one frame draws " + most + " boxes with the pulse on: that will not keep up");
   assert.ok(mean < 0.06, "the road is washed out with the pulse on: worst mean light " + mean.toFixed(4));

@@ -192,11 +192,25 @@ The player's strike sounds right in every moment now. Three things follow, and t
 apiece: say it with light as well, clear the last honest debt in the long view, and stop writing the
 same drawing out six times.
 
-- [ ] The long view of BWV 645 has frames of its own that run over white where nobody is playing: 80 of
-      its 1,318 (walked at a sixth of a second, every beat struck) have a cell over 0.9 of full light, and
-      the player tips none of them over - it is the picture's own brightest moment, the chorale's arrival.
-      The wheel's beat teeth were chased down the same way in `0.4.1` and the lamps were never asked.
-      `node tools/burn.mjs bwv645` says the count.
+- [x] The long view of BWV 645 no longer runs over white where nobody is playing. It said 80 of its
+      1,318 frames had a cell over 0.9 of full light (walked at a sixth of a second, every beat struck),
+      and the player tipped none of them over - so it was the picture's own brightest moment burning out.
+      Measured, it was not the lamps, not the blooms and not the chorale's arrival: every one of those
+      frames was tipped by a struck note's *own core*. The road laid a flare, a body and a core down the
+      same 1.8px line, which is 1.44 of the voice's own colour - over full scale before the line of sound
+      under it is even asked, so the loudest notes came out white instead of the colour that says which
+      voice they are. Now the body gives way where the core lies (the note keeps its whole width and no
+      light is laid on top of another), and the core's alpha is capped by how much light its colour
+      carries, which `Bach.lightOf` says: a gold note and a violet one are struck with the same light and
+      both keep their colour. Nothing in BWV 645 passes 0.9 now, walked at a sixtieth of a second with the
+      pulse on or off - 0.846 alone, 0.869 with it, against 0.977 before. `node tools/burn.mjs bwv645`
+      says the count.
+- [ ] The same arithmetic is still in the other two pictures that burn: BWV 639 tips a cell over white in
+      198 of its 710 frames and BWV 565 in 264 of its 3,426, with nobody playing at all (`node
+      tools/burn.mjs`). Same cause, same fix - `Bach.lightOf`, and one light deep - but a look at a time,
+      each with a walk of its own to pin it: a struck note in the braid and a struck subject in the fugue
+      picture stand in quite different company, and the road's brightest second turned out to be a bar
+      line crossing the line of sound.
 - [ ] Show the size of the moment in whichever picture takes the pulse. A struck beat is lit the same
       however it sounded; now the game hands each beat its own bell size (`beat.bell`), so the wheel's
       tooth, the lamps on the verges and the braid's ruler can ring a thin moment's strike smaller and a

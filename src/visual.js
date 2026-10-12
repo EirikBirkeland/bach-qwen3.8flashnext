@@ -101,6 +101,27 @@ window.Bach = window.Bach || {};
   };
 
   /**
+   * How much light a plain colour carries, from 0 to 1.
+   *
+   * A colour at full alpha is not the same brightness from one voice to the next:
+   * the greens and golds on this page are nearly full light on their own, the
+   * violets are about two thirds. A picture that lays a colour at a fixed alpha is
+   * therefore laying a different amount of light for every voice, and the bright
+   * ones pass full scale and come out white instead of gold. Anything that has a
+   * budget of light to keep to - a struck note's brightest thread, say - measures
+   * what it is laying with this.
+   *
+   * Anything that is not a plain #rrggbb colour is taken at full: it is better to
+   * lay a light too thin than to lay one that burns out.
+   */
+  Bach.lightOf = function (colour) {
+    if (typeof colour !== "string" || colour[0] !== "#" || colour.length !== 7) return 1;
+    var n = parseInt(colour.slice(1), 16);
+    if (!(n >= 0)) return 1;
+    return 0.2126 * ((n >> 16) & 255) / 255 + 0.7152 * ((n >> 8) & 255) / 255 + 0.0722 * (n & 255) / 255;
+  };
+
+  /**
    * The picture for whatever piece is playing. `reset` picks the look that piece
    * wears and hands it the notes; `frame` draws one moment of it. Looks are kept
    * once made, so choosing another piece does not build the drawing again.
