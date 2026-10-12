@@ -1,5 +1,28 @@
 # Releases
 
+## 0.5.1 — 2026-10-12
+
+One bright thread per pitch, and a stricter way of looking at the screen.
+
+- **Two voices, one pitch, one thread of light.** This arrangement of Wachet auf has four
+  moments where both hands strike the same pitch in the same moment. Their bars of light
+  fall on one 1.8-pixel line, and laying a bright core there twice makes one white pixel
+  rather than a louder note. So one strip of the screen now gets one thread, and it belongs
+  to the line the organ weighs most: at 1:06 the pitch E flat is gold - the chorale's colour -
+  with the other hand's flare and body shining round it.
+- **New: `node tools/strip.mjs`.** The pictures are measured on a grid of 64 x 40 cells, each
+  read at its middle, which is a fair reading of a screen of light and a poor one of a thread
+  1.8 pixels wide: a thread can pass between two cells and be read as nothing at all. The new
+  tool measures what a picture lays at the pixel a struck note really draws its core on, the
+  note's own light and the ground of line-of-sound and bar line under it. By that measure the
+  long view's notes lay at most 0.72 of full light on any strip; the fugue picture of BWV 565
+  still lays 1.44 there, and it is next.
+- **What that turned up, and did not finish.** Where a struck note crosses the line of sound
+  while the chorale arrives, three bright things share one pixel - the arrival's bloom, the
+  note's core, and the line of sound's own rule - and add to 1.20 of full light. It is one
+  pixel tall, and it is exactly where the sound arrives; the plan says so, and the wheel
+  already has the answer if it is to be opened up rather than kept.
+
 ## 0.5.0 — 2026-10-12
 
 The brightest moment of Wachet auf is no longer burnt out white.
