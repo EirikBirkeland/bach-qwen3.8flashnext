@@ -1925,3 +1925,113 @@ Next, in order - milestone 5, all of it one session:
    and now the picture can ask `beat.bell.level / game.touch().level` and agree with the ear.
 3. The shared-drawing debt: `coming`/`sounded`/`bloom`/`ring`/`halo` in three long views, plus
    the wheel's `shining`/`laid` record - one module, no behaviour change.
+
+## Session 19 — 2026-10-12 — milestone 5: a struck note is one light deep
+
+**Released 0.5.0 and 0.5.1.** The first item of milestone 5: the long view of BWV 645 had 80 frames of
+its own over full white with nobody playing. It was not the lamps the plan suspected, and chasing it
+turned up a second burn the measuring grid could not see at all.
+
+What I did:
+
+- **Blamed it before touching anything.** A scratch walk that adds each frame's boxes up at the burnt
+  cell, in the order they were drawn, says which box tips it: all 80 frames were tipped by a struck
+  note's *own core*. The lamps tipped nothing, the arrival blooms nothing, the player's strikes
+  nothing (`tools/burn.mjs` already said that much: 0 cells tipped by the pulse).
+- **`Bach.lightOf(colour)`** in `src/visual.js`: how much light a plain colour carries, on the usual
+  0.2126 / 0.7152 / 0.0722 weightings. Anything that is not a `#rrggbb` is taken at full - better to
+  lay a light too thin than one that burns out.
+- **`sounded` in `src/look-vigil.js` is one light deep.** It laid a flare (0.09), a body (0.45) and a
+  core (0.9) down the same 1.8px line: 1.44 of the voice's own colour, which is over full scale on its
+  own. Now the body is drawn as the two shoulders either side of the core and the core takes the ground
+  the body would have stood on - `CEILING` (0.65) is the light a struck note may be at its brightest,
+  `STRONGEST` (0.8) the alpha it is laid at when its colour is dark enough, and its alpha is
+  `min(STRONGEST × strength, CEILING / lightOf(colour) - flare)`.
+- **One bright thread per strip of the screen.** `owners(now)` runs before the note loop: two voices
+  striking one pitch in the same moment (this arrangement does it four times) fall on one 1.8px line,
+  and the thread goes to whichever note is shining most there - `weightOf × how fresh` - so the chorale
+  keeps its gold at a unison and the other hand keeps its flare and body. One mutation was needed for
+  it, and it is caught.
+- **New `tools/strip.mjs`** (and `luma` / `colourOf` exported from `test/screen.mjs` for it): measures
+  the light a picture lays at the *pixel* a struck note draws its core on - the notes' own light, and the
+  ground of line-of-sound and bar line under it. It refuses the wheel and the braid, whose notes are not
+  bars across a line of sound.
+- Tests: 286 (was 281), about 31 s. Four new and one extended: nothing in BWV 645 burns out at a sixth;
+  every bar line crossed at a sixtieth; the light each voice's core lays is the same ±0.1 and under
+  0.62; two voices on one pitch get one thread and it is the stoutest line's colour; and the lamps test
+  now also insists the picture *with the pulse on* stays under 0.9. Six new mutations (four in
+  `look-vigil.js`, two in `visual.js`), all caught.
+
+What the numbers said (measured before and after; the grid is the harness's 64×40, the strip is
+`tools/strip.mjs` at a sixth):
+
+- **Before:** 80 of 1,318 frames over white alone, worst cell 0.977 at 44.5 s - and the split at that
+  cell was 1.16 of light from the note itself against 0.014 from everything else in the picture.
+- **After:** zero frames over white walked at a sixtieth (13,171 frames), worst cell 0.846 alone and
+  0.869 with every beat struck. Per voice the light a struck core lays: gold 0.574, cyan 0.577, violet
+  0.536 - against 1.21, 1.16 and 0.96 before, every one of them clipped to white. The worst frame's
+  *mean* light is 0.0433 before and after: nothing was taken off the picture but those threads. Heaviest
+  frame 1290 → 1302 marks of the 1500 the page allows.
+- **The budget 0.65 was fitted, not picked.** At 0.7 the struck beat could still tip a cell (worst 0.902
+  with the pulse, one burnt); at 0.65 nothing passes; and going down to 0.56 buys nothing, because the
+  worst cell left is not a note - it is the ritornello's warm bar line plus a struck beat's bloom at
+  92.1 s, which stays at 0.869 whatever the note budget is.
+- **A coarse stride walks straight past the worst of it**: the picture's worst cell is 0.742 at a sixth,
+  0.852 at a twenty-fifth, 0.846 at a sixtieth. The spot is a two-pixel bar line lying across the line of
+  sound as a note is struck on it, and that is over inside half a second. Hence the new test that walks
+  every bar of the piece at a sixtieth.
+
+What surprised me:
+
+- **Stepping the body aside costs neither light nor width.** The note keeps its whole width; the middle
+  simply stops adding to what is already there. For the thinnest voices the "body" was already only 0.3px
+  of lit shoulder either side of a blown-out core, which is why the fix reads as notes keeping their
+  colour rather than as notes going dim.
+- **An alpha cannot be a light budget.** The palette spans 0.670 (violet) to 0.890 (green) in light, so
+  one alpha that is safe for violet is 30% too much for green. That is the whole reason `lightOf` exists,
+  and it is why every voice's core now lays about the same light (0.54-0.58) while their alphas differ
+  (0.68 gold, 0.72 cyan, 0.80 violet).
+- **The grid can miss a burnt pixel, and did.** The harness reads every 20px cell at its middle, so a
+  1.8px thread between two middles reads as nothing: the four unisons showed 0.15 in the grid and 1.00 at
+  the pixel they are drawn on. That is how the second bug was found at all - the grid had said "clean" -
+  and it is why `tools/strip.mjs` is committed rather than left in scratch.
+- **0.869 with the pulse does not move**, and that is honest: the picture's own brightest moment is the
+  ritornello coming back at 1:32, warm line and all, and the note budget has nothing to do with it.
+
+The limit of this, said plainly:
+
+- **The picture still passes full light on one row of pixels, and the new tool says so: 1.20.** Where a
+  struck note crosses the line of sound during the chorale's arrival, the arrival's bloom (0.4 of gold),
+  the note's core (0.68) and the line of sound's own 1px rule (up to 0.24 of near-white) share a pixel,
+  plus the band. The grid cannot see that row at all - it samples y 690 and the line is drawn at 688-689.
+  Filed in PLAN with the wheel's ring trick (a glow with the middle left empty) as the way out, and the
+  option of keeping it and saying so: it is one pixel tall and it is exactly where the sound arrives.
+- The strip budget is applied per 4px strip, chosen once per frame per note. The wheel's `shining` record
+  is finer - it marks the ground each light covers - and the road has no such record for anything except
+  cores.
+- **Two pictures still carry the old arithmetic**: BWV 565 lays 1.44 of a colour on a strip and tips a
+  cell in 264 of its 3,426 frames; BWV 639 tips 198 of 710 and `tools/strip.mjs` declines it on purpose,
+  because its notes run sideways and a number borrowed from the road would mean nothing.
+
+Decisions worth keeping:
+
+- **A note's light is one light.** Flare, body and core never share a pixel. This belongs in the shared
+  drawing module when milestone 5 gets to it.
+- **Light, not alpha, is what a picture budgets**, and `Bach.lightOf` says it in one place.
+- **One thread per strip goes to the line the organ weighs most** (weight × freshness), not to whichever
+  note the data wrote first: at a unison the chorale stays gold.
+- **A tool that cannot answer should say so.** `strip.mjs` prints a refusal for the wheel and the braid
+  instead of a plausible number.
+- **Two releases, because two things finished**: 0.5.0 (a note is one light deep) and 0.5.1 (one thread
+  per pitch, and the measure that found it).
+
+Next, in order:
+
+1. The same arithmetic out of BWV 565's fugue picture, then BWV 639's braid - PLAN has the numbers and
+   the two traps (the grid's blind spot, and that each look needs its own idea of what a note is). The
+   braid needs its own reading of "a strip" before anything can be claimed about it.
+2. Decide the road's hottest pixel: ring the struck note instead of blooming over it, or say out loud that
+   the one white pixel in this picture is where the sound arrives and it is meant.
+3. Then the milestone's own two: say the size of the moment with light (`beat.bell` is already handed to
+   the pictures), and the shared-drawing module - which now has a fourth thing to share: `lightOf`, the
+   ceiling, and one thread per strip.
