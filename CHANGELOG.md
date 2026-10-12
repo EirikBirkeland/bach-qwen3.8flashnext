@@ -1,5 +1,31 @@
 # Releases
 
+## 0.5.0 — 2026-10-12
+
+The brightest moment of Wachet auf is no longer burnt out white.
+
+- **A struck note was three lights deep.** The long view draws a note as a flare, a
+  body, and a bright core down one 1.8-pixel line. Laid over one another the way the
+  pictures lay light, that came to 1.44 of the voice's own colour - past full scale all
+  on its own - so the loudest notes on the screen came out *white* instead of gold or
+  violet, which is the one thing a note here exists to say.
+- **Blamed frame by frame first.** 80 of the piece's 1,318 frames (a sixth of a second
+  apart, nobody playing) had a cell over nine tenths of full light, and the player tipped
+  none of them over. Every single one of them was tipped by a note's own core: not the
+  lamps by the road, not the bloom on the chorale's arrival, not a struck beat.
+- **So the body gives way where the core lies.** A struck note keeps its whole width -
+  the lit shoulders are either side of the core now rather than underneath it - and the
+  core is laid at no more light than its own colour can carry. A gold note and a violet
+  one are now struck with the same amount of light, about six tenths of full, and each
+  keeps the colour that says which voice it is.
+- **Nothing in the piece passes nine tenths now,** walked at a sixtieth of a second with
+  the pulse on or off: the worst cell reaches 0.85 alone and 0.87 with a bell ringing on
+  the same spot, against 0.98 before. And the worst spot was not the chorale's arrival -
+  it is where a bar line crosses the line of sound just as a note is struck on it, which
+  is over in a twentieth of a second and is why the checking walks at a sixtieth.
+- The other two pictures that burn have the same arithmetic left in them, and burn worse:
+  the Toccata in 264 of its 3,426 frames, BWV 639 in 198 of its 710. They are next.
+
 ## 0.4.2 — 2026-10-11
 
 The bell you strike now fits the moment it rings in, not only the piece.
