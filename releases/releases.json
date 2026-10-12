@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.5.1",
+    "date": "2026-10-12",
+    "released": "2026-10-12T00:37:14.608Z",
+    "summary": "One bright thread per pitch in the long view, and a tool that measures light where a note is drawn",
+    "added": 272,
+    "removed": 14,
+    "logBytes": 5907992
+  },
+  {
     "version": "0.5.0",
     "date": "2026-10-12",
     "released": "2026-10-12T00:08:15.958Z",
