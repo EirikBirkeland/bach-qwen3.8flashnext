@@ -43,7 +43,40 @@ function fakeCanvas(colours) {
     globalAlpha: 1,
     globalCompositeOperation: "source-over",
     fillStyle: "",
+    strokeStyle: "",
+    lineWidth: 1,
+    lineCap: "butt",
+    lineJoin: "miter",
+    lineDashOffset: 0,
+    font: "12px serif",
+    textAlign: "left",
+    textBaseline: "alphabetic",
+    shadowColor: "rgba(0,0,0,0)",
+    shadowBlur: 0,
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
+    save() {},
+    restore() {},
+    translate(x, y) {
+      sensible("translate", [x, y]);
+    },
+    rotate(angle) {
+      sensible("rotate", [angle]);
+    },
+    scale(sx, sy) {
+      sensible("scale", [sx, sy]);
+    },
     setTransform() {},
+    setLineDash() {},
+    getLineDash() {
+      return [];
+    },
+    clearRect(x, y, w, h) {
+      sensible("clearRect", [x, y, w, h]);
+    },
+    strokeRect(x, y, w, h) {
+      sensible("strokeRect", [x, y, w, h]);
+    },
     fillRect(x, y, w, h) {
       if (!(x <= 0 && y <= 0 && w >= WINDOW.width && h >= WINDOW.height)) {
         sensible("a box of light", [x, y, w, h]);
@@ -64,8 +97,43 @@ function fakeCanvas(colours) {
       return gradient(colours);
     },
     beginPath() {},
-    arc() {},
+    closePath() {},
+    moveTo(x, y) {
+      sensible("moveTo", [x, y]);
+    },
+    lineTo(x, y) {
+      sensible("lineTo", [x, y]);
+    },
+    bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y) {
+      sensible("bezierCurveTo", [cp1x, cp1y, cp2x, cp2y, x, y]);
+    },
+    quadraticCurveTo(cpx, cpy, x, y) {
+      sensible("quadraticCurveTo", [cpx, cpy, x, y]);
+    },
+    arc(x, y, r, s, e) {
+      sensible("arc", [x, y, r, s, e]);
+    },
+    arcTo(x1, y1, x2, y2, r) {
+      sensible("arcTo", [x1, y1, x2, y2, r]);
+    },
+    ellipse(x, y, rx, ry, rot, s, e) {
+      sensible("ellipse", [x, y, rx, ry, rot, s, e]);
+    },
+    rect(x, y, w, h) {
+      sensible("rect", [x, y, w, h]);
+    },
     fill() {},
+    stroke() {},
+    clip() {},
+    fillText(text, x, y) {
+      sensible("fillText", [x, y]);
+    },
+    strokeText(text, x, y) {
+      sensible("strokeText", [x, y]);
+    },
+    measureText(text) {
+      return { width: String(text || "").length * 7 };
+    },
   };
   return {
     tag: "canvas",
@@ -1539,3 +1607,37 @@ test("a player who is there for every beat catches every beat", async () => {
   assert.strictEqual(at(), beats[beats.length - 1].time, "the harness did not land where it aimed");
   assert.match(page.elements.score.textContent, /^21 in a row · best 21 · 21 of \d+$/, "score said: " + page.elements.score.textContent);
 });
+
+test("the listener can switch between all six sacred views while a piece plays", async () => {
+  const page = openPage();
+  const catalog = [...page.window.Bach.catalog];
+  assert.strictEqual(catalog.length, 6, "expected six sacred views in Bach.catalog");
+  assert.strictEqual(page.elements.views.children.length, catalog.length, "each view in the catalog gets a button");
+
+  page.elements.pieces.children[0].click(); // BWV 565 starts on "subject" (Nave)
+  await settled();
+  page.playFrames(10, 1 / 60);
+
+  // Switch through each view by pressing keys 1-6
+  for (let i = 0; i < catalog.length; i++) {
+    const entry = catalog[i];
+    const before = page.canvas.drawn.fillRects;
+    page.press(entry.key);
+    assert.ok(page.canvas.drawn.fillRects > before, "switching to " + entry.name + " drew nothing");
+    assert.strictEqual(
+      page.elements.views.children[i].classList.contains("active"),
+      true,
+      "view button " + entry.label + " was not marked active"
+    );
+    assert.ok(page.elements.lookHint.textContent.length > 10, "no hint shown for " + entry.name);
+  }
+
+  // Pressing V cycles to the next view in the catalog (from 6 -> 1)
+  page.press("v");
+  assert.strictEqual(
+    page.elements.views.children[0].classList.contains("active"),
+    true,
+    "pressing V did not cycle back to the first view"
+  );
+});
+

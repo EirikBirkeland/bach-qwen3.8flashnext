@@ -51,7 +51,7 @@ window.Bach = window.Bach || {};
   var LEAN = 0.75; // a moment's own share: see the note above on the measured exponent
   var LEAST = 0.4; // ... and never under two fifths of the piece's own bell
   var RING = 1.2; // a bell hangs for this many beats of the piece
-  var SHORTEST = 0.9; // ... never so short it is a click
+  var SHORTEST = 0.68; // ... never so short it is a click
   var LONGEST = 2.2; // ... never so long it is a cymbal
 
   /** The middle of a list of numbers. */

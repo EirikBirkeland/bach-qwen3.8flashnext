@@ -175,9 +175,77 @@ export function createStage(piece, options) {
       assertFiniteGradient(args);
       return gradient("radial", args);
     },
+    strokeStyle: "",
+    lineWidth: 1,
+    lineCap: "butt",
+    lineJoin: "miter",
+    lineDashOffset: 0,
+    font: "12px serif",
+    textAlign: "left",
+    textBaseline: "alphabetic",
+    shadowColor: "rgba(0,0,0,0)",
+    shadowBlur: 0,
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
+    save() {},
+    restore() {},
+    translate(x, y) {
+      assertFiniteGradient([x, y]);
+    },
+    rotate(angle) {
+      assertFiniteGradient([angle]);
+    },
+    scale(sx, sy) {
+      assertFiniteGradient([sx, sy]);
+    },
+    setLineDash() {},
+    getLineDash() {
+      return [];
+    },
+    clearRect(x, y, w, h) {
+      assertFiniteGradient([x, y, w, h]);
+    },
+    strokeRect(x, y, w, h) {
+      assertFiniteGradient([x, y, w, h]);
+    },
     beginPath() {},
-    arc() {},
+    closePath() {},
+    moveTo(x, y) {
+      assertFiniteGradient([x, y]);
+    },
+    lineTo(x, y) {
+      assertFiniteGradient([x, y]);
+    },
+    bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y) {
+      assertFiniteGradient([cp1x, cp1y, cp2x, cp2y, x, y]);
+    },
+    quadraticCurveTo(cpx, cpy, x, y) {
+      assertFiniteGradient([cpx, cpy, x, y]);
+    },
+    arc(x, y, r, s, e) {
+      assertFiniteGradient([x, y, r, s, e]);
+    },
+    arcTo(x1, y1, x2, y2, r) {
+      assertFiniteGradient([x1, y1, x2, y2, r]);
+    },
+    ellipse(x, y, rx, ry, rot, s, e) {
+      assertFiniteGradient([x, y, rx, ry, rot, s, e]);
+    },
+    rect(x, y, w, h) {
+      assertFiniteGradient([x, y, w, h]);
+    },
     fill() {},
+    stroke() {},
+    clip() {},
+    fillText(text, x, y) {
+      assertFiniteGradient([x, y]);
+    },
+    strokeText(text, x, y) {
+      assertFiniteGradient([x, y]);
+    },
+    measureText(text) {
+      return { width: String(text || "").length * 7 };
+    },
   };
 
   const canvas = {

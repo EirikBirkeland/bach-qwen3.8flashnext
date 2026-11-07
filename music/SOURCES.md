@@ -14,3 +14,6 @@ All four files are from the Mutopia Project (https://www.mutopiaproject.org), fe
 - bwv639-ich-ruf-zu-dir.mid
   https://www.mutopiaproject.org/ftp/BachJS/BWV639/Ich_ruf_zu_dir/Ich_ruf_zu_dir.mid
   Licence: Creative Commons Attribution-ShareAlike 3.0
+- bwv784-invention-13-a-minor.mid
+  https://www.mutopiaproject.org/ftp/BachJS/BWV784/bach-invention-13/bach-invention-13.mid
+  Licence: Public Domain

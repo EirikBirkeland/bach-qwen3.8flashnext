@@ -182,6 +182,81 @@ window.Bach = window.Bach || {};
       ctx.globalAlpha = 0.5 * faded;
       ctx.fillStyle = STRIKE;
       ctx.fillRect(left, line - 1, right - left, 2);
+
+      // Cathedral shockwave arch soaring from the chord up into the nave vaults
+      var midX = (left + right) * 0.5;
+      var apexY = Math.max(30, line - (right - left) * 0.55);
+      ctx.strokeStyle = GOLD;
+      ctx.lineWidth = 1.8;
+      ctx.globalAlpha = 0.36 * faded;
+      ctx.beginPath();
+      ctx.moveTo(left, line);
+      ctx.quadraticCurveTo(left + (midX - left) * 0.35, apexY + 40, midX, apexY);
+      ctx.quadraticCurveTo(right - (right - midX) * 0.35, apexY + 40, right, line);
+      ctx.stroke();
+    }
+
+    /**
+     * The 3D-projected Gothic Cathedral Nave (*Rez* sanctified): ribbed vaults,
+     * perspective colonnades, and the high Sanctuary Rose Window at the apse.
+     */
+    function drawCathedralNave(width, height, line, thick, now) {
+      var cx = width * 0.5;
+      var apseY = Math.round(height * 0.15);
+      var roseR = Math.min(width, height) * 0.085;
+
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+
+      // Perspective nave vault ribs receding toward the apse
+      var bays = 5;
+      for (var b = 0; b < bays; b++) {
+        var depth = ((b + ((now * 0.25) % 1)) / bays); // 0 = far apse, 1 = foreground
+        var spread = 0.14 + 0.78 * depth * depth;
+        var baseLineY = apseY + (line - apseY) * depth * depth;
+        var apexY = Math.max(12, apseY * (1 - depth * 0.72) - 18 * depth);
+        var leftX = cx - width * 0.5 * spread;
+        var rightX = cx + width * 0.5 * spread;
+
+        ctx.strokeStyle = b === bays - 1 ? GOLD : COOL;
+        ctx.lineWidth = 0.9 + depth * 0.8;
+        ctx.globalAlpha = (0.035 + 0.065 * thick) * (0.35 + 0.65 * depth);
+        ctx.beginPath();
+        ctx.moveTo(leftX, baseLineY);
+        ctx.quadraticCurveTo(leftX + (cx - leftX) * 0.28, apexY + (baseLineY - apexY) * 0.24, cx, apexY);
+        ctx.quadraticCurveTo(rightX - (rightX - cx) * 0.28, apexY + (baseLineY - apexY) * 0.24, rightX, baseLineY);
+        ctx.stroke();
+      }
+
+      // Sanctuary Rose Window at the vanishing point of the nave (subtle per-frame
+      // alpha because the canvas veil accumulates stationary geometry ~5x)
+      ctx.strokeStyle = GOLD;
+      ctx.lineWidth = 1.0;
+      ctx.globalAlpha = 0.028 + 0.04 * thick;
+      ctx.beginPath();
+      ctx.arc(cx, apseY, roseR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, apseY, roseR * 0.52, 0, Math.PI * 2);
+      ctx.stroke();
+
+      var petals = 12;
+      var spin = time * 0.035;
+      for (var p = 0; p < petals; p++) {
+        var a0 = spin + (p * Math.PI * 2) / petals;
+        var a1 = a0 + Math.PI / petals;
+        ctx.beginPath();
+        ctx.moveTo(cx, apseY);
+        ctx.quadraticCurveTo(
+          cx + Math.cos(a0) * roseR * 0.72,
+          apseY + Math.sin(a0) * roseR * 0.72,
+          cx + Math.cos(a1) * roseR,
+          apseY + Math.sin(a1) * roseR
+        );
+        ctx.stroke();
+      }
+
+      ctx.restore();
     }
 
     function frame(now) {
@@ -240,6 +315,8 @@ window.Bach = window.Bach || {};
         ctx.fillRect(xFor(pitch) - 0.5, 0, 1, height);
       }
 
+      drawCathedralNave(width, height, line, thick, now);
+
       // The bar lines, four seconds apart here. A stronger one every phrase.
       for (var b = 0; b < bars.length; b++) {
         var y = Math.round(line - (bars[b] - now) * SPEED);
@@ -258,7 +335,10 @@ window.Bach = window.Bach || {};
         chordFlare(chord, line, 1 - since / CHORD_FADE);
       }
 
-      // The notes.
+      // The notes, plus continuous contrapuntal voice-leading ribbons and
+      // Gothic harmonic arches between simultaneously sounding voices.
+      var prevByVoice = {};
+      var activeAtLine = [];
       for (var n = from; n < to; n++) {
         var one = notes[n];
         var end = one.time + one.length;
@@ -274,6 +354,26 @@ window.Bach = window.Bach || {};
         if (top < -40) top = -40;
         if (bottom > height + 20) bottom = height + 20;
 
+        // Contrapuntal voice-leading arch struck at the line of sound as one note
+        // hands over to the next in the same voice (veiled into a silky trail)
+        var prev = prevByVoice[one.voice];
+        if (prev && one.time <= now && now - one.time < 0.07 && one.time - prev.end < 0.5) {
+          var midX = (prev.x + x) * 0.5;
+          var archH = Math.min(85, 14 + Math.abs(x - prev.x) * 0.28);
+          ctx.strokeStyle = gold || prev.gold ? GOLD : colour;
+          ctx.lineWidth = gold ? 1.8 : 1.2;
+          ctx.globalAlpha = 0.24;
+          ctx.beginPath();
+          ctx.moveTo(prev.x, line);
+          ctx.quadraticCurveTo(midX, line - archH, x, line);
+          ctx.stroke();
+        }
+        prevByVoice[one.voice] = { x: x, top: top, bottom: bottom, end: end, gold: gold };
+
+        if (one.time <= now && end >= now) {
+          activeAtLine.push({ x: x, pitch: one.pitch, colour: colour, gold: gold });
+        }
+
         if (one.time > now) {
           coming(x, top, bottom, colour, weight, Math.max(0.25, 1 - (one.time - now) / reach));
           continue;
@@ -281,6 +381,28 @@ window.Bach = window.Bach || {};
         if (top < line) coming(x, top, Math.min(bottom, line), colour, weight, 0.45);
         var age = now - end;
         sounded(x, Math.max(top, line), bottom, colour, weight, age <= 0 ? 1 : Math.max(0, 1 - age / TAIL));
+      }
+
+      // Pointed Gothic harmonic arches spanning between simultaneously sounding notes
+      if (activeAtLine.length >= 2) {
+        activeAtLine.sort(function (a, b) {
+          return a.x - b.x;
+        });
+        for (var a = 0; a < activeAtLine.length - 1; a++) {
+          var leftN = activeAtLine[a];
+          var rightN = activeAtLine[a + 1];
+          var span = rightN.x - leftN.x;
+          if (span < 6) continue;
+          var archMidX = (leftN.x + rightN.x) * 0.5;
+          var archTopY = line - Math.min(180, 22 + span * 0.36);
+          ctx.strokeStyle = leftN.gold || rightN.gold ? GOLD : leftN.colour;
+          ctx.lineWidth = leftN.gold || rightN.gold ? 1.6 : 1.1;
+          ctx.globalAlpha = 0.24;
+          ctx.beginPath();
+          ctx.moveTo(leftN.x, line);
+          ctx.quadraticCurveTo(archMidX, archTopY, rightN.x, line);
+          ctx.stroke();
+        }
       }
 
       // The subject: a lamp where the next telling is going to land, and a bloom

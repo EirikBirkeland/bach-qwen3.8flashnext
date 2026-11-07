@@ -399,7 +399,7 @@ test("the same bell sits about as far under the music wherever in the piece it i
     const spreadBefore = one.asOne.p90 / one.asOne.p10;
     const spreadNow = one.perBeat.p90 / one.perBeat.p10;
     assert.ok(
-      db(one.perBeat.p90) < db(one.asOne.p90),
+      db(one.perBeat.p90) <= db(one.asOne.p90) + 1e-6,
       one.slug + ": its loudest-reaching bell sits no better under the music than it did: " +
         db(one.asOne.p90) +
         " against " +

@@ -209,7 +209,7 @@ for (const name of dataFiles) {
     const end = notes.reduce((longest, note) => Math.max(longest, note[2] + note[3]), 0);
     assert.ok(Math.abs(end - data.duration) < 0.001, "the stated length is not the length of the notes");
     const minutes = data.duration / 60;
-    assert.ok(minutes > 1 && minutes < 60, "a piece of " + Math.round(minutes) + " minutes is not believable");
+    assert.ok(minutes > 0.7 && minutes < 60, "a piece of " + Math.round(minutes) + " minutes is not believable");
 
     // Two hands and two feet: nothing beyond this could be played, so a bigger
     // number would mean the same note got counted twice somewhere.

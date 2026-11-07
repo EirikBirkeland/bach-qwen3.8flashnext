@@ -342,7 +342,10 @@ window.Bach = window.Bach || {};
         ctx.fillRect(barX - (phraseLine ? 1 : 0.5), 0, phraseLine ? 2 : 1, height);
       }
 
-      // The notes.
+      // The notes, plus calligraphic Bezier voice-leading ribbons and vertical
+      // harmonic interval bridges at the line of sound.
+      var prevByVoice = {};
+      var soundingAtLine = [];
       for (var n = from; n < to; n++) {
         var note = notes[n];
         var weight = weightOf(note);
@@ -356,10 +359,28 @@ window.Bach = window.Bach || {};
         var dim = (warmNote ? 0.3 : 0.15) * Math.max(0.3, 1 - wait / ahead);
         coming(Math.max(start, lineX), end, y, warmNote ? GOLD : colour, weight, dim);
 
+        // Calligraphic Bezier arch struck at the line of sound when a voice steps
+        // from one pitch to the next
+        var prev = prevByVoice[note.voice];
+        if (prev && note.time <= now && now - note.time < 0.08 && Math.abs(y - prev.y) < 220) {
+          var midY = (prev.y + y) * 0.5;
+          ctx.strokeStyle = warmNote ? GOLD : colour;
+          ctx.lineWidth = note.role === "melody" ? 1.8 : 1.2;
+          ctx.globalAlpha = 0.26;
+          ctx.beginPath();
+          ctx.moveTo(lineX, prev.y);
+          ctx.quadraticCurveTo(lineX - 24, midY, lineX, y);
+          ctx.stroke();
+        }
+        prevByVoice[note.voice] = { start: start, end: end, y: y };
+
         if (note.time <= now) {
           var age = now - (note.time + note.length);
           var strength = age <= 0 ? 1 : Math.max(0, 1 - age / FADE);
           played(start, Math.min(end, lineX), y, colour, weight, strength * (warmNote ? 1.25 : 1));
+          if (age <= 0) {
+            soundingAtLine.push({ y: y, pitch: note.pitch, colour: colour, role: note.role });
+          }
         }
 
         // The moment it was struck: a flare on the line of sound.
@@ -372,6 +393,61 @@ window.Bach = window.Bach || {};
           ctx.globalAlpha = 0.4 * faded * faded;
           ctx.fillStyle = glow;
           ctx.fillRect(lineX - size, y - size, size * 2, size * 2);
+        }
+      }
+
+      // Vertical harmonic interval bridges between simultaneously sounding voices
+      if (soundingAtLine.length >= 2) {
+        soundingAtLine.sort(function (a, b) {
+          return a.y - b.y;
+        });
+        for (var h = 0; h < soundingAtLine.length - 1; h++) {
+          var highV = soundingAtLine[h];
+          var lowV = soundingAtLine[h + 1];
+          ctx.strokeStyle = GOLD;
+          ctx.lineWidth = 1.1;
+          ctx.globalAlpha = 0.22;
+          ctx.beginPath();
+          ctx.moveTo(lineX, highV.y);
+          ctx.quadraticCurveTo(lineX - 22, (highV.y + lowV.y) * 0.5, lineX, lowV.y);
+          ctx.stroke();
+        }
+      }
+
+      // Sacred Chorale Verse Inscription synchronized with the phrases of BWV 639
+      if (bars.length >= 16 && height > 420) {
+        var CHORALE_VERSES = [
+          { de: "„Ich ruf zu dir, Herr Jesu Christ, ich bitt, erhör mein Klagen“", en: "I call to Thee, Lord Jesus Christ; I pray, hear my lamenting" },
+          { de: "„Verleih mir Gnad zu dieser Frist, laß mich doch nicht verzagen“", en: "Grant me Thy grace in this hour; let me not despair" },
+          { de: "„Den rechten Glauben, Herr, ich mein, den wollest du mir geben“", en: "The true faith, Lord, I mean, which Thou wouldst give to me" },
+          { de: "„Dir zu leben, mein’m Nächsten nütz zu sein,“", en: "To live for Thee, to serve my neighbor," },
+          { de: "„dein Wort zu halten eben.“ · Soli Deo Gloria", en: "and to keep Thy Word faithfully." },
+        ];
+        var currentBar = 0;
+        for (var cb = 0; cb < bars.length; cb++) {
+          if (bars[cb] <= now) currentBar = cb;
+        }
+        var phraseIdx = Math.min(CHORALE_VERSES.length - 1, Math.floor(currentBar / Math.max(1, phraseBars)));
+        var verse = CHORALE_VERSES[phraseIdx];
+        if (verse) {
+          ctx.save();
+          ctx.globalCompositeOperation = "source-over";
+          ctx.fillStyle = "#05060b";
+          ctx.globalAlpha = 0.72;
+          ctx.beginPath();
+          ctx.rect(width * 0.24, height - 66, width * 0.56, 46);
+          ctx.fill();
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.font = "italic 14px 'Iowan Old Style', 'Palatino Linotype', Georgia, serif";
+          ctx.fillStyle = GOLD;
+          ctx.globalAlpha = 0.78;
+          ctx.fillText(verse.de, width * 0.52, height - 52);
+          ctx.font = "11px 'Iowan Old Style', 'Palatino Linotype', Georgia, serif";
+          ctx.fillStyle = COOL;
+          ctx.globalAlpha = 0.56;
+          ctx.fillText(verse.en, width * 0.52, height - 32);
+          ctx.restore();
         }
       }
 

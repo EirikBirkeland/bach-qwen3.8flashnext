@@ -81,7 +81,7 @@ window.Bach = window.Bach || {};
     gedackt: { name: "Gedackt 8′", mix: "stopped", cents: 3 },
     celeste: { name: "Voix céleste 8′", mix: "celeste", cents: 3 },
     octava: { name: "Octava 4′", mix: "octave", cents: 4 },
-    nassat: { name: "Nassat 2⅔′", mix: "small", cents: 3 },
+    nassat: { name: "Nassat 2 2/3′", mix: "small", cents: 3 },
     subbass: { name: "Subbass 16′", mix: "wood", cents: 2 },
     octavbass: { name: "Octavbass 8′", mix: "octave", cents: 3 },
     mixtur: { name: "Mixtur 4′", mix: "octave", cents: 7 },

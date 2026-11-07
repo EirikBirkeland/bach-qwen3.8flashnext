@@ -46,14 +46,23 @@
         opacity: 0.35;
       }
       h1 {
-        font-size: clamp(42px, 9vw, 84px);
+        font-size: clamp(42px, 8vw, 76px);
         font-weight: 400;
         letter-spacing: 0.22em;
         text-indent: 0.22em;
-        margin: 0 0 0.1em;
+        margin: 0 0 0.08em;
+        color: #f3e6c8;
+        text-shadow: 0 0 34px rgba(255, 212, 122, 0.22);
+      }
+      .sacred-seal {
+        color: rgba(255, 212, 122, 0.72);
+        font-size: 11px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        margin: 0 0 0.6em;
       }
       .tagline {
-        margin: 0 0 2.4em;
+        margin: 0 0 1.8em;
         color: #93a2c0;
         letter-spacing: 0.16em;
         text-transform: uppercase;
@@ -62,11 +71,11 @@
       .piece {
         display: block;
         width: 100%;
-        background: rgba(255, 255, 255, 0.02);
+        background: rgba(10, 14, 24, 0.68);
         border: 1px solid rgba(178, 196, 230, 0.25);
         color: #e9edf6;
-        padding: 16px 20px;
-        margin: 0 0 12px;
+        padding: 13px 18px;
+        margin: 0 0 10px;
         text-align: left;
         cursor: pointer;
         transition: border-color 0.3s, background 0.3s;
@@ -142,8 +151,36 @@
         font-size: 11px;
         letter-spacing: 0.09em;
         line-height: 1.8;
-        color: #63708c;
+        color: #7d8ca8;
         white-space: pre;
+        text-shadow: 0 1px 10px #05060b, 0 0 18px #05060b;
+      }
+      #views {
+        position: absolute;
+        right: 24px;
+        top: 62px;
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      button.view-btn {
+        background: rgba(5, 6, 11, 0.55);
+        border: 1px solid rgba(178, 196, 230, 0.2);
+        color: #8b9bb8;
+        font-family: inherit;
+        font-size: 10px;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        padding: 5px 9px;
+        cursor: pointer;
+        transition: border-color 0.25s, color 0.25s, background 0.25s;
+      }
+      button.view-btn:hover,
+      button.view-btn.active {
+        border-color: rgba(255, 212, 122, 0.78);
+        color: #ffd47a;
+        background: rgba(255, 212, 122, 0.08);
       }
       #voices {
         position: absolute;
@@ -250,17 +287,19 @@
         <button id="restart" class="plain" type="button">Restart</button>
         <button id="stop" class="plain" type="button">Stop</button>
       </div>
+      <div id="views"></div>
       <div id="seek">
         <div id="progress"></div>
       </div>
     </div>
 
     <div id="card" class="pane">
+      <p class="sacred-seal">J. J. &middot; Jesu Juva</p>
       <h1>BACH</h1>
-      <p class="tagline">the organ works, played as light</p>
+      <p class="tagline">the organ works, played as light &middot; Soli Deo Gloria</p>
       <div id="pieces"></div>
       <p class="note" id="status"></p>
-      <p class="hint">loudspeakers or headphones, please</p>
+      <p class="hint">loudspeakers or headphones, please &middot; keys 1&ndash;6 or V switch the sacred view</p>
       <p class="hint">space pauses &middot; &larr; &rarr; move &middot; click the line below to jump</p>
       <p class="hint">play along: click the picture, or press Enter, on the beat &middot; P turns it on and off</p>
     </div>
@@ -285,6 +324,8 @@
     <script src="src/look-vigil.js"></script>
     <script src="src/look-subject.js"></script>
     <script src="src/look-round.js"></script>
+    <script src="src/look-prospekt.js"></script>
+    <script src="src/look-cosmos.js"></script>
     <script src="src/game.js"></script>
     <script src="src/main.js"></script>
   </body>

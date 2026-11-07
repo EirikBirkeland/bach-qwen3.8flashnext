@@ -1,5 +1,19 @@
 # Releases
 
+## 0.6.0 — 2026-11-07
+
+Six switchable sacred visualizations, Two-Part Invention No. 13 in A minor (BWV 784), Gothic cathedral geometry, and the Lutheran chorale verses (*Soli Deo Gloria*).
+
+- **Two-Part Invention No. 13 in A minor, BWV 784.** Added Bach's 25-bar invention from the Bach-Gesellschaft edition (Mutopia Project, Public Domain): 564 notes of pure two-voice dialogue where the 9-note invention motive is handed five times between right and left hand.
+- **A pantheon of six live-switchable sacred visualizations.** Every piece starts on its signature picture, and the listener can switch between all six views at any moment with keys `1`–`6`, `V`, or the view bar in the corner:
+  1. **Prospekt (`src/look-prospekt.js`):** A five-division Baroque pipe organ facade (flanking Pedal Towers, Positiv/Oberwerk flats, central Hauptwerk tower, and clerestory Rose Oculus) where speaking pipes ignite from their gilded labia upward and pointed Gothic harmonic arches span overhead between sounding intervals.
+  2. **Nave (`src/look-subject.js`):** Receding 3D-projected Gothic cathedral vault ribs and apse rose window, contrapuntal voice-leading arches, and soaring cathedral shockwaves on full Toccata chords.
+  3. **Rose (`src/look-round.js`):** A Gothic stained-glass rose window with 16 pointed petal lancets, central rosette oculus, sustained circular note arcs, contrapuntal filigree, and Roman-numeral Passacaglia variation inscriptions.
+  4. **Tapestry (`src/look-braid.js`):** Woven voice-leading threads with vertical harmonic interval bridges at the line of sound and the historic German and English verses of *"Ich ruf zu dir, Herr Jesu Christ"* synchronized phrase by phrase.
+  5. **Vigil (`src/look-vigil.js`):** Perspective road converging toward the Morning Star and Gothic watchtower arches at the horizon, inscribed with Philipp Nicolai's 1599 verses for *"Wachet auf, ruft uns die Stimme"*.
+  6. **Cosmos (`src/look-cosmos.js`):** *Harmonia Mundi* — a celestial astrolabe ordered by the Circle of Fifths where active chords crystallize as translucent stained-glass polygons and voices trace orbital arcs.
+- **Full Canvas 2D liberation and visual verification.** Expanded the test harness canvases (`test/page.test.mjs`, `test/screen.mjs`) to support curves, arcs, strokes, transforms, and typography; added a Gothic Rose Window mandala behind the opening portal (`J. J. · Soli Deo Gloria`); and fixed the broken `Nassat 2 2/3′` glyph.
+
 ## 0.5.1 — 2026-10-12
 
 One bright thread per pitch, and a stricter way of looking at the screen.

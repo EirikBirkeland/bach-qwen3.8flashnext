@@ -361,6 +361,98 @@ window.Bach = window.Bach || {};
       bloom(tip.x, tip.y, view.outer * 0.1, COOL, strength * 0.16);
     }
 
+    var ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX", "XXI"];
+
+    /**
+     * Draws the Gothic Rose Window stone/gold tracery: radiating mullions for each
+     * bar of the turn, pointed petal lancets, outer trefoil cusps, and the central
+     * golden rosette oculus.
+     */
+    function drawRoseTracery(handAngle, sounding, fugue, turnIndex) {
+      var cx = view.cx;
+      var cy = view.cy;
+      var inner = view.inner;
+      var outer = view.outer;
+      var fullness = Math.min(1, sounding / 8);
+
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+
+      // Central hub rosette
+      ctx.strokeStyle = GOLD;
+      ctx.lineWidth = 1.2;
+      ctx.globalAlpha = 0.14 + 0.12 * fullness;
+      ctx.beginPath();
+      ctx.arc(cx, cy, inner * 0.72, 0, TAU);
+      ctx.stroke();
+
+      // Radiating mullions and pointed Gothic petal lancets around the wheel
+      var petals = Math.max(8, periodBars * 2);
+      for (var i = 0; i < petals; i++) {
+        var a0 = TOP * TAU + (i / petals) * TAU;
+        var aMid = TOP * TAU + ((i + 0.5) / petals) * TAU;
+        var a1 = TOP * TAU + ((i + 1) / petals) * TAU;
+
+        // Mullion spoke on bar boundaries
+        if (i % 2 === 0) {
+          ctx.strokeStyle = i === 0 ? GOLD : COOL;
+          ctx.lineWidth = i === 0 ? 1.2 : 0.8;
+          ctx.globalAlpha = i === 0 ? 0.14 : 0.05 + 0.04 * fullness;
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.cos(a0) * inner * 0.72, cy + Math.sin(a0) * inner * 0.72);
+          ctx.lineTo(cx + Math.cos(a0) * outer, cy + Math.sin(a0) * outer);
+          ctx.stroke();
+        }
+
+        // Pointed Gothic petal arch near the outer rim
+        var rBase = outer * 0.78;
+        var rTip = outer * 0.99;
+        ctx.strokeStyle = fugue ? COOL : GOLD;
+        ctx.lineWidth = 0.9;
+        ctx.globalAlpha = 0.06 + 0.06 * fullness;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a0) * rBase, cy + Math.sin(a0) * rBase);
+        ctx.quadraticCurveTo(
+          cx + Math.cos(aMid) * rTip * 1.04,
+          cy + Math.sin(aMid) * rTip * 1.04,
+          cx + Math.cos(a1) * rBase,
+          cy + Math.sin(a1) * rBase
+        );
+        ctx.stroke();
+      }
+
+      // Sacred structural inscription beneath the Rose Window
+      if (ground && view.height > 420) {
+        var label = "";
+        if (fugue) {
+          label = "THE DOUBLE FUGUE · THE WHEEL UNWINDS";
+        } else if (turnIndex <= 0) {
+          label = "PASSACAGLIA · GROUND BASS IN C MINOR";
+        } else if (turnIndex <= 20) {
+          label = "VARIATION " + (ROMAN[turnIndex] || turnIndex) + " OF XX · ABOVE THE GROUND";
+        }
+        if (label) {
+          var labelY = Math.min(view.height - 34, cy + outer + 36);
+          ctx.save();
+          ctx.globalCompositeOperation = "source-over";
+          ctx.fillStyle = "#05060b";
+          ctx.globalAlpha = 0.72;
+          ctx.beginPath();
+          ctx.rect(cx - 180, labelY - 12, 360, 24);
+          ctx.fill();
+          ctx.font = "11px 'Iowan Old Style', 'Palatino Linotype', Georgia, serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = fugue ? COOL : GOLD;
+          ctx.globalAlpha = 0.68;
+          ctx.fillText(label, cx, labelY);
+          ctx.restore();
+        }
+      }
+
+      ctx.restore();
+    }
+
     /**
      * A tooth of the rim: a short tick pointing inwards at one bearing, longer and
      * brighter the nearer its beat is to the hand. The rim already carries the bars
@@ -525,6 +617,7 @@ window.Bach = window.Bach || {};
       // ground begins. The hand brightens each one as it crosses it.
       var handAngle = angleAt(now);
       view.hand = handAngle;
+      drawRoseTracery(handAngle, sounding, fugue, turnOf(now));
       for (var b = 0; b < periodBars; b++) {
         var mark = (b / periodBars + TOP) * TAU;
         var off = Math.abs(Math.sin((mark - handAngle) / 2)); // how far the hand is from here
@@ -556,13 +649,17 @@ window.Bach = window.Bach || {};
       // Fresh every frame: what is shining now is what a mark has to share with.
       spots = {};
 
-      // The notes of the turn being played, and the last few seconds of light.
+      // The notes of the turn being played, and the last few seconds of light,
+      // plus stained-glass voice filigree arcs and central harmonic chord web.
+      var prevByVoice = {};
+      var soundingPts = [];
       for (var n = from; n < to; n++) {
         var note = notes[n];
         var away = note.time - now;
         if (away > ahead) continue;
         var angle = angleAt(note.time);
-        var lit = point(radiusFor(note.pitch), angle);
+        var rad = radiusFor(note.pitch);
+        var lit = point(rad, angle);
         var gold = groundKeys[keyOf(note)] === true;
         var colour = gold ? GOLD : pick(note.voice, n);
         var size = weightOf(note, gold);
@@ -584,6 +681,54 @@ window.Bach = window.Bach || {};
         laid(lit.x, lit.y, body);
         if (strength > 0.3) glow(lit.x, lit.y, size * (2.2 + 3.4 * strength), colour, 0.22 * strength * calm * share);
         dot(lit.x, lit.y, body, colour, 0.72 * strength * calm * share);
+
+        // Sustained arc along the pitch circle while the note speaks
+        var endAngle = angleAt(Math.min(now, end));
+        if (endAngle > angle && endAngle - angle < Math.PI) {
+          ctx.strokeStyle = colour;
+          ctx.lineWidth = gold ? 2.4 : 1.4;
+          ctx.globalAlpha = 0.38 * strength * calm;
+          ctx.beginPath();
+          ctx.arc(view.cx, view.cy, rad, angle, endAngle);
+          ctx.stroke();
+        }
+
+        // Contrapuntal filigree curve from the previous note in the same voice
+        var prev = prevByVoice[note.voice];
+        if (prev && note.time - prev.end < 0.9) {
+          ctx.strokeStyle = gold && prev.gold ? GOLD : colour;
+          ctx.lineWidth = gold ? 1.6 : 0.9;
+          ctx.globalAlpha = 0.2 * strength * calm;
+          ctx.beginPath();
+          ctx.moveTo(prev.x, prev.y);
+          ctx.quadraticCurveTo(
+            (prev.x + lit.x) * 0.45 + view.cx * 0.1,
+            (prev.y + lit.y) * 0.45 + view.cy * 0.1,
+            lit.x,
+            lit.y
+          );
+          ctx.stroke();
+        }
+        prevByVoice[note.voice] = { x: lit.x, y: lit.y, end: end, gold: gold };
+
+        if (age <= 0) {
+          soundingPts.push({ x: lit.x, y: lit.y, colour: colour, gold: gold });
+        }
+      }
+
+      // Harmonic chord web through the central hub connecting currently sounding notes
+      if (soundingPts.length >= 2) {
+        for (var s1 = 0; s1 < soundingPts.length - 1; s1++) {
+          var pA = soundingPts[s1];
+          var pB = soundingPts[s1 + 1];
+          ctx.strokeStyle = pA.gold || pB.gold ? GOLD : pA.colour;
+          ctx.lineWidth = 1.1;
+          ctx.globalAlpha = 0.18 * calm;
+          ctx.beginPath();
+          ctx.moveTo(pA.x, pA.y);
+          ctx.quadraticCurveTo(view.cx, view.cy, pB.x, pB.y);
+          ctx.stroke();
+        }
       }
 
       // A fresh telling of the ground: gold, wherever its first note falls.

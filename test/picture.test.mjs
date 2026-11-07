@@ -2207,3 +2207,40 @@ test("BWV 639: a run lights the ruler, and letting a beat go takes it back", () 
   assert.strictEqual(play.score().chain, 0, "letting the beat go did not end the run");
   assert.strictEqual(edge(play.see(next.time + 0.45).added).length, 0, "the ruler kept its light after the run ended");
 });
+
+test("BWV 784: the Prospekt organ facade lights the speaking pipes and marks the invention motive in gold", () => {
+  const scene = sceneOf("bwv784-invention-13-a-minor");
+  const stage = createStage(scene, { play: true });
+  const tune = stage.bach.theme(scene.notes, { bars: scene.look.bars });
+  assert.ok(tune && tune.heard.length >= 4, "the 9-note invention motive of BWV 784 should be found");
+
+  const entry = tune.heard[0];
+  const seen = stage.frame(entry.time + 0.05);
+  assert.ok(seen.mean > silence.mean, "the Prospekt drew no light when the motive entered");
+  assert.strictEqual(seen.burnt, 0, "the Prospekt burned out white on the motive entry");
+  assert.ok(
+    stage.drawn.some((box) => box.colour === "#ffd47a" && box.alpha > 0.2),
+    "the invention motive was not lit in gold on the Prospekt"
+  );
+});
+
+test("every piece can be rendered through all six sacred visualizations cleanly", () => {
+  const lookNames = ["prospekt", "subject", "round", "braid", "vigil", "cosmos"];
+  for (const { piece, scene } of scenes) {
+    const busyAt = busiestSecond(scene.data);
+    for (const lookName of lookNames) {
+      const customScene = {
+        slug: scene.slug,
+        data: scene.data,
+        notes: scene.notes,
+        look: Object.assign({}, scene.look, { name: lookName }),
+      };
+      const stage = createStage(customScene, { play: true });
+      const seen = stage.frame(busyAt);
+      assert.ok(seen.mean > 0.015, piece.slug + " on " + lookName + " is completely dark");
+      assert.ok(seen.mean < 0.45, piece.slug + " on " + lookName + " washed out the screen: " + seen.mean);
+      assert.ok(seen.burnt <= seen.cells * 0.04, piece.slug + " on " + lookName + " burned out: " + seen.burnt);
+    }
+  }
+});
+

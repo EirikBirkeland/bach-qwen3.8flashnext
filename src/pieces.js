@@ -15,6 +15,48 @@
 window.Bach = window.Bach || {};
 
 (function (Bach) {
+  // The pantheon of sacred visualizations: every piece wears its own default
+  // picture, and the listener can switch between all six at any moment with the
+  // 1-6 keys, V, or the view bar in the corner.
+  Bach.catalog = [
+    {
+      name: "prospekt",
+      key: "1",
+      label: "Prospekt",
+      hint: "the Baroque pipe facade · gold is the theme · Gothic arches join sounding intervals",
+    },
+    {
+      name: "subject",
+      key: "2",
+      label: "Nave",
+      hint: "cathedral nave · gold is the fugue subject · wide flares mark full chords",
+    },
+    {
+      name: "round",
+      key: "3",
+      label: "Rose",
+      hint: "Gothic rose window · turns once to the ground · the rim marks the beat",
+    },
+    {
+      name: "braid",
+      key: "4",
+      label: "Tapestry",
+      hint: "woven voice-leading ribbons · four bars to a screen · the ticks mark the beat",
+    },
+    {
+      name: "vigil",
+      key: "5",
+      label: "Vigil",
+      hint: "recedes to a horizon · gold is the chorale · warm is a repeat · lamps mark the beat",
+    },
+    {
+      name: "cosmos",
+      key: "6",
+      label: "Cosmos",
+      hint: "celestial Circle of Fifths · chords crystallize as sacred polygons in the astrolabe",
+    },
+  ];
+
   Bach.pieces = [
     {
       slug: "bwv565-toccata-and-fugue-d-minor",
@@ -71,6 +113,21 @@ window.Bach = window.Bach || {};
         1: { name: "Right hand", colour: "#79e2ff", role: "inner" },
         2: { name: "Chorale melody", colour: "#ffd47a", role: "melody" },
         3: { name: "Pedal", colour: "#c39bff", role: "pedal" },
+      },
+    },
+    {
+      slug: "bwv784-invention-13-a-minor",
+      file: "data/bwv784-invention-13-a-minor.js",
+      title: "Two-Part Invention No. 13",
+      subtitle: "in A minor, BWV 784",
+      look: {
+        name: "prospekt",
+        phrase: 4,
+        hint: "the Baroque pipe facade · gold is the motive · Gothic arches join sounding intervals",
+      },
+      voices: {
+        1: { name: "Right hand", colour: "#79e2ff", role: "melody" },
+        2: { name: "Left hand", colour: "#c39bff", role: "pedal" },
       },
     },
     {

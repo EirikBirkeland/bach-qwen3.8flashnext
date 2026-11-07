@@ -432,6 +432,101 @@ window.Bach = window.Bach || {};
         ctx.fillRect(xFor(pitch) - 0.5, view.horizon - 6, 1, view.span + 6);
       }
 
+      // The Watchman's Horizon: perspective colonnade rays converging toward the
+      // Morning Star rose window above the walls of Jerusalem, and the sacred
+      // chorale verses of Philipp Nicolai (1599).
+      (function drawWatchmansHorizon() {
+        var cx = width * 0.5;
+        var starY = view.horizon;
+        var margin = verge();
+        var choraleSinging = false;
+        for (var s = from; s < to; s++) {
+          if (notes[s].role === "melody" && notes[s].time <= now && notes[s].time + notes[s].length >= now) {
+            choraleSinging = true;
+            break;
+          }
+        }
+
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+
+        // Perspective road verges converging toward the horizon sanctuary
+        ctx.strokeStyle = choraleSinging ? WARM : COOL;
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = choraleSinging ? 0.14 : 0.07;
+        ctx.beginPath();
+        ctx.moveTo(margin, view.line);
+        ctx.lineTo(cx - width * 0.14, starY);
+        ctx.moveTo(width - margin, view.line);
+        ctx.lineTo(cx + width * 0.14, starY);
+        ctx.stroke();
+
+        // Pointed Gothic Watchtower arches framing the horizon
+        for (var a = 1; a <= 3; a++) {
+          var archW = width * (0.09 * a);
+          var archH = (26 + a * 18);
+          ctx.strokeStyle = a === 1 || choraleSinging ? "#ffd47a" : COOL;
+          ctx.globalAlpha = (choraleSinging ? 0.16 : 0.08) / a;
+          ctx.beginPath();
+          ctx.moveTo(cx - archW, starY);
+          ctx.quadraticCurveTo(cx, starY - archH * 1.4, cx + archW, starY);
+          ctx.stroke();
+        }
+
+        // The Morning Star / Rose at the horizon
+        var starR = choraleSinging ? 22 : 14;
+        ctx.strokeStyle = "#ffd47a";
+        ctx.lineWidth = choraleSinging ? 1.5 : 1;
+        ctx.globalAlpha = choraleSinging ? 0.42 : 0.2;
+        ctx.beginPath();
+        ctx.arc(cx, starY - 14, starR, 0, Math.PI * 2);
+        ctx.stroke();
+        for (var r = 0; r < 8; r++) {
+          var ang = time * 0.04 + (r * Math.PI) / 4;
+          var rayLen = (r % 2 === 0 ? 1.8 : 1.15) * starR;
+          ctx.beginPath();
+          ctx.moveTo(cx, starY - 14);
+          ctx.lineTo(cx + Math.cos(ang) * rayLen, starY - 14 + Math.sin(ang) * rayLen);
+          ctx.stroke();
+        }
+
+        // Sacred Chorale Verse Inscription for Wachet auf (BWV 645)
+        if (height > 440 && arrivals.length >= 2) {
+          var VIGIL_VERSES = [
+            { at: 0, de: "Zions Wächter auf der Zinnen", en: "The Watchmen on the Heights of Zion · Ritornello" },
+            { at: 48, de: "„Wachet auf, ruft uns die Stimme der Wächter sehr hoch auf der Zinne,“", en: "Wake, awake, for night is flying, the watchmen on the heights are crying," },
+            { at: 68, de: "„wach auf, du Stadt Jerusalem!“", en: "awake, thou city Jerusalem!" },
+            { at: 91, de: "„Mitternacht heißt diese Stunde;“", en: "Midnight is this solemn hour;" },
+            { at: 121, de: "„sie rufen uns mit hellem Munde: wo seid ihr klugen Jungfrauen?“", en: "they call us with bright voices: where are ye, wise virgins?" },
+            { at: 171, de: "„Wohl auf, der Bräutgam kömmt, steht auf, die Lampen nehmt! Alleluja!“", en: "Arise, the Bridegroom comes; stand up, take your lamps! Alleluia!" },
+          ];
+          var chosen = VIGIL_VERSES[0];
+          for (var v = 0; v < VIGIL_VERSES.length; v++) {
+            if (now >= VIGIL_VERSES[v].at) chosen = VIGIL_VERSES[v];
+          }
+          ctx.save();
+          ctx.globalCompositeOperation = "source-over";
+          ctx.fillStyle = "#05060b";
+          ctx.globalAlpha = 0.72;
+          ctx.beginPath();
+          ctx.rect(cx - width * 0.28, Math.max(48, starY - 76), width * 0.56, 46);
+          ctx.fill();
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.font = "italic 14px 'Iowan Old Style', 'Palatino Linotype', Georgia, serif";
+          ctx.fillStyle = choraleSinging ? "#ffd47a" : COOL;
+          ctx.globalAlpha = choraleSinging ? 0.82 : 0.62;
+          ctx.fillText(chosen.de, cx, Math.max(66, starY - 62));
+          ctx.font = "11px 'Iowan Old Style', 'Palatino Linotype', Georgia, serif";
+          ctx.fillStyle = COOL;
+          ctx.globalAlpha = 0.54;
+          ctx.fillText(chosen.en, cx, Math.max(84, starY - 43));
+          ctx.restore();
+        }
+
+        ctx.restore();
+      })();
+
       // The bar lines, crowding toward the horizon. A bar that begins something
       // the piece already played is warm, and stays warm while it is still to come.
       for (var b = 0; b < bars.length; b++) {
@@ -454,6 +549,7 @@ window.Bach = window.Bach || {};
       // settled before any of them is drawn, since the thread belongs to whichever
       // note is shining most on that strip and not to whichever was written down first.
       var lit = owners(now);
+      var prevByVoice = {};
       for (var n = from; n < to; n++) {
         var note = notes[n];
         var weight = weightOf(note);
@@ -463,6 +559,22 @@ window.Bach = window.Bach || {};
         var bottom = yFor(note.time, now);
         if (top < view.horizon - 4) top = view.horizon - 4;
         if (bottom <= top) continue; // too far off to be a pixel yet
+
+        // Perspective voice-leading arch struck at the line of sound when a voice
+        // steps from one note to the next
+        var prev = prevByVoice[note.voice];
+        if (prev && note.time <= now && now - note.time < 0.08 && note.time - prev.end < 0.8) {
+          var midX = (prev.x + x) * 0.5;
+          var archH = Math.min(70, 14 + Math.abs(x - prev.x) * 0.26);
+          ctx.strokeStyle = colour;
+          ctx.lineWidth = note.role === "melody" ? 1.8 : 1.1;
+          ctx.globalAlpha = 0.26;
+          ctx.beginPath();
+          ctx.moveTo(prev.x, view.line);
+          ctx.quadraticCurveTo(midX, view.line - archH, x, view.line);
+          ctx.stroke();
+        }
+        prevByVoice[note.voice] = { x: x, top: top, bottom: bottom, end: note.time + note.length };
 
         if (note.time > now) {
           coming(x, top, bottom, colour, weight, near(note.time, now));

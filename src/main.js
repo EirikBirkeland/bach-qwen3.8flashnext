@@ -9,12 +9,14 @@ window.Bach = window.Bach || {};
   var game = null;
   var prepared = null;
   var current = null;
+  var currentData = null;
+  var activeLookName = "fall";
   var pieceDuration = 0;
   var timer = 0;
   var state = "idle"; // idle, loading, playing, paused, done
 
   var elements = {};
-  ["card", "stage", "hud", "end", "pieces", "nowTitle", "nowTime", "stops", "voices", "lookHint", "pause", "restart", "stop", "again", "menu", "seek", "progress", "status", "endLine", "play", "score"].forEach(
+  ["card", "stage", "hud", "end", "pieces", "nowTitle", "nowTime", "stops", "voices", "lookHint", "pause", "restart", "stop", "again", "menu", "seek", "progress", "status", "endLine", "play", "score", "views"].forEach(
     function (id) {
       elements[id] = document.getElementById(id);
     }
@@ -137,6 +139,8 @@ window.Bach = window.Bach || {};
     loadData(piece)
       .then(function (data) {
         var look = piece.look || {};
+        currentData = data;
+        activeLookName = look.name || "fall";
         // The card says how many bars a phrase takes here, and the organ needs that
         // to know how to breathe: src/dynamics.js shapes the piece phrase by phrase.
         prepared = organ.prepare(data, rolesFor(piece), look.phrase);
@@ -157,6 +161,7 @@ window.Bach = window.Bach || {};
         // ladder laid over it: the picture says so by having a way to draw it.
         game.paint(visual.pulse());
         describeGame();
+        highlightView(activeLookName);
         elements.nowTitle.textContent = piece.title + " " + piece.subtitle;
         elements.stops.textContent = describeStops(prepared.stops);
         elements.lookHint.textContent = look.hint || "";
@@ -189,6 +194,54 @@ window.Bach = window.Bach || {};
   function toggleGame() {
     game.toggle();
     describeGame();
+  }
+
+  function highlightView(name) {
+    if (!elements.views) return;
+    var buttons = elements.views.children;
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].classList.toggle("active", buttons[i].LookName === name);
+    }
+  }
+
+  /**
+   * Switch the active visualization live while a piece plays or rests.
+   */
+  function switchLook(name) {
+    if ((state !== "playing" && state !== "paused") || !prepared || !currentData || !current || !visual) return;
+    if (!Bach.looks || !Bach.looks[name]) return;
+    var look = current.look || {};
+    activeLookName = name;
+    visual.reset(prepared.notes, {
+      name: name,
+      pitchLow: currentData.pitchRange[0],
+      pitchHigh: currentData.pitchRange[1],
+      colours: coloursFor(current),
+      bars: currentData.bars,
+      phrase: look.phrase,
+      duration: currentData.duration,
+    });
+    if (game) game.paint(visual.pulse());
+    highlightView(name);
+    var entry = (Bach.catalog || []).find(function (item) {
+      return item.name === name;
+    });
+    elements.lookHint.textContent = name === look.name && look.hint ? look.hint : (entry && entry.hint) || look.hint || "";
+    visual.frame(organ.time());
+    if (game) game.frame(organ.time());
+  }
+
+  function cycleLook() {
+    var list = Bach.catalog || [];
+    if (list.length === 0) return;
+    var idx = 0;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].name === activeLookName) {
+        idx = (i + 1) % list.length;
+        break;
+      }
+    }
+    switchLook(list[idx].name);
   }
 
   /**
@@ -261,7 +314,71 @@ window.Bach = window.Bach || {};
     elements.stops.textContent = "";
     elements.lookHint.textContent = "";
     state = "idle";
+    drawPortalMandala();
     show("card");
+  }
+
+  /**
+   * Draws a contemplative Gothic Cathedral Rose Window and pipe-organ filigree
+   * on the background stage while the portal card is shown.
+   */
+  function drawPortalMandala() {
+    if (!elements.stage || typeof elements.stage.getContext !== "function") return;
+    var ctx = elements.stage.getContext("2d");
+    if (!ctx || typeof ctx.arc !== "function") return;
+    var ratio = window.devicePixelRatio || 1;
+    var width = Math.max(320, window.innerWidth || 1280);
+    var height = Math.max(240, window.innerHeight || 800);
+    if (elements.stage.width !== Math.floor(width * ratio)) {
+      elements.stage.width = Math.floor(width * ratio);
+      elements.stage.height = Math.floor(height * ratio);
+      elements.stage.style.width = width + "px";
+      elements.stage.style.height = height + "px";
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    }
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "#05060b";
+    ctx.beginPath();
+    ctx.rect(0, 0, width, height);
+    ctx.fill();
+
+    ctx.globalCompositeOperation = "lighter";
+    var cx = width * 0.5;
+    var cy = height * 0.5;
+    var outerR = Math.min(width, height) * 0.43;
+
+    // Concentric Gothic Rose rings
+    var radii = [0.22, 0.48, 0.74, 0.94, 1.0];
+    for (var r = 0; r < radii.length; r++) {
+      ctx.strokeStyle = r % 2 === 0 ? "#ffd47a" : "#79e2ff";
+      ctx.lineWidth = r === 4 ? 1.4 : 0.9;
+      ctx.globalAlpha = r === 4 ? 0.14 : 0.07;
+      ctx.beginPath();
+      ctx.arc(cx, cy, outerR * radii[r], 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // 24 radiating stained-glass petal lancets
+    var petals = 24;
+    for (var i = 0; i < petals; i++) {
+      var a0 = (i / petals) * Math.PI * 2;
+      var aMid = ((i + 0.5) / petals) * Math.PI * 2;
+      var a1 = ((i + 1) / petals) * Math.PI * 2;
+      ctx.strokeStyle = i % 2 === 0 ? "#ffd47a" : "#bcd0f0";
+      ctx.lineWidth = 0.85;
+      ctx.globalAlpha = 0.08;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a0) * outerR * 0.22, cy + Math.sin(a0) * outerR * 0.22);
+      ctx.quadraticCurveTo(
+        cx + Math.cos(aMid) * outerR * 1.04,
+        cy + Math.sin(aMid) * outerR * 1.04,
+        cx + Math.cos(a1) * outerR * 0.22,
+        cy + Math.sin(a1) * outerR * 0.22
+      );
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   var ARROW_STEP = 10; // seconds an arrow key travels
@@ -303,6 +420,13 @@ window.Bach = window.Bach || {};
     } else if (event.key === "p" || event.key === "P") {
       toggleGame();
       return;
+    } else if (event.key === "v" || event.key === "V") {
+      cycleLook();
+      return;
+    } else if (event.key >= "1" && event.key <= "6" && Bach.catalog) {
+      var pickLook = Bach.catalog[Number(event.key) - 1];
+      if (pickLook) switchLook(pickLook.name);
+      return;
     } else if (event.key === "Escape") {
       backToMenu();
       return;
@@ -331,6 +455,19 @@ window.Bach = window.Bach || {};
       });
       elements.pieces.appendChild(button);
     });
+    if (elements.views && Bach.catalog) {
+      Bach.catalog.forEach(function (entry) {
+        var btn = document.createElement("button");
+        btn.className = "view-btn";
+        btn.type = "button";
+        btn.textContent = entry.key + " · " + entry.label;
+        btn.LookName = entry.name;
+        btn.addEventListener("click", function () {
+          switchLook(entry.name);
+        });
+        elements.views.appendChild(btn);
+      });
+    }
   }
 
   elements.stop.addEventListener("click", backToMenu);
@@ -350,5 +487,6 @@ window.Bach = window.Bach || {};
   window.addEventListener("click", clicked);
 
   buildList();
+  drawPortalMandala();
   show("card");
 })(window.Bach);
