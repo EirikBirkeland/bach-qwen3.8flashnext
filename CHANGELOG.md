@@ -1,5 +1,17 @@
 # Releases
 
+## 0.7.0 — 2026-11-07
+
+Four live-switchable Baroque organ registrations, reed and mixture ranks (*Posaune 16′*, *Trompete 8′*, *Krummhorn 8′*, *Sesquialtera II*), and C/C# stereo pipe-chest spatialization.
+
+- **Four historic Baroque registrations (`R` key or `Stops` button).** While any piece plays or rests, the listener can cycle live between four Baroque organ registrations without losing their place in the score:
+  1. **Silbermann:** The classic cathedral principal chorus (*Principal 8′, Gedackt 8′, Voix céleste 8′, Octava 4′, Nassat 2 2/3′* on manuals; *Subbass 16′, Octavbass 8′, Mixtur 4′* on pedals).
+  2. **Organo Pleno:** Cathedral tutti adding *Trompete 8′* and *Mixtur 4′* on the manuals and the thunderous *Posaune 16′* reed in the pedals.
+  3. **Chorale Solo:** Singing solo registration with *Krummhorn 8′* and *Sesquialtera II* carrying the *cantus firmus* over a soft *Gedackt 8′* accompaniment.
+  4. **Positiv:** Crisp, transparent chamber-organ registration for nimble two- and three-part counterpoint.
+- **Ceiling-safe live re-registration.** Switching stops recalculates the piece's heaviest-chord ceiling on the fly and immediately re-voices held notes with the newly drawn stops, so no registration ever clips or reaches the limiter.
+- **C-side and C#-side stereo pipe-chest division.** When the browser supports `StereoPannerNode`, pipes are panned subtly left and right by pitch parity and register, matching the physical C and C# wind-chests of a Baroque organ *Prospekt*.
+
 ## 0.6.0 — 2026-11-07
 
 Six switchable sacred visualizations, Two-Part Invention No. 13 in A minor (BWV 784), Gothic cathedral geometry, and the Lutheran chorale verses (*Soli Deo Gloria*).
