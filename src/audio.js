@@ -71,6 +71,9 @@ window.Bach = window.Bach || {};
     octave: [1, 0.55, 0.4, 0.22, 0.12, 0.07, 0.04, 0.03],
     small: [1, 0.28, 0.14, 0.06, 0.02],
     wood: [1, 0.22, 0.1, 0.05, 0.02, 0.01],
+    reed: [1, 0.78, 0.62, 0.48, 0.36, 0.25, 0.16, 0.1],
+    krummhorn: [1, 0.18, 0.72, 0.14, 0.48, 0.09, 0.28, 0.05],
+    bright: [0.6, 1, 0.68, 0.44, 0.28, 0.16, 0.08],
   };
 
   // The ranks the instrument is built from. `cents` is how far apart two pipes
@@ -85,6 +88,10 @@ window.Bach = window.Bach || {};
     subbass: { name: "Subbass 16′", mix: "wood", cents: 2 },
     octavbass: { name: "Octavbass 8′", mix: "octave", cents: 3 },
     mixtur: { name: "Mixtur 4′", mix: "octave", cents: 7 },
+    trompete: { name: "Trompete 8′", mix: "reed", cents: 5 },
+    krummhorn: { name: "Krummhorn 8′", mix: "krummhorn", cents: 4 },
+    sesquialtera: { name: "Sesquialtera II", mix: "bright", cents: 5 },
+    posaune: { name: "Posaune 16′", mix: "reed", cents: 4 },
   };
 
   // Which stops are drawn for each kind of line. A note adds up its own pipes,
@@ -122,6 +129,110 @@ window.Bach = window.Bach || {};
       ],
     },
   };
+
+  // Four historic Baroque organ registrations the listener can cycle through live
+  // with the R key or the Stops button in the corner.
+  var PRESETS = [
+    {
+      key: "silbermann",
+      label: "Silbermann",
+      registration: REGISTRATION,
+    },
+    {
+      key: "pleno",
+      label: "Organo Pleno",
+      registration: {
+        melody: {
+          breath: 0.07,
+          stops: [
+            { rank: "principal", ratio: 1, level: 0.26 },
+            { rank: "trompete", ratio: 1, level: 0.18 },
+            { rank: "octava", ratio: 2, level: 0.15 },
+            { rank: "nassat", ratio: 3, level: 0.06, from: 52 },
+            { rank: "mixtur", ratio: 4, level: 0.08, from: 48 },
+          ],
+        },
+        inner: {
+          breath: 0.05,
+          stops: [
+            { rank: "principal", ratio: 1, level: 0.25 },
+            { rank: "gedackt", ratio: 1, level: 0.12 },
+            { rank: "octava", ratio: 2, level: 0.12 },
+            { rank: "mixtur", ratio: 4, level: 0.05, from: 50 },
+          ],
+        },
+        pedal: {
+          breath: 0.11,
+          stops: [
+            { rank: "subbass", ratio: 1, level: 0.3 },
+            { rank: "posaune", ratio: 1, level: 0.22 },
+            { rank: "octavbass", ratio: 2, level: 0.15 },
+            { rank: "mixtur", ratio: 4, level: 0.06 },
+          ],
+        },
+      },
+    },
+    {
+      key: "chorale",
+      label: "Chorale Solo",
+      registration: {
+        melody: {
+          breath: 0.05,
+          stops: [
+            { rank: "krummhorn", ratio: 1, level: 0.28 },
+            { rank: "gedackt", ratio: 1, level: 0.16 },
+            { rank: "sesquialtera", ratio: 2, level: 0.12, from: 48 },
+            { rank: "nassat", ratio: 3, level: 0.06, from: 52 },
+          ],
+        },
+        inner: {
+          breath: 0.04,
+          stops: [
+            { rank: "gedackt", ratio: 1, level: 0.24 },
+            { rank: "celeste", ratio: 1, level: 0.1, detune: 6, from: 50 },
+            { rank: "octava", ratio: 2, level: 0.08 },
+          ],
+        },
+        pedal: {
+          breath: 0.08,
+          stops: [
+            { rank: "subbass", ratio: 1, level: 0.36 },
+            { rank: "octavbass", ratio: 2, level: 0.12 },
+          ],
+        },
+      },
+    },
+    {
+      key: "positiv",
+      label: "Positiv",
+      registration: {
+        melody: {
+          breath: 0.06,
+          stops: [
+            { rank: "gedackt", ratio: 1, level: 0.24 },
+            { rank: "principal", ratio: 1, level: 0.18 },
+            { rank: "octava", ratio: 2, level: 0.16 },
+            { rank: "sesquialtera", ratio: 4, level: 0.07, from: 48 },
+          ],
+        },
+        inner: {
+          breath: 0.05,
+          stops: [
+            { rank: "gedackt", ratio: 1, level: 0.22 },
+            { rank: "octava", ratio: 2, level: 0.13 },
+          ],
+        },
+        pedal: {
+          breath: 0.08,
+          stops: [
+            { rank: "subbass", ratio: 1, level: 0.28 },
+            { rank: "octavbass", ratio: 2, level: 0.18 },
+            { rank: "mixtur", ratio: 4, level: 0.06 },
+          ],
+        },
+      },
+    },
+  ];
 
   var WAVE_VARIANTS = 4;
 
@@ -342,7 +453,8 @@ window.Bach = window.Bach || {};
    * piece, since no note there is high enough to call it. So the page can say
    * what the organ is doing.
    */
-  function stopsDrawn(notes) {
+  function stopsDrawn(notes, reg) {
+    var activeReg = reg || REGISTRATION;
     var highest = 0;
     var lines = {};
     for (var i = 0; i < notes.length; i++) {
@@ -356,7 +468,7 @@ window.Bach = window.Bach || {};
       for (var r = 0; r < group.roles.length; r++) {
         var role = group.roles[r];
         if (!lines[role]) continue;
-        var stops = stopsFor(REGISTRATION, role).stops;
+        var stops = stopsFor(activeReg, role).stops;
         for (var s = 0; s < stops.length; s++) {
           if (stops[s].from !== undefined && highest < stops[s].from) continue;
           var name = RANKS[stops[s].rank].name;
@@ -401,6 +513,7 @@ window.Bach = window.Bach || {};
     var offset = 0; // seconds into the piece when playback began
     var next = 0; // index of the next note to hand over
     var sounding = []; // everything running, so it can be shut off
+    var presetIndex = 0; // active registration preset index in PRESETS
 
     function build() {
       if (ctx) return;
@@ -504,7 +617,7 @@ window.Bach = window.Bach || {};
      * moment of a piece predictable; the pipes are never louder than the plan
      * says, only ever a little quieter.
      */
-    function pipe(freq, when, length, level, wave, cents) {
+    function pipe(freq, when, length, level, wave, cents, pitch) {
       var gain = ctx.createGain();
       var shape = envelope(when, length);
       var sustain = level * (0.9 + Math.random() * 0.1) * ENVELOPE.sagTo;
@@ -522,7 +635,17 @@ window.Bach = window.Bach || {};
       oscillator.start(when);
       oscillator.stop(shape.end);
 
-      gain.connect(tremulant);
+      // Subtle C-side / C#-side stereo pipe-chest spatialization when supported
+      if (typeof ctx.createStereoPanner === "function" && typeof pitch === "number") {
+        var panner = ctx.createStereoPanner();
+        var side = pitch % 2 === 0 ? -1 : 1;
+        var spread = 0.08 + 0.18 * Math.max(0, Math.min(1, (pitch - 36) / 48));
+        panner.pan.value = side * spread;
+        gain.connect(panner);
+        panner.connect(tremulant);
+      } else {
+        gain.connect(tremulant);
+      }
       sounding.push({ gain: gain, pipes: [oscillator], endsAt: shape.end });
     }
 
@@ -562,7 +685,8 @@ window.Bach = window.Bach || {};
           left,
           base * stop.level,
           voices[stop.rank][(index + i) % voices[stop.rank].length],
-          (stop.detune || 0) + (Math.random() * 2 - 1) * rank.cents
+          (stop.detune || 0) + (Math.random() * 2 - 1) * rank.cents,
+          note.pitch
         );
       }
       breath(when, base * drawn.breath);
@@ -677,6 +801,7 @@ window.Bach = window.Bach || {};
        * still fits.
        */
       prepare: function (data, roles, phrase) {
+        presetIndex = 0;
         var notes = toObjects(data, roles);
         var shades = Bach.dynamics
           ? Bach.dynamics(notes, { bars: data.bars, duration: data.duration, phrase: phrase })
@@ -687,12 +812,36 @@ window.Bach = window.Bach || {};
           notes: notes,
           busiest: widestChord(notes),
           registration: REGISTRATION,
-          stops: stopsDrawn(notes),
+          preset: PRESETS[0].label,
+          stops: stopsDrawn(notes, REGISTRATION),
           // A piece with only a couple of notes at a time is not played as if it
           // were a tutti, so the weight is never taken under MIN_CHORD.
           gain: CEILING / Math.max(MIN_CHORD, heaviest),
           duration: data.duration,
         };
+      },
+
+      /**
+       * Cycle to the next historic Baroque registration preset (or pick one by
+       * index), updating the active piece's registration, ceiling gain, and stop
+       * list without losing the player's place in the music.
+       */
+      cycleRegistration: function (targetPiece) {
+        presetIndex = (presetIndex + 1) % PRESETS.length;
+        var chosen = PRESETS[presetIndex];
+        var piece = targetPiece || playing;
+        if (piece) {
+          piece.registration = chosen.registration;
+          piece.preset = chosen.label;
+          piece.stops = stopsDrawn(piece.notes, chosen.registration);
+          var heaviest = heaviestChord(piece.notes, chosen.registration);
+          piece.gain = CEILING / Math.max(MIN_CHORD, heaviest);
+        }
+        return chosen;
+      },
+
+      presetName: function () {
+        return PRESETS[presetIndex].label;
       },
 
       /**
@@ -761,5 +910,6 @@ window.Bach = window.Bach || {};
     noteWeight: noteWeight,
     heaviestChord: heaviestChord,
     stopsDrawn: stopsDrawn,
+    presets: PRESETS,
   };
 })(window.Bach);

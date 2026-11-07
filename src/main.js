@@ -16,7 +16,7 @@ window.Bach = window.Bach || {};
   var state = "idle"; // idle, loading, playing, paused, done
 
   var elements = {};
-  ["card", "stage", "hud", "end", "pieces", "nowTitle", "nowTime", "stops", "voices", "lookHint", "pause", "restart", "stop", "again", "menu", "seek", "progress", "status", "endLine", "play", "score", "views"].forEach(
+  ["card", "stage", "hud", "end", "pieces", "nowTitle", "nowTime", "stops", "voices", "lookHint", "pause", "restart", "stop", "again", "menu", "seek", "progress", "status", "endLine", "play", "score", "views", "reg"].forEach(
     function (id) {
       elements[id] = document.getElementById(id);
     }
@@ -164,6 +164,7 @@ window.Bach = window.Bach || {};
         highlightView(activeLookName);
         elements.nowTitle.textContent = piece.title + " " + piece.subtitle;
         elements.stops.textContent = describeStops(prepared.stops);
+        if (elements.reg) elements.reg.textContent = "Stops: " + (prepared.preset || "Silbermann");
         elements.lookHint.textContent = look.hint || "";
         fillVoices(piece, data);
         elements.status.textContent = "";
@@ -194,6 +195,19 @@ window.Bach = window.Bach || {};
   function toggleGame() {
     game.toggle();
     describeGame();
+  }
+
+  /**
+   * Cycle through the historic Baroque registrations (Silbermann, Organo Pleno,
+   * Chorale Solo, Positiv) live while a piece plays or rests.
+   */
+  function cycleStops() {
+    if ((state !== "playing" && state !== "paused") || !prepared || typeof organ.cycleRegistration !== "function") return;
+    var at = organ.time();
+    organ.cycleRegistration(prepared);
+    elements.stops.textContent = describeStops(prepared.stops);
+    if (elements.reg) elements.reg.textContent = "Stops: " + (prepared.preset || "Silbermann");
+    if (state === "playing") organ.play(prepared, at);
   }
 
   function highlightView(name) {
@@ -420,6 +434,9 @@ window.Bach = window.Bach || {};
     } else if (event.key === "p" || event.key === "P") {
       toggleGame();
       return;
+    } else if (event.key === "r" || event.key === "R") {
+      cycleStops();
+      return;
     } else if (event.key === "v" || event.key === "V") {
       cycleLook();
       return;
@@ -472,6 +489,7 @@ window.Bach = window.Bach || {};
 
   elements.stop.addEventListener("click", backToMenu);
   elements.play.addEventListener("click", toggleGame);
+  if (elements.reg) elements.reg.addEventListener("click", cycleStops);
   elements.again.addEventListener("click", function () {
     start(current);
   });

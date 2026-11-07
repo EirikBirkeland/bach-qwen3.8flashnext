@@ -1641,3 +1641,34 @@ test("the listener can switch between all six sacred views while a piece plays",
   );
 });
 
+test("the listener can cycle through historic Baroque organ registrations live", async () => {
+  const page = openPage();
+  page.elements.pieces.children[0].click(); // BWV 565
+  await settled();
+  page.playFrames(30, 1 / 60);
+
+  assert.strictEqual(page.elements.reg.textContent, "Stops: Silbermann");
+  assert.match(page.elements.stops.textContent, /Principal 8′/);
+
+  // Press R to switch to Organo Pleno (Trompete 8' and Posaune 16')
+  page.press("r");
+  assert.strictEqual(page.elements.reg.textContent, "Stops: Organo Pleno");
+  assert.match(page.elements.stops.textContent, /Trompete 8′/);
+  assert.match(page.elements.stops.textContent, /Posaune 16′/);
+
+  // Click #reg to switch to Chorale Solo (Krummhorn 8' and Sesquialtera II)
+  page.elements.reg.click();
+  assert.strictEqual(page.elements.reg.textContent, "Stops: Chorale Solo");
+  assert.match(page.elements.stops.textContent, /Krummhorn 8′/);
+  assert.match(page.elements.stops.textContent, /Sesquialtera II/);
+
+  // Press R to switch to Positiv
+  page.press("R");
+  assert.strictEqual(page.elements.reg.textContent, "Stops: Positiv");
+
+  // Press R once more to return to Silbermann
+  page.press("r");
+  assert.strictEqual(page.elements.reg.textContent, "Stops: Silbermann");
+});
+
+
