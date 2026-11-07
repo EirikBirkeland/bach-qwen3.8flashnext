@@ -2,3 +2,4 @@ pi-run.log
 loop.log
 
 scratch/
+node_modules/
