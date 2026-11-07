@@ -2035,3 +2035,34 @@ Next, in order:
 3. Then the milestone's own two: say the size of the moment with light (`beat.bell` is already handed to
    the pictures), and the shared-drawing module - which now has a fourth thing to share: `lightOf`, the
    ceiling, and one thread per strip.
+
+---
+
+## Session 20 — 2026-11-07 — Soli Deo Gloria: AGENTS_ARGON, six switchable sacred views, BWV 784, Gothic cathedral geometry, and live Baroque registrations
+
+**Released 0.6.0 and 0.7.0.**
+
+What I did:
+
+- **Wrote `AGENTS_ARGON.md` (and synced `AGENTS.md`).** Diagnosed why Sessions 10–19 had stalled (the mock canvas in `test/page.test.mjs` and `test/screen.mjs` only implemented `ctx.fillRect`, forcing all visuals to be axis-aligned rectangles, and pixel-burn scripts penalized sacred radiance). Established mandatory Playwright screenshot verification and the *Soli Deo Gloria* architectural roadmap.
+- **Unlocked the full HTML5 Canvas 2D API in `test/page.test.mjs` and `test/screen.mjs`.** Added finite-coordinate checked support for `bezierCurveTo`, `quadraticCurveTo`, `arc`, `arcTo`, `ellipse`, `moveTo`, `lineTo`, `rect`, `stroke`, `fill`, `clip`, `save`, `restore`, `translate`, `rotate`, `scale`, `fillText`, `strokeText`, and `measureText`.
+- **Added Two-Part Invention No. 13 in A minor, BWV 784 (`PLAN.md`).** Fetched the public-domain Bach-Gesellschaft MIDI from Mutopia (`music/bwv784-invention-13-a-minor.mid`, recorded in `music/SOURCES.md`), converted all 564 notes / 25 bars into `data/bwv784-invention-13-a-minor.{json,js}`, and added it to `src/pieces.js`. `Bach.theme` finds the 9-note invention motive heard 5 times across both hands.
+- **Built two new sacred visualizations and upgraded the existing four (`0.6.0`):**
+  1. `src/look-prospekt.js` (*Prospekt*): A symmetrical 5-division Baroque pipe facade (Pedal Towers, Positiv/Oberwerk flats, central Hauptwerk tower, and clerestory Rose Oculus) where speaking pipes ignite from their gilded labia upward and pointed Gothic harmonic arches connect sounding intervals.
+  2. `src/look-cosmos.js` (*Cosmos — Harmonia Mundi*): A celestial astrolabe ordered by the Circle of Fifths (`C, G, D, A, E, B, F#, C#, Ab, Eb, Bb, F`) where active chords form translucent stained-glass polygons and voices trace orbital arcs.
+  3. `src/look-subject.js` (*Nave*): Added 3D-projected Gothic cathedral nave vault ribs, apse rose window, contrapuntal voice-leading arches at the line of sound, and Gothic shockwaves on Toccata chords.
+  4. `src/look-round.js` (*Rose — Rosa Mystica*): Added 16 pointed Gothic petal lancets, central rosette oculus, sustained circular note arcs, contrapuntal filigree, central harmonic chord web, and Roman-numeral Passacaglia variation inscriptions (`VARIATION I OF XX` … `THE DOUBLE FUGUE`).
+  5. `src/look-braid.js` (*Tapestry*): Added calligraphic voice-leading arches, vertical harmonic interval bridges at the line of sound, and the historic German and English Lutheran chorale verses of *"Ich ruf zu dir, Herr Jesu Christ"* synchronized phrase by phrase.
+  6. `src/look-vigil.js` (*Vigil*): Added perspective colonnade rays converging toward the Morning Star and Gothic watchtower arches at the horizon, inscribed with Philipp Nicolai's 1599 verses for *"Wachet auf, ruft uns die Stimme"*.
+- **Added the Live Visualization Switcher (`#views`, keys `1`–`6` and `V`) and Cathedral Portal (`J. J. · Soli Deo Gloria`).** Any piece can now be viewed through any of the six sacred visualizations at any moment.
+- **Added four live-switchable Baroque Organ Registrations (`0.7.0`, `R` key or `#reg` button) and C/C# stereo pipe-chest panning:**
+  - Added reed and mutation ranks (`Posaune 16′`, `Trompete 8′`, `Krummhorn 8′`, `Sesquialtera II`) and four historic presets in `src/audio.js`: *Silbermann*, *Organo Pleno*, *Chorale Solo*, and *Positiv*.
+  - Switching registrations recalculates `piece.gain` from `heaviestChord(notes, registration)` on the fly and immediately re-voices held notes.
+  - Fixed the missing glyph `Nassat 2⅔′` (`Nassat 2▯'`) by using `Nassat 2 2/3′`.
+- **Verified with Playwright screenshots and 297 passing tests (`node --test`).**
+
+What should come next:
+
+1. Automatic section-aware registration option (*Historical Auto* mode for BWV 582 and BWV 565 so the organ can also evolve its registration automatically across structural sections of the Passacaglia and Toccata/Fugue).
+2. Interactive harmonic/contrapuntal inspector or key/chord indicator in the HUD or *Cosmos*/*Prospekt* views showing the active triad/interval and fugue subject entry count.
+3. Deeper visual-audio synesthesia when playing along (sanctus waves rippling through the cathedral vaults and rose window petals on true strikes).
